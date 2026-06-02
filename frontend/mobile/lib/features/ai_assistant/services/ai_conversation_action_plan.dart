@@ -18,24 +18,40 @@ class AiCreateGroupActionPlan {
     );
   }
 
-  bool get isValid => groupName.isNotEmpty && memberNames.toSet().length >= 2;
+  List<String> get uniqueMemberNames {
+    final seen = <String>{};
+    final result = <String>[];
+    for (final name in memberNames) {
+      final normalized = _normalizeName(name);
+      if (normalized.isEmpty || seen.contains(normalized)) continue;
+      seen.add(normalized);
+      result.add(name.trim());
+    }
+    return result;
+  }
+
+  bool get isValid => groupName.isNotEmpty && uniqueMemberNames.length >= 2;
+
+  static String _normalizeName(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
 
   String get invalidMessage =>
-      'Trợ lý cần tên nhóm và ít nhất 2 thành viên khác ngoài bạn.';
+      'Tro ly can ten nhom va it nhat 2 thanh vien khac ngoai ban.';
 
   String duplicateMemberMessage(String name) =>
-      'Có nhiều người tên "$name". Hãy nói rõ họ tên.';
+      'Co nhieu nguoi ten "$name". Hay noi ro ho ten.';
 
   String missingMemberMessage(String name) =>
-      'Không tìm thấy "$name" trong danh bạ.';
+      'Khong tim thay "$name" trong danh ba.';
 
   String selectedMemberDetail(Iterable<User> users) {
     return users.map((user) => user.displayName).join(', ');
   }
 
-  String get cancelMessage => 'Đã hủy thao tác tạo nhóm.';
+  String get cancelMessage => 'Da huy thao tac tao nhom.';
 
-  String get successMessage => 'Đã tạo nhóm "$groupName".';
+  String get successMessage => 'Da tao nhom "$groupName".';
 }
 
 class AiMuteConversationActionPlan {
@@ -48,17 +64,20 @@ class AiMuteConversationActionPlan {
 
   String get title => muted ? 'Tắt thông báo' : 'Bật thông báo';
 
-  String get description => muted
-      ? 'Trợ lý sẽ tắt thông báo cho cuộc trò chuyện này.'
-      : 'Trợ lý sẽ bật lại thông báo cho cuộc trò chuyện này.';
+  String get description =>
+      muted
+          ? 'Trợ lý sẽ tắt thông báo cho cuộc trò chuyện này.'
+          : 'Trợ lý sẽ bật lại thông báo cho cuộc trò chuyện này.';
 
   String get confirmLabel => muted ? 'Tắt thông báo' : 'Bật thông báo';
 
-  String get cancelMessage => muted
-      ? 'Đã hủy thao tác tắt thông báo.'
-      : 'Đã hủy thao tác bật thông báo.';
+  String get cancelMessage =>
+      muted
+          ? 'Đã hủy thao tác tắt thông báo.'
+          : 'Đã hủy thao tác bật thông báo.';
 
-  String get successMessage => muted ? 'Đã tắt thông báo.' : 'Đã bật thông báo.';
+  String get successMessage =>
+      muted ? 'Đã tắt thông báo.' : 'Đã bật thông báo.';
 }
 
 class AiPinMessageActionPlan {
@@ -71,15 +90,17 @@ class AiPinMessageActionPlan {
   String get title =>
       pin ? 'Xác nhận ghim tin nhắn' : 'Xác nhận bỏ ghim tin nhắn';
 
-  String get description => pin
-      ? 'Trợ lý sẽ ghim tin nhắn trong cuộc trò chuyện hiện tại.'
-      : 'Trợ lý sẽ bỏ ghim tin nhắn trong cuộc trò chuyện hiện tại.';
+  String get description =>
+      pin
+          ? 'Trợ lý sẽ ghim tin nhắn trong cuộc trò chuyện hiện tại.'
+          : 'Trợ lý sẽ bỏ ghim tin nhắn trong cuộc trò chuyện hiện tại.';
 
   String get confirmLabel => pin ? 'Ghim' : 'Bỏ ghim';
 
-  String get cancelMessage => pin
-      ? 'Đã hủy thao tác ghim tin nhắn.'
-      : 'Đã hủy thao tác bỏ ghim tin nhắn.';
+  String get cancelMessage =>
+      pin
+          ? 'Đã hủy thao tác ghim tin nhắn.'
+          : 'Đã hủy thao tác bỏ ghim tin nhắn.';
 
   String get missingMessage =>
       'Không tìm thấy tin nhắn phù hợp để ghim/bỏ ghim.';

@@ -1413,7 +1413,8 @@ class MainShellState extends State<MainShell> {
       await contactProvider.fetchFriends();
     }
     final selectedUsers = <User>[];
-    for (final name in plan.memberNames) {
+    final selectedUserIds = <String>{};
+    for (final name in plan.uniqueMemberNames) {
       final matches = _findUsersByName(contactProvider.friends, name);
       if (matches.length != 1) {
         _showErrorSnackBar(
@@ -1423,7 +1424,21 @@ class MainShellState extends State<MainShell> {
         );
         return;
       }
-      selectedUsers.add(matches.first);
+      final selectedUser = matches.first;
+      if (!selectedUserIds.add(selectedUser.id)) {
+        _showErrorSnackBar(
+          'Tro ly can it nhat 2 thanh vien khac nhau de tao nhom.',
+        );
+        return;
+      }
+      selectedUsers.add(selectedUser);
+    }
+
+    if (selectedUsers.length < 2) {
+      _showErrorSnackBar(
+        'Tro ly can resolve it nhat 2 thanh vien khac nhau de tao nhom.',
+      );
+      return;
     }
 
     final confirmed = await _confirmAiAction(
