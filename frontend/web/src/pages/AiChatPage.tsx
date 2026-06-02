@@ -78,10 +78,15 @@ const isNetworkError = (error: unknown) => {
   return !maybeError.response && (Boolean(maybeError.request) || maybeError.code === 'ERR_NETWORK' || maybeError.message === 'Network Error')
 }
 
+function isRawHttpErrorMessage(message?: string | null) {
+  return /^request failed with status code \d{3}$/i.test((message ?? '').trim())
+}
+
 function resolveErrorPresentation(error: unknown): { message: string; providerStatus: ProviderStatus; degraded: boolean } {
   const response = isAxiosLikeError(error) ? error.response : undefined
   const status = response?.status ?? null
-  const extracted = extractMessage(response?.data) || extractMessage(error)
+  const extractedRaw = extractMessage(response?.data) || extractMessage(error)
+  const extracted = isRawHttpErrorMessage(extractedRaw) ? '' : extractedRaw
 
   if (status === 401) {
     return {
@@ -101,9 +106,9 @@ function resolveErrorPresentation(error: unknown): { message: string; providerSt
 
   if (status === 404) {
     return {
-      message: extracted || 'Đường dẫn AI trên máy chủ chưa sẵn sàng hoặc đang cấu hình sai. Vui lòng kiểm tra deploy gateway.',
+      message: extracted || 'Dịch vụ AI trên máy chủ chưa sẵn sàng hoặc đang cấu hình lại. Vui lòng thử lại sau ít phút.',
       providerStatus: null,
-      degraded: false,
+      degraded: true,
     }
   }
 
@@ -115,9 +120,9 @@ function resolveErrorPresentation(error: unknown): { message: string; providerSt
     }
   }
 
-  if (status === 503) {
+  if (status === 500 || status === 502 || status === 503 || status === 504) {
     return {
-      message: extracted || 'Nhà cung cấp AI hiện chưa sẵn sàng. Hãy thử lại sau ít phút.',
+      message: extracted || 'VNALO AI hiện đang bảo trì hoặc gặp bất tiện tạm thời. Bạn vui lòng thử lại sau ít phút.',
       providerStatus: 'AI_PROVIDER_UNAVAILABLE',
       degraded: true,
     }
@@ -238,10 +243,7 @@ const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
 
 function isStaleRawAiError(content: string) {
   const normalized = content.trim().toLowerCase()
-  return normalized === 'request failed with status code 403'
-    || normalized === 'request failed with status code 401'
-    || normalized === 'request failed with status code 404'
-    || normalized === 'request failed with status code 500'
+  return /^request failed with status code \d{3}$/.test(normalized)
 }
 
 function normalizeStoredMessages(payload: unknown): AiMessage[] {
@@ -646,6 +648,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         contextId: historyStorageKey ?? undefined,
         clientUserEntryId: buildClientEntryId('web-user'),
         clientAssistantEntryId: buildClientEntryId('web-assistant'),
+        clientPlatform: 'WEB',
       })
       const responseActionCommand = (aiResponse.actionCommand as AiActionCommand | undefined) ?? null
       const safeActionCommand = responseActionCommand && isKnownAiActionCommand(responseActionCommand) ? responseActionCommand : null

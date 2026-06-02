@@ -7,8 +7,10 @@ import iuh.cnm.vnalo.aiservice.dto.response.AiChatResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -107,6 +109,47 @@ class GeminiAiServiceTest {
         assertNotNull(response.getConversationId());
         assertTrue(response.getRequiresConfirmation());
         assertEquals("medium", response.getRiskLevel());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void webPlatformRequestAddsWebCapabilityPrompt() {
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "{\\\"textReply\\\":\\\"I can guide you manually.\\\",\\\"actionCommand\\\":null,\\\"emotion\\\":\\\"thinking\\\"}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+        ArgumentCaptor<HttpEntity<Map<String, Object>>> entityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), entityCaptor.capture(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("thu hoi tin nhan vua gui")
+                        .analyzeIntent(true)
+                        .clientPlatform("WEB")
+                        .history(List.of())
+                        .build()
+        );
+
+        Map<String, Object> payload = entityCaptor.getValue().getBody();
+        assertNotNull(payload);
+        Map<String, Object> systemInstruction = (Map<String, Object>) payload.get("systemInstruction");
+        List<Map<String, Object>> parts = (List<Map<String, Object>>) systemInstruction.get("parts");
+        String prompt = String.valueOf(parts.get(0).get("text"));
+        assertTrue(prompt.contains("PLATFORM ACTION CAPABILITIES - WEB"));
+        assertTrue(prompt.contains("khong tra actionCommand cho RECALL_MESSAGE"));
     }
 
     @Test
