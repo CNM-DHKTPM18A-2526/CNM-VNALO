@@ -18,10 +18,10 @@ class AiCreateGroupActionPlan {
     );
   }
 
-  bool get isValid => groupName.isNotEmpty && memberNames.isNotEmpty;
+  bool get isValid => groupName.isNotEmpty && memberNames.toSet().length >= 2;
 
   String get invalidMessage =>
-      'Trợ lý cần tên nhóm và ít nhất một thành viên.';
+      'Trợ lý cần tên nhóm và ít nhất 2 thành viên khác ngoài bạn.';
 
   String duplicateMemberMessage(String name) =>
       'Có nhiều người tên "$name". Hãy nói rõ họ tên.';
