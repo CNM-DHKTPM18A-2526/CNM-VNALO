@@ -43,3 +43,9 @@ Tài liệu này chuẩn hóa cách AI Assistant chuyển ý định người d�
 ## Parity cần duy trì
 - Web và mobile phải dùng cùng tên command, cùng key params chính: `target`, `recipient`, `content`, `groupName`, `memberNames`, `callType`.
 - Khi thêm action mới, bắt buộc cập nhật: prompt backend, web contract, mobile action plan/router, test validate thiếu/ambiguous target.
+
+## Hardening cập nhật
+- Mobile tạo nhóm phải dùng danh sách thành viên distinct sau normalize tên và sau khi resolve user ID.
+- Mobile không được tạo nhóm nếu resolve còn dưới 2 user khác nhau, kể cả khi AI trả về tên trùng lặp.
+- Web và mobile đều phải dừng action khi target ambiguous thay vì tự chọn ứng viên đầu tiên.
+
