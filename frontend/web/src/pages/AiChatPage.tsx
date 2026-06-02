@@ -20,6 +20,7 @@ import {
 import {
   extractActionTarget,
   extractCreateGroupIntentTargets,
+  buildUnsupportedActionIssue,
   resolveConversationAction,
   resolveCreateGroupAction,
   resolveFriendRequestAction,
@@ -328,12 +329,6 @@ function buildRiskLabel(risk: AiActionPreview['risk']) {
   return 'An toàn'
 }
 
-function buildActionRisk(command: AiActionCommand): AiActionPreview['risk'] {
-  if (HIGH_RISK_ACTION_COMMANDS.has(command)) return 'high'
-  if (command === 'CREATE_GROUP' || command === 'SEND_FRIEND_REQUEST' || command === 'START_CALL') return 'medium'
-  return 'low'
-}
-
 function resolveNavigatePath(command: AiActionCommand, params?: Record<string, unknown> | null) {
   if (command === 'NAVIGATE_TO_CHAT') return '/chat'
   if (command === 'NAVIGATE_TO_CONTACTS') return '/contacts'
@@ -345,6 +340,8 @@ function resolveNavigatePath(command: AiActionCommand, params?: Record<string, u
   if (page === 'chat') return '/chat'
   if (page === 'contacts') return '/contacts'
   if (page === 'profile' || page === 'settings') return '/profile'
+  if (page === 'scanner' || page === 'qr') return '/scanner'
+  if (page === 'timeline' || page === 'social') return '/timeline'
   return null
 }
 
@@ -363,77 +360,9 @@ const CONVERSATION_ACTION_COMMANDS = new Set<AiActionCommand>([
   'DISBAND_GROUP',
 ])
 
-const HIGH_RISK_ACTION_COMMANDS = new Set<AiActionCommand>([
-  'BLOCK_USER',
-  'UNBLOCK_USER',
-  'REMOVE_GROUP_MEMBER',
-  'TRANSFER_GROUP_OWNER',
-  'LEAVE_GROUP',
-  'DISBAND_GROUP',
-  'RECALL_MESSAGE',
-])
 
 function isConversationAction(command: AiActionCommand) {
   return CONVERSATION_ACTION_COMMANDS.has(command)
-}
-
-function buildActionLabel(command: AiActionCommand) {
-  switch (command) {
-    case 'OPEN_CHAT':
-      return 'Mở cuộc trò chuyện'
-    case 'COMPOSE_MESSAGE':
-      return 'Mở chat và điền nháp'
-    case 'OPEN_GROUP_SETTINGS':
-      return 'Mở cài đặt nhóm'
-    case 'START_CALL':
-      return 'Mở chat để gọi'
-    case 'RECALL_MESSAGE':
-      return 'Thu hồi tin nhắn'
-    case 'CREATE_GROUP':
-      return 'Tạo nhóm mới'
-    case 'MUTE_CONVERSATION':
-      return 'Tắt thông báo cuộc trò chuyện'
-    case 'UNMUTE_CONVERSATION':
-      return 'Bật lại thông báo cuộc trò chuyện'
-    case 'PIN_MESSAGE':
-      return 'Ghim tin nhắn'
-    case 'UNPIN_MESSAGE':
-      return 'Bỏ ghim tin nhắn'
-    case 'SEND_FRIEND_REQUEST':
-      return 'Gửi lời mời kết bạn'
-    case 'BLOCK_USER':
-      return 'Chặn người dùng'
-    case 'UNBLOCK_USER':
-      return 'Bỏ chặn người dùng'
-    case 'CHANGE_GROUP_NAME':
-      return 'Đổi tên nhóm'
-    case 'ADD_GROUP_MEMBER':
-      return 'Thêm thành viên'
-    case 'REMOVE_GROUP_MEMBER':
-      return 'Xóa thành viên'
-    case 'TRANSFER_GROUP_OWNER':
-      return 'Chuyển quyền trưởng nhóm'
-    case 'LEAVE_GROUP':
-      return 'Rời nhóm'
-    case 'DISBAND_GROUP':
-      return 'Giải tán nhóm'
-    case 'NAVIGATE_TO':
-      return 'Đi đến trang yêu cầu'
-    case 'NAVIGATE_TO_SETTINGS':
-      return 'Mở cài đặt'
-    case 'NAVIGATE_TO_CHAT':
-      return 'Đi đến Chat'
-    case 'NAVIGATE_TO_CONTACTS':
-      return 'Đi đến Danh bạ'
-    case 'NAVIGATE_TO_SCANNER':
-      return 'Mở trình quét'
-    case 'NAVIGATE_TO_TIMELINE':
-      return 'Mở nhật ký'
-    case 'OPEN_PROFILE':
-      return 'Mở hồ sơ'
-    default:
-      return 'Thực hiện thao tác'
-  }
 }
 
 function buildActionSuccessFeedback(command: AiActionCommand) {
@@ -445,7 +374,7 @@ function buildActionSuccessFeedback(command: AiActionCommand) {
     return 'Đã mở đúng cuộc trò chuyện và lưu nội dung nháp nếu AI có cung cấp. Hãy kiểm tra lại trước khi gửi.'
   }
 
-  if (HIGH_RISK_ACTION_COMMANDS.has(command)) {
+  if (getAiActionRisk(command) === 'high') {
     return 'Đã mở đúng cuộc trò chuyện. Hãy tự kiểm tra kỹ và xác nhận thủ công trước khi thực hiện thao tác nhạy cảm.'
   }
 
@@ -890,13 +819,14 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         return
       }
 
+      const unsupportedIssue = buildUnsupportedActionIssue(command)
       setPendingActionReview({
-        title: 'Web chưa hỗ trợ tự động thao tác này',
-        description: 'Trợ lý đã nhận ra ý định của bạn, nhưng web hiện chưa có executor an toàn cho thao tác này.',
-        confirmLabel: 'Mở Chat',
+        title: 'Thao tac can xu ly thu cong',
+        description: unsupportedIssue.message,
+        confirmLabel: 'Mo Chat',
         path: '/chat',
-        feedback: 'Đã mở Chat. Bạn có thể tiếp tục thủ công hoặc dùng mobile để thực hiện thao tác này.',
-        preview: { risk: 'medium', targetLabel: command },
+        feedback: 'Da mo Chat de ban tiep tuc thao tac thu cong mot cach an toan.',
+        preview: { risk: getAiActionRisk(command), targetLabel: getAiActionLabel(command) },
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
@@ -1187,7 +1117,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
                     onClick={() => void handleAction(message, index)}
                     disabled={isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null}
                   >
-                    {actionBusyIndex === index ? 'Đang xử lý...' : buildActionLabel(message.actionCommand)}
+                    {actionBusyIndex === index ? 'Đang xử lý...' : getAiActionLabel(message.actionCommand)}
                   </button>
                 </div>
               ) : null}
@@ -1278,7 +1208,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
               <div>
                 <h3 id='ai-resolution-title'>Chọn đúng cuộc trò chuyện</h3>
                 <p>Hãy xác nhận đúng đối tượng để tránh mở nhầm cuộc trò chuyện hoặc điền nháp sai người.</p>
-                {renderActionPreview({ risk: buildActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
+                {renderActionPreview({ risk: getAiActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
               </div>
               <button className='modal-close-btn' type='button' onClick={() => closePendingResolution('dismiss')} aria-label='Đóng'>
                 <X size={18} />

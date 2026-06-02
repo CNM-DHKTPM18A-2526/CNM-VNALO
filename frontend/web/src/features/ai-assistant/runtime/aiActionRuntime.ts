@@ -159,6 +159,8 @@ export function getLookupDisplayName(user: UserLookupResult) {
   return user.displayName?.trim() || user.phone?.trim() || user.email?.trim() || ''
 }
 
+const AMBIGUOUS_SCORE_DELTA = 24
+
 export function findBestMatches<T>(items: T[], target: string, getLabel: (item: T) => string): AiTargetMatch<T>[] {
   return items
     .map((value) => ({ value, score: computeTargetMatchScore(getLabel(value), target) }))
@@ -179,8 +181,8 @@ export function validateCreateGroupTargets(friends: Friend[], requestedTargets: 
       return
     }
     const bestScore = matches[0]?.score ?? -1
-    const sameBestMatches = matches.filter((item) => item.score === bestScore)
-    if (sameBestMatches.length > 1) {
+    const closeMatches = matches.filter((item) => bestScore - item.score <= AMBIGUOUS_SCORE_DELTA)
+    if (closeMatches.length > 1) {
       ambiguousTargets.push(target)
       return
     }
@@ -217,6 +219,10 @@ export function resolveCreateGroupAction(params: AiActionParams | null | undefin
     issues.push({ code: 'TARGET_AMBIGUOUS', message: `Có nhiều liên hệ khớp với ${validation.ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy nói rõ họ tên.`, targets: validation.ambiguousTargets })
   }
 
+  if (validation.memberIds.length < 2) {
+    issues.push({ code: 'NOT_ENOUGH_GROUP_MEMBERS', message: 'Can resolve fewer than 2 distinct friends for this group.', targets: memberNames })
+  }
+
   if (issues.length > 0) return { issues }
   return {
     issues: [],
@@ -240,9 +246,9 @@ export function resolveConversationAction(command: AiActionCommand, params: AiAc
     return { issues: [{ code: 'TARGET_NOT_FOUND', message: `Không tìm thấy "${target}" trong danh sách trò chuyện hoặc danh bạ.`, targets: [target] }] }
   }
   const bestScore = matches[0].score
-  const sameBestMatches = matches.filter((item) => item.score === bestScore)
-  if (sameBestMatches.length > 1) {
-    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Có nhiều cuộc trò chuyện khớp với "${target}". Hãy chọn thủ công để tránh nhầm.`, targets: [target] }] }
+  const closeMatches = matches.filter((item) => bestScore - item.score <= AMBIGUOUS_SCORE_DELTA)
+  if (closeMatches.length > 1) {
+    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Co nhieu cuoc tro chuyen khop voi "${target}". Hay chon thu cong de tranh nham.`, targets: [target] }] }
   }
 
   if (command === 'START_CALL' && matches[0].value.isGroup) {
@@ -267,9 +273,9 @@ export function resolveFriendRequestAction(params: AiActionParams | null | undef
     return { issues: [{ code: 'TARGET_NOT_FOUND', message: `Không tìm thấy người dùng "${target}".`, targets: [target] }] }
   }
   const bestScore = matches[0].score
-  const sameBestMatches = matches.filter((item) => item.score === bestScore)
-  if (sameBestMatches.length > 1) {
-    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Có nhiều người dùng khớp với "${target}". Hãy nói rõ hơn.`, targets: [target] }] }
+  const closeMatches = matches.filter((item) => bestScore - item.score <= AMBIGUOUS_SCORE_DELTA)
+  if (closeMatches.length > 1) {
+    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Co nhieu nguoi dung khop voi "${target}". Hay noi ro hon.`, targets: [target] }] }
   }
   return {
     issues: [],
