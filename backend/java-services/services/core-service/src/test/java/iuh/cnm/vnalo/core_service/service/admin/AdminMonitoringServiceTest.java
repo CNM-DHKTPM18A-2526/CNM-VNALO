@@ -100,10 +100,9 @@ class AdminMonitoringServiceTest {
         when(authSessionAuditRepository.countByEventTypeSince(eq("QR_LOGIN_APPROVED"), any(Instant.class))).thenReturn(2L);
         when(authOtpRepository.countByPurposeAndCreatedAtAfter(eq(OtpPurpose.REGISTER), any(Instant.class))).thenReturn(3L);
         when(authOtpRepository.countByPurposeAndCreatedAtAfter(eq(OtpPurpose.RESET_PASSWORD), any(Instant.class))).thenReturn(2L);
-        when(authOtpRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(7L);
-        when(authOtpRepository.countByVerifiedAtAfter(any(Instant.class))).thenReturn(4L);
-        when(aiChatHistoryRepository.countByCreatedAtAfter(any(OffsetDateTime.class))).thenReturn(7L);
-        when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("user"), any(OffsetDateTime.class))).thenReturn(2L);
+        when(authOtpRepository.countByVerifiedAtAfter(any(Instant.class))).thenReturn(5L);
+        when(aiChatHistoryRepository.countByCreatedAtAfter(any(OffsetDateTime.class))).thenReturn(9L);
+        when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("user"), any(OffsetDateTime.class))).thenReturn(4L);
         when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("assistant"), any(OffsetDateTime.class))).thenReturn(5L);
         when(aiChatHistoryRepository.countDistinctUsersSince(any(OffsetDateTime.class))).thenReturn(3L);
         when(authQrLoginSessionRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(6L);

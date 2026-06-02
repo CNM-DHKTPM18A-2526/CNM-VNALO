@@ -148,7 +148,12 @@ public class AdminMonitoringService {
 
         return authSessionAuditRepository.findMonitoringTrend(since, "hour", normalizedEventType, normalizedPlatform)
                 .stream()
-                .map(point -> new AdminMonitoringTrendPointResponse(point.getBucket(), point.getTotal(), point.getWarning(), point.getError()))
+                .map(point -> new AdminMonitoringTrendPointResponse(
+                        point.getBucket(),
+                        point.getTotal(),
+                        point.getWarning(),
+                        point.getError()
+                ))
                 .toList();
     }
 
