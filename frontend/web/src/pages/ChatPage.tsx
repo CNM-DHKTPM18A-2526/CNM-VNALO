@@ -325,6 +325,10 @@ const EMOJI_TO_REACTION_KEY = REACTION_OPTIONS.reduce<Record<string, ReactionKey
 const RESTRICTED_TEXT = 'Noi dung duoc an tren web do chinh sach dong bo.'
 const DELETE_FOR_ME_STORAGE_PREFIX = 'vnalo:chat:deleted-for-me:'
 
+function isAiAssistantConversationId(conversationId?: string | null): boolean {
+  return conversationId === AI_ASSISTANT_CONVERSATION_ID
+}
+
 function buildDeleteForMeStorageKey(userId?: string | null): string | null {
   const normalized = String(userId ?? '').trim()
   if (!normalized) {
@@ -961,6 +965,7 @@ export default function ChatPage() {
   const syncLatestMessages = useCallback(async (targetId?: string) => {
     const conversationId = targetId || selectedConversationIdRef.current
     if (!conversationId || !accessToken) return
+    if (isAiAssistantConversationId(conversationId)) return
 
     // Don't poll for conversations that are no longer in our list (ghost groups)
     if (!targetId && !conversationsRef.current.some(c => c.id === conversationId)) {
@@ -1237,6 +1242,7 @@ export default function ChatPage() {
 
   const syncConversationReactions = useCallback(async () => {
     if (!selectedConversationIdRef.current || !accessToken) return
+    if (isAiAssistantConversationId(selectedConversationIdRef.current)) return
 
     // Limit to only 10 latest messages for initial sync to avoid network flood
     const messageIds = selectedMessagesRef.current
@@ -1255,6 +1261,7 @@ export default function ChatPage() {
   const loadPinnedMessages = useCallback(
     async (conversationId: string) => {
       if (!accessToken || !conversationId) return
+      if (isAiAssistantConversationId(conversationId)) return
 
       // Hard guard: avoid double/simultaneous calls for same conversation
       if (loadingPinnedRef.current[conversationId]) return
@@ -1327,6 +1334,7 @@ export default function ChatPage() {
 
   const syncConversationMetadata = useCallback(async (conversationId: string) => {
     if (!accessToken) return;
+    if (isAiAssistantConversationId(conversationId)) return;
     try {
       const data = await fetchConversation(accessToken, conversationId) as any;
       if (!data) return;
@@ -1365,6 +1373,7 @@ export default function ChatPage() {
   // Fail-Safe Heartbeat: Ensure active conversation settings are always fresh
   useEffect(() => {
     if (!accessToken || !selectedConversationId || !isSocketConnected) return;
+    if (isAiAssistantConversationId(selectedConversationId)) return;
 
     // Only poll if the conversation exists in our list to avoid 404 noise
     // (Wait for inbox to load first)
@@ -1389,7 +1398,10 @@ export default function ChatPage() {
 
       // AUTO-JOIN ALL CONVERSATIONS ON CONNECT
       if (conversationsRef.current.length > 0) {
-        const conversationIds = conversationsRef.current.map(c => c.id);
+        const conversationIds = conversationsRef.current
+          .map(c => c.id)
+          .filter((conversationId) => !isAiAssistantConversationId(conversationId));
+        if (conversationIds.length === 0) return;
         console.log('[ChatPage] Auto-joining', conversationIds.length, 'conversations on connect');
         void joinMultipleConversations(conversationIds);
       }
@@ -2012,7 +2024,8 @@ export default function ChatPage() {
     if (!isSocketConnected) return
     if (!conversations || conversations.length === 0) return
 
-    const ids = conversations.map(c => c.id)
+    const ids = conversations.map(c => c.id).filter(id => !isAiAssistantConversationId(id))
+    if (ids.length === 0) return
     console.log('[ChatPage] Auto-joining conversations after inbox load:', ids.length)
     void joinMultipleConversations(ids)
   }, [accessToken, isSocketConnected, conversations, joinMultipleConversations])
@@ -3979,6 +3992,11 @@ export default function ChatPage() {
       return
     }
 
+    if (isAiAssistantConversationId(conversationId)) {
+      setIsLoadingMessages(false)
+      return
+    }
+
     const loadKey = `${conversationId}:${isRestrictedMode ? 'restricted' : 'full'}`
     if (lastLoadedMessagesKeyRef.current === loadKey) {
       return
@@ -4152,7 +4170,9 @@ export default function ChatPage() {
 
 
   const joinAllConversations = useCallback(async (list: ConversationSummary[]) => {
-    const conversationIds = list.map((conversation) => conversation.id)
+    const conversationIds = list
+      .map((conversation) => conversation.id)
+      .filter((conversationId) => !isAiAssistantConversationId(conversationId))
 
     if (conversationIds.length === 0) {
       return
@@ -4309,6 +4329,10 @@ export default function ChatPage() {
       return
     }
 
+    if (isAiAssistantConversationId(activeConversationId)) {
+      return
+    }
+
     const convMessages = messagesByConversation[activeConversationId] || []
     const latestSeq = convMessages.at(-1)?.serverSeq
 
@@ -4327,6 +4351,10 @@ export default function ChatPage() {
   }, [accessToken, markAsRead, messagesByConversation, routedConversationId, selectedConversationId])
   useEffect(() => {
     if (!accessToken || !selectedConversationId) {
+      return
+    }
+
+    if (isAiAssistantConversationId(selectedConversationId)) {
       return
     }
 
@@ -5793,6 +5821,11 @@ function PinnedLogicHooks({
       return;
     }
 
+    if (isAiAssistantConversationId(selectedConversationId)) {
+      console.log('[PinnedLogicHooks.effect] Skipping pinned fetch for AI assistant conversation');
+      return;
+    }
+
     // Avoid re-fetching same conversation (Double Guard)
     if (lastConvRef.current === selectedConversationId) {
       console.log('[PinnedLogicHooks.effect] Skipping pinned fetch - same conversation');
@@ -5861,9 +5894,6 @@ function PinnedLogicHooks({
 
   return null;
 }
-
-
-
 
 
 

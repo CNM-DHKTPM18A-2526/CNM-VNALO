@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mic, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react'
+import { Copy, Mic, Paperclip, Reply, RotateCcw, Send, Share2, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
@@ -1029,6 +1029,43 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     ])
   }
 
+  const handleCopyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard?.writeText(content)
+      setActionFeedback({ tone: 'success', message: 'Đã sao chép tin nhắn.' })
+    } catch {
+      setActionFeedback({ tone: 'error', message: 'Không thể sao chép tin nhắn trên trình duyệt hiện tại.' })
+    }
+  }
+
+  const handleShareMessage = async (message: AiMessage) => {
+    const text = message.content.trim()
+    if (!text) return
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, title: 'VNALO AI Assistant' })
+        return
+      }
+
+      await navigator.clipboard?.writeText(text)
+      setActionFeedback({ tone: 'success', message: 'Trình duyệt chưa hỗ trợ chia sẻ trực tiếp, nội dung đã được sao chép.' })
+    } catch (error) {
+      if ((error as { name?: string })?.name === 'AbortError') return
+      setActionFeedback({ tone: 'error', message: 'Không thể chia sẻ tin nhắn. Vui lòng thử lại.' })
+    }
+  }
+
+  const handleReplyToMessage = (message: AiMessage) => {
+    const preview = getAiMessagePreview(message)
+    setInputValue((current) => {
+      const existing = current.trim()
+      const quoted = `Trả lời: "${preview}"\n`
+      return existing ? `${quoted}${existing}` : quoted
+    })
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
   return (
     <div className={embedded ? 'ai-chat-layout ai-chat-layout-embedded' : 'ai-chat-layout'}>
       {!embedded ? <aside className='ai-chat-sidebar'>
@@ -1110,9 +1147,19 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
               className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'} data-role={message.role}
             >
               <div className='ai-message-action-toolbar' aria-label='Thao tác tin nhắn'>
-                <button type='button' className='ai-message-action-btn' onClick={() => void navigator.clipboard?.writeText(message.content)} title='Copy tin nhắn'>Copy</button>
+                <button type='button' className='ai-message-action-btn' onClick={() => handleReplyToMessage(message)} title='Trả lời tin nhắn' aria-label='Trả lời tin nhắn'>
+                  <Reply size={14} />
+                </button>
+                <button type='button' className='ai-message-action-btn' onClick={() => void handleShareMessage(message)} title='Chia sẻ tin nhắn' aria-label='Chia sẻ tin nhắn'>
+                  <Share2 size={14} />
+                </button>
+                <button type='button' className='ai-message-action-btn' onClick={() => void handleCopyMessage(message.content)} title='Sao chép tin nhắn' aria-label='Sao chép tin nhắn'>
+                  <Copy size={14} />
+                </button>
                 {message.role === 'assistant' && message.degraded && retryPrompt ? (
-                  <button type='button' className='ai-message-action-btn' onClick={handleRetry} disabled={isAssistantBusy}>Thử lại</button>
+                  <button type='button' className='ai-message-action-btn' onClick={handleRetry} disabled={isAssistantBusy} title='Thử lại' aria-label='Thử lại'>
+                    <RotateCcw size={14} />
+                  </button>
                 ) : null}
               </div>
               <p className='ai-message-text'>{message.content}</p>

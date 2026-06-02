@@ -5114,15 +5114,17 @@
 }
 
 .ai-message-action-btn {
-  min-height: 28px;
-  padding: 0 8px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: var(--shadow-sm);
 }
 
@@ -5130,6 +5132,11 @@
   color: var(--primary);
   border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
   background: var(--surface-hover);
+}
+
+.ai-message-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 @media (max-width: 640px) {
