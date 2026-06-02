@@ -115,7 +115,14 @@ public class AdminMonitoringService {
     }
 
     @Transactional(readOnly = true)
-    public AdminMonitoringEventPageResponse getRecentEvents(UUID requesterId, Integer limit, Integer page, Integer windowHours, String eventType, String platform) {
+    public AdminMonitoringEventPageResponse getRecentEvents(
+            UUID requesterId,
+            Integer limit,
+            Integer page,
+            Integer windowHours,
+            String eventType,
+            String platform
+    ) {
         assertMonitoringAccess(requesterId);
         int safeLimit = limit == null ? DEFAULT_EVENT_LIMIT : Math.max(1, Math.min(limit, MAX_EVENT_LIMIT));
         int safePage = page == null ? 0 : Math.max(0, page);
@@ -140,15 +147,24 @@ public class AdminMonitoringService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminMonitoringTrendPointResponse> getEventTrend(UUID requesterId, Integer windowHours, String eventType, String platform) {
+    public List<AdminMonitoringTrendPointResponse> getEventTrend(
+            UUID requesterId,
+            Integer windowHours,
+            String eventType,
+            String platform
+    ) {
         assertMonitoringAccess(requesterId);
         Instant since = resolveSince(windowHours, Instant.now());
         String normalizedEventType = normalizeOptionalFilter(eventType, true);
         String normalizedPlatform = normalizeOptionalFilter(platform, true);
 
         return authSessionAuditRepository.findMonitoringTrend(since, "hour", normalizedEventType, normalizedPlatform)
-                .stream()
-                .map(point -> new AdminMonitoringTrendPointResponse(point.getBucket(), point.getTotal(), point.getWarning(), point.getError()))
+                .map(point -> new AdminMonitoringTrendPointResponse(
+                        point.getBucket(),
+                        point.getTotal(),
+                        point.getWarning(),
+                        point.getError()
+                ))
                 .toList();
     }
 
@@ -174,7 +190,9 @@ public class AdminMonitoringService {
     }
 
     private Instant resolveSince(Integer windowHours, Instant now) {
-        int safeWindowHours = windowHours == null ? DEFAULT_WINDOW_HOURS : Math.max(MIN_WINDOW_HOURS, Math.min(windowHours, MAX_WINDOW_HOURS));
+        int safeWindowHours = windowHours == null
+                ? DEFAULT_WINDOW_HOURS
+                : Math.max(MIN_WINDOW_HOURS, Math.min(windowHours, MAX_WINDOW_HOURS));
         return now.minusSeconds(safeWindowHours * 60L * 60L);
     }
 

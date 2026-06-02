@@ -10,7 +10,7 @@ import { QrLoginPage } from './pages/QrLoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LegalPage } from './pages/LegalPage'
-import { AdminMonitoringPage } from './pages/AdminMonitoringPage'
+import { AdminDashboardPage } from './features/analytics/AdminDashboardPage'
 import ChatPage from './pages/ChatPage'
 import CallPage from './pages/CallPage'
 import { ContactsPage } from './pages/ContactsPage'
@@ -51,7 +51,7 @@ function App() {
             <Route path='profile' element={<ProfilePage />} />
             <Route path='chat-ai' element={<Navigate replace to='/chat/vnalo-ai-assistant' />} />
             <Route path='social' element={<SocialPage />} />
-
+            <Route path='admin/monitoring' element={<AdminDashboardPage />} />
             <Route path='stories/create' element={<CreateStoryPage />} />
             <Route path='stories/:storyId' element={<StoryViewerPage />} />
           </Route>
