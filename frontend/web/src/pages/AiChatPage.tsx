@@ -809,10 +809,10 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         }
 
         setPendingActionReview({
-          title: 'X?c nh?n t?o nh?m',
-          description: `Tr? l? s? t?o nh?m "${resolution.groupName}" v?i ${resolution.memberLabels.join(', ')}. B?n v?n c? th? h?y n?u danh s?ch ch?a ??ng.`,
-          confirmLabel: 'T?o nh?m',
-          feedback: `?? t?o nh?m "${resolution.groupName}".`,
+          title: 'Xac nhan tao nhom',
+          description: `Tro ly se tao nhom "${resolution.groupName}" voi ${resolution.memberLabels.join(', ')}. Ban van co the huy neu danh sach chua dung.`,
+          confirmLabel: 'Tao nhom',
+          feedback: `Da tao nhom "${resolution.groupName}".`,
           preview: { risk: 'medium', targetLabel: resolution.groupName, draft: resolution.memberLabels.join(', ') },
           execute: async () => {
             const conversationId = await createGroupConversation(accessToken, {
@@ -828,7 +828,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       if (command === 'SEND_FRIEND_REQUEST') {
         const target = extractActionTarget(params)
         if (!target) {
-          const messageText = 'M?nh ch?a x?c ??nh ???c ng??i c?n k?t b?n. H?y n?i r? t?n, email ho?c s? ?i?n tho?i.'
+          const messageText = 'Minh chua xac dinh duoc nguoi can ket ban. Hay noi ro ten, email hoac so dien thoai.'
           setActionFeedback({ tone: 'warning', message: messageText })
           appendAssistantFeedback(messageText)
           return
@@ -844,10 +844,10 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         }
 
         setPendingActionReview({
-          title: 'X?c nh?n g?i k?t b?n',
-          description: `Tr? l? s? g?i l?i m?i k?t b?n t?i ${resolution.targetLabel}.`,
-          confirmLabel: 'G?i k?t b?n',
-          feedback: `?? g?i l?i m?i k?t b?n t?i ${resolution.targetLabel}.`,
+          title: 'Xac nhan gui ket ban',
+          description: `Tro ly se gui loi moi ket ban toi ${resolution.targetLabel}.`,
+          confirmLabel: 'Gui ket ban',
+          feedback: `Da gui loi moi ket ban toi ${resolution.targetLabel}.`,
           preview: { risk: 'medium', targetLabel: resolution.targetLabel, draft: resolution.message },
           execute: async () => {
             await sendFriendRequest(accessToken, {
@@ -863,7 +863,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         const target = extractActionTarget(params)
         if (!target) {
           navigate('/chat')
-          const messageText = 'M?nh ch?a x?c ??nh ???c ng??i nh?n ho?c cu?c tr? chuy?n c? th?, n?n ?? m? Chat ?? b?n t? ch?n th? c?ng.'
+          const messageText = 'Minh chua xac dinh duoc nguoi nhan hoac cuoc tro chuyen cu the, nen da mo Chat de ban tu chon thu cong.'
           setActionFeedback({ tone: 'info', message: messageText })
           appendAssistantFeedback(messageText)
           return
