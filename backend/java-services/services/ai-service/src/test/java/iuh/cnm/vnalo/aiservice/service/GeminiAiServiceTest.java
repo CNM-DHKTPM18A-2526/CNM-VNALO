@@ -7,8 +7,10 @@ import iuh.cnm.vnalo.aiservice.dto.response.AiChatResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -110,6 +112,85 @@ class GeminiAiServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void webPlatformRequestAddsWebCapabilityPrompt() {
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "{\\\"textReply\\\":\\\"I can guide you manually.\\\",\\\"actionCommand\\\":null,\\\"emotion\\\":\\\"thinking\\\"}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+        ArgumentCaptor<HttpEntity<Map<String, Object>>> entityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), entityCaptor.capture(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("thu hoi tin nhan vua gui")
+                        .analyzeIntent(true)
+                        .clientPlatform("WEB")
+                        .history(List.of())
+                        .build()
+        );
+
+        Map<String, Object> payload = entityCaptor.getValue().getBody();
+        assertNotNull(payload);
+        Map<String, Object> systemInstruction = (Map<String, Object>) payload.get("systemInstruction");
+        List<Map<String, Object>> parts = (List<Map<String, Object>>) systemInstruction.get("parts");
+        String prompt = String.valueOf(parts.get(0).get("text"));
+        assertTrue(prompt.contains("PLATFORM ACTION CAPABILITIES - WEB"));
+        assertTrue(prompt.contains("RECALL_MESSAGE, PIN_MESSAGE, UNPIN_MESSAGE"));
+        assertTrue(prompt.contains("khong tra actionCommand cho MUTE_CONVERSATION"));
+    }
+
+    @Test
+    void webPlatformRequestBlocksUnsupportedCommandEvenIfModelReturnsIt() {
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "{\\\"textReply\\\":\\\"I will mute it.\\\",\\\"actionCommand\\\":\\\"MUTE_CONVERSATION\\\",\\\"actionParams\\\":{\\\"target\\\":\\\"Nhom 1\\\"},\\\"emotion\\\":\\\"thinking\\\"}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("tat thong bao Nhom 1")
+                        .analyzeIntent(true)
+                        .clientPlatform("WEB")
+                        .history(List.of())
+                        .build()
+        );
+
+        assertNull(response.getActionCommand());
+        assertNull(response.getActionParams());
+        assertFalse(response.getRequiresConfirmation());
+        assertEquals("low", response.getRiskLevel());
+        assertTrue(response.getTextReply().contains("thao tac thu cong"));
+    }
+
+    @Test
     void interactWithGemini_acceptsGroupManagementCommands() {
         String responseJson = """
                 {
@@ -143,6 +224,52 @@ class GeminiAiServiceTest {
         assertEquals(List.of("An", "Binh"), response.getActionParams().get("memberNames"));
         assertTrue(response.getRequiresConfirmation());
         assertEquals("medium", response.getRiskLevel());
+    }
+
+    @Test
+    void interactWithGemini_blocksCreateGroupWithFewerThanTwoDistinctMembers() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        String rawReply = objectMapper.writeValueAsString(Map.of(
+                "textReply", "I will create the group.",
+                "actionCommand", "CREATE_GROUP",
+                "actionParams", Map.of(
+                        "groupName", "Nhom test",
+                        "memberNames", List.of("An", " an ")
+                ),
+                "emotion", "thinking"
+        ));
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": %s
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """.formatted(objectMapper.writeValueAsString(rawReply));
+
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("Create group with An")
+                        .analyzeIntent(true)
+                        .build()
+        );
+
+        assertNull(response.getActionCommand());
+        assertNull(response.getActionParams());
+        assertFalse(response.getTextReply().toLowerCase().contains("create the group"));
+        assertFalse(response.getRequiresConfirmation());
+        assertEquals("low", response.getRiskLevel());
     }
 
     @Test

@@ -38,6 +38,10 @@ public class AiChatRequest {
     // Deep Alignment: Sync mascot preference
     private String mascotId;
 
+    // Optional: WEB, MOBILE, DESKTOP. Used to constrain action capabilities safely.
+    @Size(max = 24, message = "Client platform cannot exceed 24 characters")
+    private String clientPlatform;
+
     // Stable client-generated ids for idempotent mobile history sync.
     @Size(max = 100, message = "Client user entry id cannot exceed 100 characters")
     private String clientUserEntryId;

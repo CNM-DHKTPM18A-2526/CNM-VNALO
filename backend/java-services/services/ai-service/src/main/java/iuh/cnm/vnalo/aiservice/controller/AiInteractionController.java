@@ -129,12 +129,21 @@ public class AiInteractionController {
 
         String prompt = normalizeIntentText(request.getPrompt());
         if (looksLikeCallIntent(prompt)) {
+            String target = extractCallTarget(prompt);
+            if (target == null || target.isBlank()) {
+                fallback.setTextReply("AI dang gap su co va minh chua xac dinh duoc nguoi can goi. Ban hay noi ro ten nguoi trong danh ba de minh chuan bi buoc xac nhan goi.");
+                return fallback;
+            }
+
             Map<String, Object> params = new HashMap<>();
+            params.put("target", target);
             params.put("callType", isVideoCallIntent(prompt) ? "video" : "voice");
 
             fallback.setActionCommand("START_CALL");
             fallback.setActionParams(params);
-            fallback.setTextReply("AI dang gap su co, nhung minh van co the bat dau cuoc goi cho ban.");
+            fallback.setRequiresConfirmation(true);
+            fallback.setRiskLevel("medium");
+            fallback.setTextReply("AI dang gap su co, nhung minh co the chuan bi buoc xac nhan goi cho " + target + ".");
         }
 
         return fallback;
@@ -159,6 +168,25 @@ public class AiInteractionController {
                 || prompt.contains("cam");
     }
 
+    private String extractCallTarget(String prompt) {
+        String target = prompt
+                .replaceFirst("^(hay\\s+)?(goi|call|phone|dien\\s+thoai|cuoc\\s+goi)(\\s+(video|voice|thoai|dien))?\\s+(cho|toi|den|with|to|for)\\s+", "")
+                .replaceFirst("^(hay\\s+)?(goi|call|phone)(\\s+(video|voice|thoai|dien))?\\s+", "")
+                .replaceAll("\\s+(giup\\s+minh|giup\\s+toi|nhe|voi|please)$", "")
+                .trim();
+
+        if (target.isBlank()
+                || target.equals("ban")
+                || target.equals("toi")
+                || target.equals("minh")
+                || target.equals("this friend")
+                || target.equals("friend")
+                || target.equals("nguoi nay")) {
+            return null;
+        }
+        return target;
+    }
+
     private String normalizeIntentText(String input) {
         if (input == null || input.isBlank()) {
             return "";
@@ -167,7 +195,7 @@ public class AiInteractionController {
         String normalized = Normalizer.normalize(input.toLowerCase(Locale.ROOT), Normalizer.Form.NFD);
         return DIACRITICS_PATTERN.matcher(normalized)
                 .replaceAll("")
-                .replace('đ', 'd')
-                .replace('Đ', 'D');
+                .replace('\u0111', 'd')
+                .replace('\u0110', 'D');
     }
 }

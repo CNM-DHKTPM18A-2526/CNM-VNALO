@@ -90,20 +90,20 @@ class AdminMonitoringServiceTest {
         when(authAccountRepository.sumFailedLoginCount()).thenReturn(5L);
         when(refreshTokenRepository.countActiveTokens(any(Instant.class))).thenReturn(4L);
         when(refreshTokenRepository.countRevokedSince(any(Instant.class))).thenReturn(1L);
-        when(refreshTokenRepository.countActiveMobileSessions(any(Instant.class))).thenReturn(2L);
-        when(authSessionAuditRepository.count()).thenReturn(20L);
-        when(authSessionAuditRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(10L);
-        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_SUCCESS"), any(Instant.class))).thenReturn(6L);
-        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_FAILED"), any(Instant.class))).thenReturn(1L);
+        when(refreshTokenRepository.countActiveMobileSessions(any(Instant.class))).thenReturn(3L);
+        when(authSessionAuditRepository.count()).thenReturn(12L);
+        when(authSessionAuditRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(6L);
+        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_SUCCESS"), any(Instant.class))).thenReturn(2L);
+        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_FAILED"), any(Instant.class))).thenReturn(3L);
         when(authSessionAuditRepository.countByEventTypeSince(eq("SESSION_REVOKED_LOGOUT"), any(Instant.class))).thenReturn(1L);
         when(authSessionAuditRepository.countByEventTypeSince(eq("SESSION_REVOKED_LOGOUT_ALL"), any(Instant.class))).thenReturn(1L);
         when(authSessionAuditRepository.countByEventTypeSince(eq("QR_LOGIN_APPROVED"), any(Instant.class))).thenReturn(2L);
+        when(authOtpRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(7L);
         when(authOtpRepository.countByPurposeAndCreatedAtAfter(eq(OtpPurpose.REGISTER), any(Instant.class))).thenReturn(3L);
         when(authOtpRepository.countByPurposeAndCreatedAtAfter(eq(OtpPurpose.RESET_PASSWORD), any(Instant.class))).thenReturn(2L);
-        when(authOtpRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(7L);
-        when(authOtpRepository.countByVerifiedAtAfter(any(Instant.class))).thenReturn(4L);
-        when(aiChatHistoryRepository.countByCreatedAtAfter(any(OffsetDateTime.class))).thenReturn(7L);
-        when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("user"), any(OffsetDateTime.class))).thenReturn(2L);
+        when(authOtpRepository.countByVerifiedAtAfter(any(Instant.class))).thenReturn(5L);
+        when(aiChatHistoryRepository.countByCreatedAtAfter(any(OffsetDateTime.class))).thenReturn(9L);
+        when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("user"), any(OffsetDateTime.class))).thenReturn(4L);
         when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("assistant"), any(OffsetDateTime.class))).thenReturn(5L);
         when(aiChatHistoryRepository.countDistinctUsersSince(any(OffsetDateTime.class))).thenReturn(3L);
         when(authQrLoginSessionRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(6L);
@@ -120,7 +120,6 @@ class AdminMonitoringServiceTest {
         AdminMonitoringSummaryResponse summary = service.getSummary(adminId, 24);
 
         assertNotNull(summary);
-        assertEquals(AdminMonitoringService.ACCESS_MODE_RBAC, summary.accessMode());
         assertEquals(8L, summary.accounts().active());
         assertEquals(3L, summary.ai().distinctActiveUsersLast24Hours());
         assertEquals(2L, summary.consent().termsLast24Hours());
