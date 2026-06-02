@@ -104,6 +104,7 @@ public class GeminiAiService {
             // Call Gemini with key rotation when quota/rate-limit is hit.
             ResponseEntity<String> response = exchangeGeminiWithRotation(url, payload);
             responseObj = parseGeminiResponse(response.getBody(), request.isAnalyzeIntent());
+            enforcePlatformActionCapabilities(responseObj, request.getClientPlatform());
             answer = responseObj.getTextReply();
         } catch (Exception geminiEx) {
             log.warn("Gemini failed in GeminiAiService ({}), falling back to Ollama...", geminiEx.getMessage());
@@ -118,6 +119,7 @@ public class GeminiAiService {
 
                 String ollamaAnswer = ollamaProvider.generate(dynamicSystemPrompt, historyMessages);
                 responseObj = parseFallbackResponse(ollamaAnswer, request.isAnalyzeIntent());
+                enforcePlatformActionCapabilities(responseObj, request.getClientPlatform());
                 answer = responseObj.getTextReply();
                 provider = "ollama";
             } catch (Exception ollamaEx) {
@@ -212,6 +214,32 @@ public class GeminiAiService {
         return sb.toString();
     }
 
+    private void enforcePlatformActionCapabilities(AiChatResponse response, String clientPlatform) {
+        if (response == null || response.getActionCommand() == null || response.getActionCommand().isBlank()) {
+            return;
+        }
+        String platform = clientPlatform == null ? "" : clientPlatform.trim().toUpperCase(Locale.ROOT);
+        if (!"WEB".equals(platform)) {
+            return;
+        }
+        String command = normalizeActionAlias(response.getActionCommand().trim().toUpperCase(Locale.ROOT));
+        if (isWebExecutableAction(command)) {
+            response.setActionCommand(command);
+            return;
+        }
+        log.warn("Blocked action command '{}' because clientPlatform=WEB does not support a safe executor yet", command);
+        blockActionCommand(response, command);
+    }
+
+    private boolean isWebExecutableAction(String command) {
+        return switch (command) {
+            case "OPEN_CHAT", "COMPOSE_MESSAGE", "START_CALL", "CREATE_GROUP", "SEND_FRIEND_REQUEST",
+                    "RECALL_MESSAGE", "PIN_MESSAGE", "UNPIN_MESSAGE", "OPEN_GROUP_SETTINGS", "NAVIGATE_TO", "NAVIGATE_TO_CHAT",
+                    "NAVIGATE_TO_CONTACTS", "NAVIGATE_TO_SETTINGS", "NAVIGATE_TO_SCANNER", "NAVIGATE_TO_TIMELINE" -> true;
+            default -> false;
+        };
+    }
+
     private void appendPlatformCapabilityPrompt(StringBuilder sb, String clientPlatform) {
         String platform = clientPlatform == null ? "" : clientPlatform.trim().toUpperCase(Locale.ROOT);
         if (!"WEB".equals(platform)) {
@@ -219,8 +247,8 @@ public class GeminiAiService {
         }
 
         sb.append("\n\n## PLATFORM ACTION CAPABILITIES - WEB");
-        sb.append("\n- Web chi duoc tra actionCommand cho: OPEN_CHAT, COMPOSE_MESSAGE, START_CALL, CREATE_GROUP, SEND_FRIEND_REQUEST, NAVIGATE_TO, NAVIGATE_TO_CHAT, NAVIGATE_TO_CONTACTS, NAVIGATE_TO_SETTINGS, NAVIGATE_TO_SCANNER, NAVIGATE_TO_TIMELINE.");
-        sb.append("\n- Tren web, khong tra actionCommand cho RECALL_MESSAGE, PIN_MESSAGE, UNPIN_MESSAGE, MUTE_CONVERSATION, UNMUTE_CONVERSATION, BLOCK_USER, UNBLOCK_USER, CHANGE_GROUP_NAME, ADD_GROUP_MEMBER, REMOVE_GROUP_MEMBER, TRANSFER_GROUP_OWNER, LEAVE_GROUP, DISBAND_GROUP vi chua co executor an toan.");
+        sb.append("\n- Web chi duoc tra actionCommand cho: OPEN_CHAT, COMPOSE_MESSAGE, START_CALL, CREATE_GROUP, SEND_FRIEND_REQUEST, OPEN_GROUP_SETTINGS, RECALL_MESSAGE, PIN_MESSAGE, UNPIN_MESSAGE, NAVIGATE_TO, NAVIGATE_TO_CHAT, NAVIGATE_TO_CONTACTS, NAVIGATE_TO_SETTINGS, NAVIGATE_TO_SCANNER, NAVIGATE_TO_TIMELINE.");
+        sb.append("\n- Tren web, khong tra actionCommand cho MUTE_CONVERSATION, UNMUTE_CONVERSATION, BLOCK_USER, UNBLOCK_USER, CHANGE_GROUP_NAME, ADD_GROUP_MEMBER, REMOVE_GROUP_MEMBER, TRANSFER_GROUP_OWNER, LEAVE_GROUP, DISBAND_GROUP vi chua co executor an toan.");
         sb.append("\n- Neu nguoi dung yeu cau action web chua ho tro, hay tra loi huong dan thao tac thu cong ngan gon va dat actionCommand null.");
         sb.append("\n- Tuyet doi khong noi rang da thuc hien thanh cong action neu client web chua xac nhan hoac executor chua hoan tat.");
     }

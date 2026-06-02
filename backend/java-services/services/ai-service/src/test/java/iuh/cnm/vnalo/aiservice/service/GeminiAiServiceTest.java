@@ -149,7 +149,45 @@ class GeminiAiServiceTest {
         List<Map<String, Object>> parts = (List<Map<String, Object>>) systemInstruction.get("parts");
         String prompt = String.valueOf(parts.get(0).get("text"));
         assertTrue(prompt.contains("PLATFORM ACTION CAPABILITIES - WEB"));
-        assertTrue(prompt.contains("khong tra actionCommand cho RECALL_MESSAGE"));
+        assertTrue(prompt.contains("RECALL_MESSAGE, PIN_MESSAGE, UNPIN_MESSAGE"));
+        assertTrue(prompt.contains("khong tra actionCommand cho MUTE_CONVERSATION"));
+    }
+
+    @Test
+    void webPlatformRequestBlocksUnsupportedCommandEvenIfModelReturnsIt() {
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "{\\\"textReply\\\":\\\"I will mute it.\\\",\\\"actionCommand\\\":\\\"MUTE_CONVERSATION\\\",\\\"actionParams\\\":{\\\"target\\\":\\\"Nhom 1\\\"},\\\"emotion\\\":\\\"thinking\\\"}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("tat thong bao Nhom 1")
+                        .analyzeIntent(true)
+                        .clientPlatform("WEB")
+                        .history(List.of())
+                        .build()
+        );
+
+        assertNull(response.getActionCommand());
+        assertNull(response.getActionParams());
+        assertFalse(response.getRequiresConfirmation());
+        assertEquals("low", response.getRiskLevel());
+        assertTrue(response.getTextReply().contains("thao tac thu cong"));
     }
 
     @Test

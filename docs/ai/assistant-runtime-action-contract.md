@@ -1,4 +1,4 @@
-﻿# VNALO AI Agent Runtime Action Contract
+# VNALO AI Agent Runtime Action Contract
 
 ## Mục tiêu
 Tài liệu này chuẩn hóa cách AI Assistant chuyển ý định người dùng thành thao tác an toàn trên VNALO. AI không tự thực thi trực tiếp dữ liệu nhạy cảm; AI chỉ trả về `actionCommand` và `actionParams`, client sẽ validate, resolve target, yêu cầu xác nhận và mới gọi API.
@@ -19,8 +19,8 @@ Tài liệu này chuẩn hóa cách AI Assistant chuyển ý định người d�
 | `START_CALL` | Target là hội thoại 1-1, không phải nhóm | Medium | Mở chat/flow xác nhận | Mở màn hình call sau xác nhận |
 | `CREATE_GROUP` | Có tên nhóm + ít nhất 2 thành viên khác ngoài creator, tất cả là bạn bè | Medium | Confirm + gọi API tạo nhóm | Confirm + gọi API tạo nhóm |
 | `SEND_FRIEND_REQUEST` | Target resolve duy nhất qua search user | Medium | Confirm + gửi lời mời | Confirm + gửi lời mời |
-| `RECALL_MESSAGE` | Có tin nhắn mới nhất của chính user, đủ điều kiện thu hồi | High | Chưa execute trực tiếp | Confirm + recall |
-| `PIN_MESSAGE`/`UNPIN_MESSAGE` | Có message hợp lệ và đủ quyền | Medium | Chưa execute trực tiếp | Confirm + pin/unpin |
+| `RECALL_MESSAGE` | Có tin nhắn mới nhất của chính user, đủ điều kiện thu hồi | High | Confirm + recall latest eligible own message | Confirm + recall |
+| `PIN_MESSAGE`/`UNPIN_MESSAGE` | Có message/pin hợp lệ và đủ quyền | Medium | Confirm + pin/unpin latest eligible message | Confirm + pin/unpin |
 | `MUTE_CONVERSATION`/`UNMUTE_CONVERSATION` | Có conversation hợp lệ | Low | Chưa execute trực tiếp | Confirm + execute nếu có provider |
 | Group admin actions | Có nhóm, role đủ quyền, target rõ ràng | High | Flow thủ công | Confirm + execute tùy handler |
 
@@ -51,4 +51,4 @@ Tài liệu này chuẩn hóa cách AI Assistant chuyển ý định người d�
 
 - AI service phải reject CREATE_GROUP nếu memberNames sau normalize/dedupe còn dưới 2 tên distinct.
 
-- Web không được coi việc mở chat là thực thi thành công cho `MUTE/UNMUTE`, `PIN/UNPIN`, `RECALL` hoặc group-admin actions khi chưa có executor thật.
+- Web không được coi việc mở chat là thực thi thành công cho `MUTE/UNMUTE` hoặc group-admin actions khi chưa có executor thật. `RECALL`, `PIN` và `UNPIN` hiện phải đi qua executor thật và bước xác nhận.

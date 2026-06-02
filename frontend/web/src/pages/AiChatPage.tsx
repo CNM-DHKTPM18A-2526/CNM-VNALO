@@ -5,7 +5,7 @@ import { Copy, Mic, Paperclip, Reply, RotateCcw, Send, Share2, Sparkles, Trash2,
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
 import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
-import { createGroupConversation, fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
+import { createGroupConversation, fetchInbox, fetchMessages, fetchPinnedMessages, pinMessage, recallMessage, sendAiChatMessage, unpinMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
 import { getFriends, searchUsers, sendFriendRequest } from '../features/friends/friends.api'
 import { UserAvatar } from '../shared/components/UserAvatar'
@@ -352,6 +352,9 @@ const CONVERSATION_ACTION_COMMANDS = new Set<AiActionCommand>([
   'COMPOSE_MESSAGE',
   'START_CALL',
   'OPEN_GROUP_SETTINGS',
+  'RECALL_MESSAGE',
+  'PIN_MESSAGE',
+  'UNPIN_MESSAGE',
 ])
 
 
@@ -359,6 +362,14 @@ function isConversationAction(command: AiActionCommand) {
   return CONVERSATION_ACTION_COMMANDS.has(command)
 }
 
+function isRecallCandidate(message: { senderId?: string; from?: string; status?: string | null; recalledAt?: string | null; recalled_at?: string | null }, userId?: string | null) {
+  const senderId = String(message.senderId ?? message.from ?? '').trim()
+  return Boolean(userId && senderId === userId && message.status !== 'RECALLED' && !message.recalledAt && !message.recalled_at)
+}
+
+function isPinCandidate(message: { id?: string; messageType?: string | null; status?: string | null; recalledAt?: string | null; recalled_at?: string | null }) {
+  return Boolean(message.id && message.messageType !== 'system' && message.messageType !== 'SYSTEM' && message.status !== 'RECALLED' && !message.recalledAt && !message.recalled_at)
+}
 function buildActionSuccessFeedback(command: AiActionCommand) {
   if (command === 'START_CALL') {
     return 'Đã mở đúng cuộc trò chuyện. Hãy bấm nút gọi để xác nhận cuộc gọi trên web.'
@@ -783,6 +794,94 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         return
       }
 
+      if (command === 'RECALL_MESSAGE' || command === 'PIN_MESSAGE' || command === 'UNPIN_MESSAGE') {
+        const target = extractActionTarget(params)
+        if (!target) {
+          const messageText = 'Mình cần biết cuộc trò chuyện nào để thực hiện thao tác tin nhắn an toàn.'
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const inbox = await fetchInbox(accessToken, user?.id)
+        const { resolution, issues } = resolveConversationAction(command, params, inbox)
+        if (!resolution) {
+          const messageText = issues.map((issue) => issue.message).join(' ')
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const conversation = resolution.conversation
+        const rawMessages = await fetchMessages(accessToken, conversation.id, true)
+        if (command === 'RECALL_MESSAGE') {
+          const candidate = [...rawMessages].reverse().find((item) => isRecallCandidate(item, user?.id))
+          if (!candidate?.id) {
+            const messageText = 'Không tìm thấy tin nhắn gần nhất của bạn đủ điều kiện thu hồi trong cuộc trò chuyện này.'
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
+          }
+
+          setPendingActionReview({
+            title: 'Xác nhận thu hồi tin nhắn',
+            description: 'Trợ lý sẽ thu hồi tin nhắn gần nhất của bạn trong ' + conversation.name + '. Thao tác này có thể ảnh hưởng đến tất cả người trong cuộc trò chuyện.',
+            confirmLabel: 'Thu hồi tin nhắn',
+            feedback: 'Đã thu hồi tin nhắn gần nhất của bạn trong ' + conversation.name + '.',
+            preview: { risk: 'high', targetLabel: conversation.name, draft: candidate.content ?? undefined },
+            execute: async () => {
+              await recallMessage(accessToken, candidate.id)
+              window.dispatchEvent(new CustomEvent('vnalo:ai-action-message-updated', { detail: { conversationId: conversation.id, messageId: candidate.id, action: 'RECALL_MESSAGE' } }))
+            },
+          })
+          return
+        }
+
+        if (command === 'PIN_MESSAGE') {
+          const candidate = [...rawMessages].reverse().find(isPinCandidate)
+          if (!candidate?.id) {
+            const messageText = 'Không tìm thấy tin nhắn phù hợp để ghim trong cuộc trò chuyện này.'
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
+          }
+
+          setPendingActionReview({
+            title: 'Xác nhận ghim tin nhắn',
+            description: 'Trợ lý sẽ ghim tin nhắn gần nhất phù hợp trong ' + conversation.name + '.',
+            confirmLabel: 'Ghim tin nhắn',
+            feedback: 'Đã ghim tin nhắn trong ' + conversation.name + '.',
+            preview: { risk: 'medium', targetLabel: conversation.name, draft: candidate.content ?? undefined },
+            execute: async () => {
+              await pinMessage(accessToken, conversation.id, candidate.id)
+              window.dispatchEvent(new CustomEvent('vnalo:ai-action-message-updated', { detail: { conversationId: conversation.id, messageId: candidate.id, action: 'PIN_MESSAGE' } }))
+            },
+          })
+          return
+        }
+
+        const pinnedMessages = await fetchPinnedMessages(accessToken, conversation.id)
+        const candidatePin = [...pinnedMessages].reverse().find((item) => item.messageId)
+        if (!candidatePin?.messageId) {
+          const messageText = 'Cuộc trò chuyện này hiện chưa có tin nhắn ghim phù hợp để bỏ ghim.'
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        setPendingActionReview({
+          title: 'Xác nhận bỏ ghim tin nhắn',
+          description: 'Trợ lý sẽ bỏ ghim tin nhắn ghim gần nhất trong ' + conversation.name + '.',
+          confirmLabel: 'Bỏ ghim',
+          feedback: 'Đã bỏ ghim tin nhắn trong ' + conversation.name + '.',
+          preview: { risk: 'medium', targetLabel: conversation.name },
+          execute: async () => {
+            await unpinMessage(accessToken, conversation.id, candidatePin.messageId)
+            window.dispatchEvent(new CustomEvent('vnalo:ai-action-message-updated', { detail: { conversationId: conversation.id, messageId: candidatePin.messageId, action: 'UNPIN_MESSAGE' } }))
+          },
+        })
+        return
+      }
       if (isConversationAction(command)) {
         const target = extractActionTarget(params)
         if (!target) {

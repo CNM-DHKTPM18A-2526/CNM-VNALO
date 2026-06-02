@@ -1,4 +1,4 @@
-﻿export type AiActionCommand =
+export type AiActionCommand =
   | 'OPEN_CHAT'
   | 'COMPOSE_MESSAGE'
   | 'START_CALL'
@@ -52,12 +52,12 @@ export const AI_ACTION_DEFINITIONS: Record<AiActionCommand, AiActionDefinition> 
   OPEN_CHAT: { command: 'OPEN_CHAT', label: 'Mở cuộc trò chuyện', risk: 'low', capability: 'navigate', requiresConfirmation: false },
   COMPOSE_MESSAGE: { command: 'COMPOSE_MESSAGE', label: 'Mở chat và điền nháp', risk: 'low', capability: 'execute', requiresConfirmation: false },
   START_CALL: { command: 'START_CALL', label: 'Chuẩn bị cuộc gọi', risk: 'medium', capability: 'review', requiresConfirmation: true },
-  RECALL_MESSAGE: { command: 'RECALL_MESSAGE', label: 'Thu hồi tin nhắn', risk: 'high', capability: 'unsupported', requiresConfirmation: true, destructive: true },
+  RECALL_MESSAGE: { command: 'RECALL_MESSAGE', label: 'Thu hồi tin nhắn', risk: 'high', capability: 'execute', requiresConfirmation: true, destructive: true },
   CREATE_GROUP: { command: 'CREATE_GROUP', label: 'Tạo nhóm mới', risk: 'medium', capability: 'execute', requiresConfirmation: true, minGroupMembers: 2 },
   MUTE_CONVERSATION: { command: 'MUTE_CONVERSATION', label: 'Tắt thông báo cuộc trò chuyện', risk: 'low', capability: 'unsupported', requiresConfirmation: true },
   UNMUTE_CONVERSATION: { command: 'UNMUTE_CONVERSATION', label: 'Bật lại thông báo cuộc trò chuyện', risk: 'low', capability: 'unsupported', requiresConfirmation: true },
-  PIN_MESSAGE: { command: 'PIN_MESSAGE', label: 'Ghim tin nhắn', risk: 'medium', capability: 'unsupported', requiresConfirmation: true },
-  UNPIN_MESSAGE: { command: 'UNPIN_MESSAGE', label: 'Bỏ ghim tin nhắn', risk: 'medium', capability: 'unsupported', requiresConfirmation: true },
+  PIN_MESSAGE: { command: 'PIN_MESSAGE', label: 'Ghim tin nhắn', risk: 'medium', capability: 'execute', requiresConfirmation: true },
+  UNPIN_MESSAGE: { command: 'UNPIN_MESSAGE', label: 'Bỏ ghim tin nhắn', risk: 'medium', capability: 'execute', requiresConfirmation: true },
   OPEN_GROUP_SETTINGS: { command: 'OPEN_GROUP_SETTINGS', label: 'Mở cài đặt nhóm', risk: 'medium', capability: 'navigate', requiresConfirmation: false },
   OPEN_PROFILE: { command: 'OPEN_PROFILE', label: 'Mở hồ sơ', risk: 'low', capability: 'navigate', requiresConfirmation: false },
   SEND_FRIEND_REQUEST: { command: 'SEND_FRIEND_REQUEST', label: 'Gửi lời mời kết bạn', risk: 'medium', capability: 'execute', requiresConfirmation: true },
