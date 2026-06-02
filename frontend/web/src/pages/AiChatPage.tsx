@@ -154,6 +154,8 @@ const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const AI_HISTORY_UPDATED_EVENT = 'vnalo:ai-history-updated'
+const AI_PENDING_UPDATED_EVENT = 'vnalo:ai-pending-updated'
+const AI_PENDING_KEY_PREFIX = 'vnalo_ai_chat_pending:'
 const MAX_API_HISTORY = 20
 
 const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
@@ -213,6 +215,18 @@ function buildAiStorageKey(userId?: string | number | null) {
     return null
   }
   return `${STORAGE_KEY}:${userId}`
+}
+
+function buildAiPendingKey(userId?: string | number | null) {
+  if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
+    return null
+  }
+  return `${AI_PENDING_KEY_PREFIX}${userId}`
+}
+
+function readAiPending(key: string | null) {
+  if (!key) return false
+  return localStorage.getItem(key) === 'true'
 }
 
 const PRESET_PROMPTS = [
@@ -577,9 +591,11 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
   const { recordActivity: recordAiAssistantActivity, resetMeta: resetAiAssistantMeta } = useAiAssistant()
   const navigate = useNavigate()
   const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
+  const pendingStorageKey = useMemo(() => buildAiPendingKey(user?.id as string | number | undefined), [user?.id])
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isPersistentPending, setIsPersistentPending] = useState(() => readAiPending(pendingStorageKey))
   const [actionBusyIndex, setActionBusyIndex] = useState<number | null>(null)
   const [activeActionLabel, setActiveActionLabel] = useState<string>('')
   const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState | null>(null)
@@ -635,6 +651,36 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       setMessages([INITIAL_ASSISTANT_MESSAGE])
     }
   }, [historyStorageKey])
+
+  useEffect(() => {
+    setIsPersistentPending(readAiPending(pendingStorageKey))
+  }, [pendingStorageKey])
+
+  useEffect(() => {
+    if (!pendingStorageKey) return
+
+    const handlePendingUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; pending?: boolean }>).detail
+      if (detail?.key !== pendingStorageKey) return
+      setIsPersistentPending(Boolean(detail.pending))
+    }
+
+    window.addEventListener(AI_PENDING_UPDATED_EVENT, handlePendingUpdated)
+    return () => window.removeEventListener(AI_PENDING_UPDATED_EVENT, handlePendingUpdated)
+  }, [pendingStorageKey])
+
+  const persistPending = (pending: boolean) => {
+    if (!pendingStorageKey) return
+    if (pending) {
+      localStorage.setItem(pendingStorageKey, 'true')
+    } else {
+      localStorage.removeItem(pendingStorageKey)
+    }
+    setIsPersistentPending(pending)
+    window.dispatchEvent(new CustomEvent(AI_PENDING_UPDATED_EVENT, {
+      detail: { key: pendingStorageKey, pending },
+    }))
+  }
 
   useEffect(() => {
     if (!historyStorageKey) return
@@ -708,10 +754,11 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     }
 
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
-  }, [messages, isLoading, actionFeedback])
+  }, [messages, isLoading, isPersistentPending, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
-  const isAssistantBusy = isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null
+  const showTypingIndicator = isLoading || isPersistentPending
+  const isAssistantBusy = showTypingIndicator || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null
 
   useEffect(() => {
     const input = inputRef.current
@@ -755,6 +802,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     setActionFeedback(null)
     inFlightRequestRef.current = true
     setIsLoading(true)
+    persistPending(true)
 
     try {
       const apiHistory = updatedMessages.slice(-MAX_API_HISTORY).map((message) => ({
@@ -777,13 +825,12 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         actionParams: aiResponse.actionParams ?? null,
       }
 
-        setMessages((currentMessages) => {
-          const baseMessages = currentMessages.some((message) => message.role === 'user' && message.content === query)
-            ? currentMessages
-            : updatedMessages
-          return persistMessages([...baseMessages, assistantMessage])
-        })
-        setRetryPrompt('')
+      const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
+        ? messages
+        : updatedMessages
+      const persisted = persistMessages([...baseMessages, assistantMessage])
+      setMessages(persisted)
+      setRetryPrompt('')
     } catch (error) {
       console.error('AI chat failed:', error)
       const errorPresentation = resolveErrorPresentation(error)
@@ -796,13 +843,13 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         providerStatus: errorPresentation.providerStatus,
       }
 
-        setMessages((currentMessages) => {
-          const baseMessages = currentMessages.some((message) => message.role === 'user' && message.content === query)
-            ? currentMessages
-            : updatedMessages
-          return persistMessages([...baseMessages, errorMessage])
-        })
+      const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
+        ? messages
+        : updatedMessages
+      const persisted = persistMessages([...baseMessages, errorMessage])
+      setMessages(persisted)
     } finally {
+      persistPending(false)
       if (!isUnmountedRef.current) {
         inFlightRequestRef.current = false
         setIsLoading(false)
@@ -1208,7 +1255,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
               <div className='ai-message-time'>{message.timestamp}</div>
             </div>
           ))}
-          {isLoading && (
+          {showTypingIndicator && (
             <div className='ai-typing-indicator'>
               <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} đang được chuẩn bị` : 'Trợ lý AI đang soạn phản hồi'}</span>
               <div className='ai-typing-dot' />
