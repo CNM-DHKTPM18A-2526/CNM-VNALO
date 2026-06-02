@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
 import {
@@ -490,6 +490,7 @@ export default function ChatPage() {
   const currentUserId = user?.id || ''
   const { t } = useLanguage()
   const navigate = useNavigate()
+  const location = useLocation()
   const { conversationId: conversationIdFromUrl } = useParams<{ conversationId?: string }>()
   const routedConversationId = conversationIdFromUrl ?? ''
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
@@ -3935,6 +3936,16 @@ export default function ChatPage() {
     setPreselectedMemberIds([]);
     setIsCreateGroupOpen(true)
   }, [])
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search)
+    if (searchParams.get('createGroup') !== 'true') return
+
+    handleOpenCreateGroupModal()
+    searchParams.delete('createGroup')
+    const nextSearch = searchParams.toString()
+    navigate({ pathname: '/chat', search: nextSearch ? `?${nextSearch}` : '' }, { replace: true })
+  }, [handleOpenCreateGroupModal, location.search, navigate])
 
   const handleCreateGroupFromDirect = useCallback(() => {
     if (selectedConversation && !selectedConversation.isGroup) {

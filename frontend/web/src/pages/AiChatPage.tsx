@@ -7,6 +7,8 @@ import { useAuth } from '../features/auth/useAuth'
 import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
 import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
+import { getFriends } from '../features/friends/friends.api'
+import type { Friend } from '../features/friends/friends.types'
 import { UserAvatar } from '../shared/components/UserAvatar'
 
 type ProviderStatus =
@@ -410,6 +412,44 @@ function extractActionTarget(params?: Record<string, unknown> | null) {
     params.name ??
     ''
   return String(raw).trim()
+}
+
+function extractGroupTargets(params?: Record<string, unknown> | null) {
+  if (!params) return []
+  const rawCandidates = [
+    params.members,
+    params.memberNames,
+    params.participants,
+    params.participantNames,
+    params.users,
+    params.userNames,
+    params.recipients,
+    params.recipientNames,
+    params.contacts,
+    params.contactNames,
+    params.target,
+  ]
+
+  return rawCandidates.flatMap((raw) => {
+    if (!raw) return []
+    if (Array.isArray(raw)) return raw.map((item) => String(item).trim())
+    return String(raw)
+      .split(/[,;\n]|\s+và\s+|\s+and\s+/i)
+      .map((item) => item.trim())
+  }).filter(Boolean)
+}
+
+function getFriendDisplayName(friend: Friend) {
+  return friend.nickname?.trim() || friend.displayName?.trim() || ''
+}
+
+function findFriendMatches(friends: Friend[], target: string) {
+  const normalizedTarget = normalizeLookupText(target)
+  if (!normalizedTarget) return []
+  return friends
+    .map((friend) => ({ friend, score: computeConversationMatchScore(getFriendDisplayName(friend), normalizedTarget) }))
+    .filter((item) => item.score >= 0)
+    .sort((left, right) => right.score - left.score)
 }
 
 function extractComposeContent(params?: Record<string, unknown> | null) {
@@ -881,13 +921,52 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       }
 
       if (command === 'CREATE_GROUP') {
+        const requestedTargets = extractGroupTargets(params)
+        const groupName = String(params.title ?? params.groupName ?? params.name ?? '').trim()
+
+        if (requestedTargets.length > 0) {
+          const friends = await getFriends(accessToken)
+          const missingTargets: string[] = []
+          const ambiguousTargets: string[] = []
+
+          requestedTargets.forEach((target) => {
+            const matches = findFriendMatches(friends, target)
+            if (matches.length === 0) {
+              missingTargets.push(target)
+              return
+            }
+
+            const bestScore = matches[0]?.score ?? -1
+            const sameBestMatches = matches.filter((item) => item.score === bestScore)
+            if (sameBestMatches.length > 1) {
+              ambiguousTargets.push(target)
+            }
+          })
+
+          if (missingTargets.length > 0) {
+            const messageText = `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không mở tạo nhóm để tránh chọn nhầm người.`
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
+          }
+
+          if (ambiguousTargets.length > 0) {
+            const messageText = `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy mở tạo nhóm và chọn thủ công để an toàn.`
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
+          }
+        }
+
         setPendingActionReview({
           title: 'Mở luồng tạo nhóm',
-          description: 'AI sẽ mở màn hình tạo nhóm. Bạn vẫn cần kiểm tra thành viên và xác nhận tạo nhóm thủ công.',
+          description: requestedTargets.length > 0
+            ? 'Mình đã kiểm tra tên trong danh bạ. Web vẫn sẽ mở modal tạo nhóm để bạn tự chọn và xác nhận lần cuối.'
+            : 'AI chưa xác định rõ thành viên. Web chỉ mở modal tạo nhóm để bạn tự chọn thủ công.',
           confirmLabel: 'Mở tạo nhóm',
           path: '/chat?createGroup=true',
           feedback: 'Đã mở luồng tạo nhóm. Hãy kiểm tra tên nhóm và danh sách thành viên trước khi tạo.',
-          preview: { risk: 'medium', targetLabel: String(params.title ?? params.groupName ?? 'Nhóm mới') },
+          preview: { risk: 'medium', targetLabel: groupName || requestedTargets.join(', ') || 'Nhóm mới' },
         })
         return
       }
