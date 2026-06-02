@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { changePassword } from '../auth/auth.api'
 import { useAuth } from '../auth/useAuth'
 import { validatePassword } from '../auth/password.util'
+import { canAccessAdminMonitoring } from '../auth/adminAccess'
 import { Icon } from '../../shared/components/Icon'
 import { SegmentedControl, ToggleSwitch } from '../../shared/components/SettingsControls'
 import { useTheme } from '../../shared/contexts/ThemeContext'
@@ -70,7 +71,7 @@ export function SettingsModalContent({
   onChangePasswordSuccess,
   showChangePasswordButton = true,
 }: SettingsModalContentProps) {
-  const { accessToken, logout } = useAuth()
+  const { accessToken, logout, user } = useAuth()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const { language, setLanguage, t } = useLanguage()
@@ -86,6 +87,7 @@ export function SettingsModalContent({
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
+  const canOpenAdminDashboard = canAccessAdminMonitoring(user, accessToken)
 
   const openAdminDashboard = () => {
     navigate('/admin/monitoring')
@@ -233,17 +235,18 @@ export function SettingsModalContent({
                 description={t('settings.startupDesc')}
                 action={<span className='settings-window-pill'>{t('settings.comingSoon')}</span>}
               />
-
-              <SettingsRow
-                title={t('settings.adminDashboard')}
-                description={t('settings.adminDashboardDesc')}
-                action={
-                  <button className='settings-window-action-btn' type='button' onClick={openAdminDashboard}>
-                    <span aria-hidden='true'>↗</span>
-                    {t('settings.openDashboard')}
-                  </button>
-                }
-              />
+              {canOpenAdminDashboard ? (
+                <SettingsRow
+                  title={t('settings.adminDashboard')}
+                  description={t('settings.adminDashboardDesc')}
+                  action={
+                    <button className='settings-window-action-btn' type='button' onClick={openAdminDashboard}>
+                      <span aria-hidden='true'>↗</span>
+                      {t('settings.openDashboard')}
+                    </button>
+                  }
+                />
+              ) : null}
             </section>
           )}
 

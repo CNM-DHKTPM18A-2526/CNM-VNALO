@@ -1117,13 +1117,25 @@ export async function fetchSuggestedReplies(
 export async function sendAiChatMessage(
   token: string,
   prompt: string,
-  history: Array<{ role: 'user' | 'assistant'; content: string }>
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+  options?: {
+    analyzeIntent?: boolean
+    contextId?: string | null
+    enableDeepSummary?: boolean
+    clientUserEntryId?: string
+    clientAssistantEntryId?: string
+  },
 ): Promise<{
   textReply: string
   actionCommand?: string | null
   actionParams?: Record<string, unknown> | null
   degraded?: boolean
   providerStatus?: string
+  conversationId?: string
+  userEntryId?: string
+  assistantEntryId?: string
+  requiresConfirmation?: boolean | null
+  riskLevel?: string | null
 }> {
   const ACCESS_TOKEN_KEY = 'vnalo_access_token'
 
@@ -1137,7 +1149,15 @@ export async function sendAiChatMessage(
   }
 
   const postChat = async (accessToken: string) => {
-    return aiApi.post('chat', { prompt, history }, {
+    return aiApi.post('chat', {
+      prompt,
+      history,
+      analyzeIntent: Boolean(options?.analyzeIntent),
+      enableDeepSummary: Boolean(options?.enableDeepSummary),
+      ...(options?.contextId ? { contextId: options.contextId } : {}),
+      ...(options?.clientUserEntryId ? { clientUserEntryId: options.clientUserEntryId } : {}),
+      ...(options?.clientAssistantEntryId ? { clientAssistantEntryId: options.clientAssistantEntryId } : {}),
+    }, {
       headers: { Authorization: `Bearer ${accessToken}` }
     })
   }
@@ -1168,10 +1188,14 @@ export async function sendAiChatMessage(
       actionParams: data?.actionParams ?? null,
       degraded: Boolean(data?.degraded),
       providerStatus: data?.providerStatus,
+      conversationId: data?.conversationId,
+      userEntryId: data?.userEntryId,
+      assistantEntryId: data?.assistantEntryId,
+      requiresConfirmation: data?.requiresConfirmation ?? null,
+      riskLevel: data?.riskLevel ?? null,
     };
   } catch (error) {
     console.error('[sendAiChatMessage] failed:', error);
     throw error;
   }
 }
-

@@ -7,8 +7,8 @@ import { useAuth } from '../features/auth/useAuth'
 import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
 import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
-import { getFriends } from '../features/friends/friends.api'
-import type { Friend } from '../features/friends/friends.types'
+import { getFriends, searchUsers, sendFriendRequest } from '../features/friends/friends.api'
+import type { Friend, UserLookupResult } from '../features/friends/friends.types'
 import { UserAvatar } from '../shared/components/UserAvatar'
 
 type ProviderStatus =
@@ -53,6 +53,8 @@ type AiMessage = {
   providerStatus?: ProviderStatus
   actionCommand?: AiActionCommand | null
   actionParams?: Record<string, unknown> | null
+  requiresConfirmation?: boolean | null
+  riskLevel?: string | null
 }
 
 
@@ -70,6 +72,7 @@ type PendingActionReview = {
   path?: string
   feedback: string
   preview?: AiActionPreview
+  execute?: () => Promise<void> | void
 }
 
 type AiActionPreview = {
@@ -303,6 +306,8 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
           ? (value.actionCommand as AiActionCommand)
           : null,
         actionParams: value.actionParams && typeof value.actionParams === 'object' ? (value.actionParams as Record<string, unknown>) : null,
+        requiresConfirmation: typeof value.requiresConfirmation === 'boolean' ? value.requiresConfirmation : null,
+        riskLevel: typeof value.riskLevel === 'string' ? value.riskLevel : null,
       }
     })
     .filter((item): item is AiMessage => item !== null)
@@ -434,13 +439,35 @@ function extractGroupTargets(params?: Record<string, unknown> | null) {
     if (!raw) return []
     if (Array.isArray(raw)) return raw.map((item) => String(item).trim())
     return String(raw)
-      .split(/[,;\n]|\s+và\s+|\s+and\s+/i)
+      .split(/[,;\n]|\s+và\s+|\s+va\s+|\s+and\s+/i)
       .map((item) => item.trim())
   }).filter(Boolean)
 }
 
 function getFriendDisplayName(friend: Friend) {
   return friend.nickname?.trim() || friend.displayName?.trim() || ''
+}
+
+function extractCreateGroupIntentTargets(text: string) {
+  const normalized = normalizeLookupText(text)
+  if (!normalized.includes('tao nhom')) return []
+
+  const source = text.trim()
+  const match = source.match(/t\u1ea1o\s+nh\u00f3m\s+(?:v\u1edbi|c\u00f9ng|cho|g\u1ed3m)?\s*(.+)$/i)
+    ?? source.match(/tao\s+nhom\s+(?:voi|cung|cho|gom)?\s*(.+)$/i)
+  const rawTarget = match?.[1]?.trim()
+  if (!rawTarget) return []
+
+  const cleaned = rawTarget
+    .replace(/^v\u1edbi\s+/i, '')
+    .replace(/^voi\s+/i, '')
+    .replace(/[.!?]+$/g, '')
+    .trim()
+
+  return cleaned
+    .split(/[,;\n]|\s+v\u00e0\s+|\s+va\s+|\s+and\s+/i)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 function findFriendMatches(friends: Friend[], target: string) {
@@ -450,6 +477,47 @@ function findFriendMatches(friends: Friend[], target: string) {
     .map((friend) => ({ friend, score: computeConversationMatchScore(getFriendDisplayName(friend), normalizedTarget) }))
     .filter((item) => item.score >= 0)
     .sort((left, right) => right.score - left.score)
+}
+
+function getLookupDisplayName(user: UserLookupResult) {
+  return user.displayName?.trim() || user.phone?.trim() || user.email?.trim() || ''
+}
+
+function findUserMatches(users: UserLookupResult[], target: string) {
+  const normalizedTarget = normalizeLookupText(target)
+  if (!normalizedTarget) return []
+  return users
+    .map((lookupUser) => ({ lookupUser, score: computeConversationMatchScore(getLookupDisplayName(lookupUser), normalizedTarget) }))
+    .filter((item) => item.score >= 0)
+    .sort((left, right) => right.score - left.score)
+}
+
+function buildClientEntryId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function validateCreateGroupTargets(friends: Friend[], requestedTargets: string[]) {
+  const missingTargets: string[] = []
+  const ambiguousTargets: string[] = []
+
+  requestedTargets.forEach((target) => {
+    const matches = findFriendMatches(friends, target)
+    if (matches.length === 0) {
+      missingTargets.push(target)
+      return
+    }
+
+    const bestScore = matches[0]?.score ?? -1
+    const sameBestMatches = matches.filter((item) => item.score === bestScore)
+    if (sameBestMatches.length > 1) {
+      ambiguousTargets.push(target)
+    }
+  })
+
+  return { missingTargets, ambiguousTargets }
 }
 
 function extractComposeContent(params?: Record<string, unknown> | null) {
@@ -826,6 +894,39 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       return
     }
 
+    const createGroupIntentTargets = extractCreateGroupIntentTargets(query)
+    if (createGroupIntentTargets.length > 0) {
+      const userMessage: AiMessage = {
+        role: 'user',
+        content: query,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+
+      if (!textToSend) {
+        setInputValue('')
+      }
+
+      const friends = await getFriends(accessToken)
+      const { missingTargets, ambiguousTargets } = validateCreateGroupTargets(friends, createGroupIntentTargets)
+
+      if (missingTargets.length > 0 || ambiguousTargets.length > 0) {
+        const assistantText = missingTargets.length > 0
+          ? `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không tạo nhóm hoặc mở luồng tạo nhóm để tránh chọn nhầm người.`
+          : `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy nói rõ hơn hoặc tự chọn thủ công trong modal tạo nhóm.`
+        const assistantMessage: AiMessage = {
+          role: 'assistant',
+          content: assistantText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          providerStatus: null,
+          degraded: false,
+        }
+        saveMessages([...messages, userMessage, assistantMessage])
+        setActionFeedback({ tone: 'warning', message: assistantText })
+        setRetryPrompt('')
+        return
+      }
+    }
+
     if (!textToSend) {
       setInputValue('')
     }
@@ -850,7 +951,12 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         content: message.content,
       }))
 
-      const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory)
+      const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory, {
+        analyzeIntent: true,
+        contextId: historyStorageKey ?? undefined,
+        clientUserEntryId: buildClientEntryId('web-user'),
+        clientAssistantEntryId: buildClientEntryId('web-assistant'),
+      })
       const responseActionCommand = (aiResponse.actionCommand as AiActionCommand | undefined) ?? null
       const safeActionCommand = responseActionCommand && KNOWN_ACTION_COMMANDS.has(responseActionCommand) ? responseActionCommand : null
       const assistantMessage: AiMessage = {
@@ -863,6 +969,8 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
         actionCommand: safeActionCommand,
         actionParams: aiResponse.actionParams ?? null,
+        requiresConfirmation: aiResponse.requiresConfirmation ?? null,
+        riskLevel: aiResponse.riskLevel ?? null,
       }
 
       const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
@@ -921,50 +1029,42 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       }
 
       if (command === 'CREATE_GROUP') {
-        const requestedTargets = extractGroupTargets(params)
+        const requestedTargets = [...new Set(extractGroupTargets(params).map((target) => target.trim()).filter(Boolean))]
         const groupName = String(params.title ?? params.groupName ?? params.name ?? '').trim()
 
-        if (requestedTargets.length > 0) {
-          const friends = await getFriends(accessToken)
-          const missingTargets: string[] = []
-          const ambiguousTargets: string[] = []
-
-          requestedTargets.forEach((target) => {
-            const matches = findFriendMatches(friends, target)
-            if (matches.length === 0) {
-              missingTargets.push(target)
-              return
-            }
-
-            const bestScore = matches[0]?.score ?? -1
-            const sameBestMatches = matches.filter((item) => item.score === bestScore)
-            if (sameBestMatches.length > 1) {
-              ambiguousTargets.push(target)
-            }
-          })
-
-          if (missingTargets.length > 0) {
-            const messageText = `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không mở tạo nhóm để tránh chọn nhầm người.`
-            setActionFeedback({ tone: 'warning', message: messageText })
-            appendAssistantFeedback(messageText)
-            return
-          }
-
-          if (ambiguousTargets.length > 0) {
-            const messageText = `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy mở tạo nhóm và chọn thủ công để an toàn.`
-            setActionFeedback({ tone: 'warning', message: messageText })
-            appendAssistantFeedback(messageText)
-            return
-          }
+        if (requestedTargets.length < 2) {
+          const messageText = 'Cần ít nhất 2 thành viên khác ngoài bạn để tạo nhóm. Hãy cung cấp thêm thành viên trước khi mình mở luồng tạo nhóm.'
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
         }
+
+        const friends = await getFriends(accessToken)
+        const { missingTargets, ambiguousTargets } = validateCreateGroupTargets(friends, requestedTargets)
+
+        if (missingTargets.length > 0) {
+          const messageText = `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không mở tạo nhóm để tránh chọn nhầm người.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        if (ambiguousTargets.length > 0) {
+          const messageText = `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy mở tạo nhóm và chọn thủ công để an toàn.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const createGroupQuery = new URLSearchParams({ createGroup: 'true' })
+        if (groupName) createGroupQuery.set('groupName', groupName)
+        createGroupQuery.set('members', requestedTargets.join(','))
 
         setPendingActionReview({
           title: 'Mở luồng tạo nhóm',
-          description: requestedTargets.length > 0
-            ? 'Mình đã kiểm tra tên trong danh bạ. Web vẫn sẽ mở modal tạo nhóm để bạn tự chọn và xác nhận lần cuối.'
-            : 'AI chưa xác định rõ thành viên. Web chỉ mở modal tạo nhóm để bạn tự chọn thủ công.',
+          description: 'Mình đã kiểm tra tên trong danh bạ. Web vẫn sẽ mở modal tạo nhóm để bạn tự chọn và xác nhận lần cuối.',
           confirmLabel: 'Mở tạo nhóm',
-          path: '/chat?createGroup=true',
+          path: `/chat?${createGroupQuery.toString()}`,
           feedback: 'Đã mở luồng tạo nhóm. Hãy kiểm tra tên nhóm và danh sách thành viên trước khi tạo.',
           preview: { risk: 'medium', targetLabel: groupName || requestedTargets.join(', ') || 'Nhóm mới' },
         })
@@ -972,13 +1072,46 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       }
 
       if (command === 'SEND_FRIEND_REQUEST') {
+        const target = extractActionTarget(params)
+        if (!target) {
+          setActionFeedback({ tone: 'warning', message: 'AI chưa xác định được người cần kết bạn.' })
+          appendAssistantFeedback('Mình chưa xác định được người cần kết bạn. Hãy nói rõ tên, email hoặc số điện thoại.')
+          return
+        }
+
+        const lookupUsers = await searchUsers(accessToken, target)
+        const matches = findUserMatches(lookupUsers, target)
+        if (matches.length === 0) {
+          const messageText = `Không tìm thấy "${target}" trong hệ thống. Mình sẽ không gửi lời mời kết bạn để tránh nhầm người.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const bestScore = matches[0]?.score ?? -1
+        const candidates = matches.filter((item) => item.score === bestScore)
+        if (candidates.length > 1) {
+          const messageText = `Có nhiều người khớp với "${target}". Hãy mở Danh bạ và chọn đúng tài khoản trước khi gửi lời mời.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const selectedUser = candidates[0].lookupUser
+        const friendMessage = String(params.message ?? params.note ?? '').trim()
         setPendingActionReview({
-          title: 'Mở danh bạ để gửi kết bạn',
-          description: 'Trợ lý web sẽ không tự gửi lời mời kết bạn. Mình sẽ mở Danh bạ để bạn kiểm tra đúng người rồi tự gửi.',
-          confirmLabel: 'Mở Danh bạ',
-          path: '/contacts',
-          feedback: 'Đã mở Danh bạ. Hãy xác nhận đúng người trước khi gửi lời mời kết bạn.',
-          preview: { risk: 'medium', targetLabel: extractActionTarget(params) || 'Chưa rõ liên hệ' },
+          title: 'Xác nhận gửi lời mời kết bạn',
+          description: 'Trợ lý sẽ gửi lời mời kết bạn tới đúng tài khoản đã tìm thấy trong hệ thống.',
+          confirmLabel: 'Gửi lời mời',
+          feedback: `Đã gửi lời mời kết bạn tới ${getLookupDisplayName(selectedUser)}.`,
+          preview: { risk: 'medium', targetLabel: getLookupDisplayName(selectedUser), draft: friendMessage },
+          execute: async () => {
+            await sendFriendRequest(accessToken, {
+              toUserId: selectedUser.id,
+              message: friendMessage || undefined,
+              source: 'SEARCH',
+            })
+          },
         })
         return
       }
@@ -1098,17 +1231,30 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     )
   }
 
-  const confirmPendingActionReview = () => {
+  const confirmPendingActionReview = async () => {
     if (!pendingActionReview) {
       return
     }
 
-    if (pendingActionReview.path) {
-      navigate(pendingActionReview.path)
-    }
-    setActionFeedback({ tone: 'info', message: pendingActionReview.feedback })
-    appendAssistantFeedback(pendingActionReview.feedback)
+    const review = pendingActionReview
     setPendingActionReview(null)
+    setActionFeedback({ tone: 'info', message: 'Đang thực hiện thao tác AI...' })
+
+    try {
+      if (review.execute) {
+        await review.execute()
+      }
+      if (review.path) {
+        navigate(review.path)
+      }
+      setActionFeedback({ tone: 'success', message: review.feedback })
+      appendAssistantFeedback(review.feedback)
+    } catch (error) {
+      console.error('AI confirmed action failed:', error)
+      const message = extractMessage(error) || 'Không thể thực hiện thao tác AI trên web lúc này. Vui lòng thử lại.'
+      setActionFeedback({ tone: 'error', message })
+      appendAssistantFeedback(message)
+    }
   }
 
   const executeResolvedConversationAction = (conversation: ConversationSummary, resolution: PendingActionResolution) => {
@@ -1282,6 +1428,18 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
               </div>
             </div>
           </div>
+          <div className='chat-window-header-actions ai-chat-header-actions'>
+            <button
+              type='button'
+              className='chat-window-icon-btn ai-header-clear-btn'
+              onClick={handleClearHistory}
+              disabled={isAssistantBusy}
+              title='Xóa lịch sử chat AI'
+              aria-label='Xóa lịch sử chat AI'
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         </header>
 
         <div className='ai-chat-messages' ref={messagesContainerRef} role='log' aria-live='polite' aria-relevant='additions text'>
@@ -1403,7 +1561,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
               <button className='btn btn-subtle' type='button' onClick={() => closePendingActionReview('cancel')}>
                 Hủy
               </button>
-              <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
+              <button className='btn btn-primary' type='button' onClick={() => void confirmPendingActionReview()}>
                 {pendingActionReview.confirmLabel}
               </button>
             </div>
