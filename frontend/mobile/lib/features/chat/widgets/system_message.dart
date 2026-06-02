@@ -221,6 +221,26 @@ class _SystemMessageState extends State<SystemMessage>
       iconColor = parsedEvent.iconColor;
     } else {
       displayText = widget.content;
+      
+      // Ẩn các tin nhắn hệ thống cũ (chữ trơn) bị lặp lại do đã có tin nhắn JSON mới
+      // Đồng thời ẩn luôn các tin nhắn bị lỗi font chữ (chứa ký tự Ä')
+      final lowerText = displayText.toLowerCase();
+      if (lowerText.contains('ä\'') ||
+          lowerText.contains('đã đổi tên nhóm') ||
+          lowerText.contains('đã cập nhật thông tin nhóm') ||
+          lowerText.contains('đã thêm thành viên') ||
+          lowerText.contains('đã rời khỏi nhóm') ||
+          lowerText.contains('đã xóa một thành viên') ||
+          lowerText.contains('đã ghim một tin nhắn') ||
+          lowerText.contains('đã bỏ ghim một tin nhắn') ||
+          lowerText.contains('đã thay đổi ảnh đại diện') ||
+          lowerText.contains('đã được thăng cấp') ||
+          lowerText.contains('đã chuyển quyền') ||
+          lowerText.contains('đã giải tán') ||
+          lowerText.contains('đã bị hủy quyền')) {
+        return const SizedBox.shrink();
+      }
+
       icon = Icons.info_outline;
       iconColor = Colors.grey;
     }

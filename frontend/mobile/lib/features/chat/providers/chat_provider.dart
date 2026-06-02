@@ -361,6 +361,13 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       _messages[conversationId] = [...newOnes, ...list];
 
+      // Process signals for new messages polled
+      for (final msg in newOnes) {
+        if (msg.messageType == MessageType.SYSTEM || (msg.content?.startsWith('{') ?? false)) {
+          _processSignalMessage(msg);
+        }
+      }
+
       // Update lastMessage for conversation list
       final idx = _conversations.indexWhere((c) => c.id == conversationId);
       if (idx >= 0) {
@@ -1467,108 +1474,20 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     debugPrint('[DEBUG][H2] ChatProvider._handleIncomingMessage ENTRY - msgId=${message.id} convId=$conversationId senderId=${message.senderId}');
     // #endregion
 
+    // ─── SIGNAL PROCESSING (BEFORE dedup check) ─────────────────────────────
+    // CRITICAL: Process signals BEFORE the early dedup check.
+    // Reason: REST polling (_pollMessagesTick) may add the message to _messages
+    // BEFORE the socket delivers it. When socket arrives, dedup fires → return.
+    // This means signals (UPDATE_GROUP_INFO, PIN, UNPIN, REACTIONS) are NEVER processed.
+    // Fix: Process signals first, then let dedup handle message list deduplication.
+    _processSignalMessage(message);
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Early deduplication: skip if a message with the same server ID is already in the list
     final existing = _messages[conversationId] ?? [];
     if (!message.id.startsWith('local-') && existing.any((m) => m.id == message.id)) {
       debugPrint('[ChatProvider] _handleIncomingMessage: SKIPPED duplicate server id=${message.id}');
       return;
-    }
-
-    // Signal handling for reactions etc (do NOT depend on messageType == SYSTEM)
-    // Some backends/clients may deliver these signals as TEXT.
-    try {
-      final content = message.content ?? '';
-      if (content.isNotEmpty && content.trimLeft().startsWith('{')) {
-        final data = jsonDecode(content);
-        if (data is Map && data['action'] == 'UPDATE_MESSAGE_REACTIONS') {
-          final msgId = data['messageId'];
-          final actionType = data['type'];
-          final emoji = data['emoji'];
-          final actorId = data['actorId'];
-
-          if (msgId != null) {
-            debugPrint('SIGNAL: Reaction update signal received for $msgId.');
-            if (actionType != null && emoji != null && actorId != null) {
-              final currentReactions = _reactions[msgId] ?? [];
-              if (actionType == 'ADD') {
-                final newReaction = MessageReaction(
-                  id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
-                  conversationId: conversationId,
-                  messageId: msgId,
-                  serverSeq: 0,
-                  userId: actorId,
-                  emoji: emoji,
-                  createdAt: DateTime.now(),
-                );
-                final filtered = currentReactions.where((r) => r.userId != actorId).toList();
-                filtered.add(newReaction);
-                _reactions[msgId] = filtered;
-              } else if (actionType == 'REMOVE') {
-                _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
-              }
-              notifyListeners();
-            }
-            // Delay reloading to prevent wiping out optimistic update if backend DB is slow
-            Future.delayed(const Duration(seconds: 2), () => loadReactions(msgId));
-          }
-          return;
-        } else if (data is Map && data.containsKey('action')) {
-            final action = data['action'];
-            // Process other group actions for ALL signal-like messages (both true SYSTEM and TEXT signals)
-            final toast = _formatSystemActionAsNotification(conversationId, data);
-            if (toast.isNotEmpty) {
-              _sendSystemNotification(conversationId, toast);
-            }
-
-            bool skipRefresh = false;
-
-            // Manually handle specific actions for immediate optimistic UI update
-            if (action == 'UPDATE_GROUP_INFO' && data['metadata'] != null) {
-              skipRefresh = true;
-              final newName = data['metadata']['newName'];
-              if (newName != null) {
-                final idx = _conversations.indexWhere((c) => c.id == conversationId);
-                if (idx >= 0) {
-                  _conversations[idx] = _conversations[idx].copyWith(title: newName);
-                  notifyListeners();
-                }
-              }
-            } else if (action == 'CHANGE_GROUP_AVATAR' && data['metadata'] != null) {
-              skipRefresh = true;
-              final newAvatarUrl = data['metadata']['newAvatarUrl'];
-              if (newAvatarUrl != null) {
-                final idx = _conversations.indexWhere((c) => c.id == conversationId);
-                if (idx >= 0) {
-                  _conversations[idx] = _conversations[idx].copyWith(avatarUrl: newAvatarUrl);
-                  notifyListeners();
-                }
-              }
-            } else if (action == 'PIN_MESSAGE') {
-              Future.delayed(const Duration(seconds: 1), () => loadPinnedMessages(conversationId));
-            } else if (action == 'UNPIN_MESSAGE') {
-              if (data['metadata'] != null) {
-                final messageId = data['metadata']['messageId'];
-                if (messageId != null && _pinnedMessages.containsKey(conversationId)) {
-                  _pinnedMessages[conversationId]!.removeWhere((m) => m.id == messageId);
-                  notifyListeners();
-                }
-              }
-              Future.delayed(const Duration(seconds: 1), () => loadPinnedMessages(conversationId));
-            }
-
-            // Ensure group name/avatar/members refresh realtime from backend
-            // Delayed to prevent fetching stale data due to backend cache/replication lag
-            if (_activeConversationId == conversationId && !skipRefresh) {
-              Future.delayed(const Duration(seconds: 2), () {
-                if (_activeConversationId == conversationId) {
-                  refreshConversation(conversationId);
-                }
-              });
-            }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error parsing system signal: $e');
     }
 
     // FILTER: Prevent "Ghost Conversations" from friend requests
@@ -3809,5 +3728,148 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   void toggleReaction(String messageId, String emoji) async {
     debugPrint('toggleReaction called: messageId=$messageId, emoji=$emoji, userId=$_currentUserId');
     await addReaction(messageId, emoji);
+  }
+
+  void _processSignalMessage(Message message) {
+    final String conversationId = message.conversationId;
+    
+    try {
+      final content = message.content ?? '';
+      if (content.isNotEmpty && content.trimLeft().startsWith('{')) {
+        final data = jsonDecode(content);
+        if (data is Map && data['action'] == 'UPDATE_MESSAGE_REACTIONS') {
+          final msgId = data['messageId']?.toString();
+          final actionType = data['type'];
+          final emoji = data['emoji'];
+          final actorId = data['actorId'];
+
+          if (msgId != null) {
+            debugPrint('SIGNAL: Reaction update signal received for $msgId.');
+            if (actionType != null && emoji != null && actorId != null) {
+              final currentReactions = _reactions[msgId] ?? [];
+              if (actionType == 'ADD') {
+                final newReaction = MessageReaction(
+                  id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
+                  conversationId: conversationId,
+                  messageId: msgId,
+                  serverSeq: 0,
+                  userId: actorId,
+                  emoji: emoji,
+                  createdAt: DateTime.now(),
+                );
+                final filtered = currentReactions.where((r) => r.userId != actorId).toList();
+                filtered.add(newReaction);
+                _reactions[msgId] = filtered;
+              } else if (actionType == 'REMOVE') {
+                _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
+              }
+              notifyListeners();
+            }
+            // Ensure consistency against backend lag
+            Future.delayed(const Duration(seconds: 1), () => loadReactions(msgId));
+            Future.delayed(const Duration(seconds: 3), () => loadReactions(msgId));
+          }
+          return;
+        } else if (data is Map && data.containsKey('action')) {
+            final action = data['action'];
+            // Process other group actions for ALL signal-like messages (both true SYSTEM and TEXT signals)
+            bool skipRefresh = false;
+
+            // Manually handle specific actions for immediate optimistic UI update
+            if ((action == 'UPDATE_GROUP_INFO' || action == 'RENAME_GROUP') && data['metadata'] != null) {
+              // DO NOT skip refresh! Let it reload from backend to ensure all metadata is perfect.
+              final newName = data['metadata']['title']?.toString() ?? data['metadata']['name']?.toString() ?? data['metadata']['newName']?.toString();
+              final onlyAdminCanPost = data['metadata']['onlyAdminCanPost'];
+              
+              final idx = _conversations.indexWhere((c) => c.id == conversationId);
+              if (idx >= 0) {
+                var updated = _conversations[idx];
+                if (newName != null) updated = updated.copyWith(title: newName);
+                
+                if (onlyAdminCanPost != null) {
+                  bool parsedVal = false;
+                  if (onlyAdminCanPost is bool) parsedVal = onlyAdminCanPost;
+                  else if (onlyAdminCanPost is String) parsedVal = onlyAdminCanPost.toLowerCase() == 'true';
+                  updated = updated.copyWith(onlyAdminCanPost: parsedVal);
+                }
+                
+                _conversations[idx] = updated;
+                notifyListeners();
+              }
+            } else if (action == 'CHANGE_GROUP_AVATAR' && data['metadata'] != null) {
+              skipRefresh = true;
+              final newAvatarUrl = data['metadata']['newAvatarUrl'];
+              if (newAvatarUrl != null) {
+                final idx = _conversations.indexWhere((c) => c.id == conversationId);
+                if (idx >= 0) {
+                  _conversations[idx] = _conversations[idx].copyWith(avatarUrl: newAvatarUrl);
+                  notifyListeners();
+                }
+              }
+            } else if (action == 'PIN_MESSAGE') {
+              skipRefresh = true;
+              // Try to immediately add message to pinned list from signal data
+              final pinnedMsgId = data['messageId']?.toString();
+              if (pinnedMsgId != null) {
+                // Find the message in the current messages list to pin it immediately
+                final msgs = _messages[conversationId] ?? [];
+                final msgToPinIdx = msgs.indexWhere((m) => m.id == pinnedMsgId);
+                if (msgToPinIdx >= 0) {
+                  final msgToPin = msgs[msgToPinIdx];
+                  final currentPins = _pinnedMessages[conversationId] ?? [];
+                  if (!currentPins.any((m) => m.id == msgToPin.id)) {
+                    _pinnedMessages[conversationId] = [msgToPin, ...currentPins];
+                    notifyListeners();
+                  }
+                }
+              }
+              // Also reload from server to get the full pin data (multiple times to beat cache/lag)
+              Future.delayed(const Duration(seconds: 1), () => loadPinnedMessages(conversationId));
+              Future.delayed(const Duration(seconds: 3), () => loadPinnedMessages(conversationId));
+            } else if (action == 'UNPIN_MESSAGE') {
+              skipRefresh = true;
+              // Extract messageId from top-level OR metadata
+              final unpinMsgId = data['messageId']?.toString() 
+                ?? data['metadata']?['messageId']?.toString();
+              if (unpinMsgId != null) {
+                final currentPins = _pinnedMessages[conversationId] ?? [];
+                final updatedPins = currentPins.where((m) => m.id != unpinMsgId).toList();
+                if (updatedPins.length != currentPins.length) {
+                  _pinnedMessages[conversationId] = updatedPins;
+                  notifyListeners();
+                }
+              }
+              Future.delayed(const Duration(seconds: 1), () => loadPinnedMessages(conversationId));
+              Future.delayed(const Duration(seconds: 3), () => loadPinnedMessages(conversationId));
+            }
+
+            // Ensure group name/avatar/members refresh realtime from backend
+            // Delayed to prevent fetching stale data due to backend cache/replication lag
+            if (_activeConversationId == conversationId && !skipRefresh) {
+              refreshConversation(conversationId);
+              
+              Future.delayed(const Duration(seconds: 1), () {
+                if (_activeConversationId == conversationId) {
+                  refreshConversation(conversationId);
+                }
+              });
+              
+              Future.delayed(const Duration(seconds: 2), () {
+                if (_activeConversationId == conversationId) {
+                  refreshConversation(conversationId);
+                }
+              });
+              
+              Future.delayed(const Duration(seconds: 5), () {
+                if (_activeConversationId == conversationId) {
+                  refreshConversation(conversationId);
+                }
+              });
+            }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing system signal: $e');
+    }
   }
 }

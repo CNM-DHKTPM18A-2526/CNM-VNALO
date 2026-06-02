@@ -580,6 +580,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           }
 
                           return MessageBubble(
+                            key: ValueKey('${message.id}_${chat.getReactionsForMessage(message.id).length}_${message.status}'),
                             message: message,
                             isMine: isMine,
                             showTime: showTime,
@@ -619,6 +620,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
                 if (canSend)
                   ChatInputBar(
+                    key: ValueKey('input_bar_${conv.id}_${conv.onlyAdminCanPost}'),
                     conversationId: conv.id,
                     onSend: (text) async {
                       if (conv.type == ConversationType.DIRECT) {
@@ -685,7 +687,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     isGroup: conv.type == ConversationType.GROUP,
                   )
                 else
-                  _buildReadOnlyBanner(),
+                  _buildReadOnlyBanner(key: ValueKey('banner_${conv.id}_${conv.onlyAdminCanPost}')),
               ],
             ),
           ),
@@ -1004,9 +1006,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Widget _buildReadOnlyBanner() {
+  Widget _buildReadOnlyBanner({Key? key}) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final linkColor = isDarkMode ? Colors.blue.shade400 : Colors.blue.shade600;
+    
     return Container(
+      key: key,
       width: double.infinity,
       color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -1021,9 +1026,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               child: RichText(
                 text: TextSpan(
                   style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700, height: 1.4),
-                  children: const [
-                    TextSpan(text: 'Bạn không có quyền ', style: TextStyle(fontWeight: FontWeight.bold)),
-                    TextSpan(text: 'gửi tin nhắn vào nhóm này.'),
+                  children: [
+                    const TextSpan(text: 'Chỉ '),
+                    TextSpan(
+                      text: 'trưởng và phó cộng đồng', 
+                      style: TextStyle(fontWeight: FontWeight.bold, color: linkColor),
+                    ),
+                    const TextSpan(text: ' được gửi tin nhắn vào cộng đồng. '),
+                    TextSpan(
+                      text: 'Tìm hiểu thêm', 
+                      style: TextStyle(fontWeight: FontWeight.bold, color: linkColor),
+                    ),
                   ],
                 ),
               ),
