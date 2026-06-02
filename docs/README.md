@@ -31,6 +31,7 @@
 | [Precondition Matrix](ai-agent/precondition-matrix.md) | Action-by-action validation matrix for resolver, policy, confirmation, and executor layers. |
 | [RAG Knowledge Policy](ai-agent/rag-knowledge-policy.md) | What can be indexed, chunked, retrieved, or excluded from assistant RAG. |
 | [Safety and Privacy](ai-agent/safety-and-privacy.md) | Sensitive-data, consent, audit, and destructive-action guardrails. |
+| [Analytics Event Taxonomy](ai-agent/analytics-event-taxonomy.md) | Production-safe assistant analytics event schema and aggregates. |
 
 ## Operations and Deployment
 
@@ -48,6 +49,8 @@
 | [Analytics](system/analytics/README.md) | Analytics service architecture, API, operations, quality gates, and rollout plans. |
 | [Moderation](system/moderation/01-service-overview.md) | Moderation service domain documentation. |
 | [Performance Reviews](system/performance) | Endpoint performance reviews and integration fix summaries. |
+| [Admin Monitoring](admin-monitoring/README.md) | RBAC, dashboard widgets, export rules, and privacy boundaries. |
+| [Privacy Data Map](privacy/data-collection-map.md) | Data collection categories, consent, and sensitive-data exclusions. |
 
 ## Root References
 
