@@ -4,6 +4,17 @@ import { resizeImageFile } from '../../../utils/image';
 import { Icon } from '../../../shared/components/Icon';
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 import { REACTION_OPTIONS } from '../../chat/chat.constants';
+import { MEDIA_API_URL } from '../../../api.client';
+
+const getMediaUrl = (url: string) => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+
+  const cleaned = trimmed.replace(/^\/+/, '');
+  if (cleaned.startsWith('uploads/')) return `${MEDIA_API_URL}${cleaned}`;
+  return `${MEDIA_API_URL}uploads/${cleaned}`;
+};
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -317,23 +328,27 @@ export function CreatePostModal({
           />
 
           {mediaUrls.length > 0 && (
-            <div className="create-post-media-preview">
-              {mediaUrls.map((url, idx) => (
-                    <div key={idx} className="media-preview-item">
-                      {/\.(mp4|webm|ogg)(\?.*)?$/i.test(url) ? (
-                        <video src={url} controls />
-                      ) : (
-                        <img src={url} alt="preview" />
-                      )}
-                      <button
-                        type="button"
-                        className="media-preview-remove"
-                        onClick={() => setMediaUrls(prev => prev.filter((_, i) => i !== idx))}
-                      >
-                        <Icon name="close" size={16} />
-                      </button>
-                    </div>
-                  ))}
+            <div className="create-post-media-preview" data-count={mediaUrls.length}>
+              {mediaUrls.map((url, idx) => {
+                const finalUrl = getMediaUrl(url);
+                const isVideo = /\.(mp4|webm|ogg)(\?.*)?$/i.test(finalUrl);
+                return (
+                  <div key={idx} className="media-preview-item">
+                    {isVideo ? (
+                      <video src={finalUrl} controls />
+                    ) : (
+                      <img src={finalUrl} alt="preview" />
+                    )}
+                    <button
+                      type="button"
+                      className="media-preview-remove"
+                      onClick={() => setMediaUrls(prev => prev.filter((_, i) => i !== idx))}
+                    >
+                      <Icon name="close" size={16} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 
