@@ -123,6 +123,17 @@ const CallPage: React.FC = () => {
         }
       }
 
+      let initialIceCandidates: any[] = [];
+      const initialIceStr = sessionStorage.getItem(`pending_ice_${callId}`);
+      if (initialIceStr) {
+        sessionStorage.removeItem(`pending_ice_${callId}`);
+        try {
+          initialIceCandidates = JSON.parse(initialIceStr);
+        } catch (e) {
+          console.error('[CallPage] Failed to parse initial ICE', e);
+        }
+      }
+
       service.initialize({
         socket,
         conversationId,
@@ -134,6 +145,9 @@ const CallPage: React.FC = () => {
         initialSdp,
       })
       .then(() => {
+        // Inject buffered ICE candidates immediately after initialize completes
+        initialIceCandidates.forEach(c => service.handleIceCandidate(c));
+
         if (!isCaller && initialSdp) {
           return service.acceptCall();
         }

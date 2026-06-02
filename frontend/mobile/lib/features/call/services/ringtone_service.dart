@@ -12,33 +12,30 @@ class RingtoneService {
   }
 
   Future<void> startRinging() async {
-    if (_isPlaying) return;
     try {
       debugPrint('[RingtoneService] Starting ringing sound...');
-      await _player.play(AssetSource('sounds/ringtone.mp3'));
       _isPlaying = true;
+      await _player.play(AssetSource('sounds/ringtone.mp3'));
     } catch (e) {
       debugPrint('[RingtoneService] Error playing ringtone: $e');
     }
   }
 
   Future<void> startDialing() async {
-    if (_isPlaying) return;
     try {
       debugPrint('[RingtoneService] Starting dialing sound...');
-      await _player.play(AssetSource('sounds/dialing.mp3'));
       _isPlaying = true;
+      await _player.play(AssetSource('sounds/dialing.mp3'));
     } catch (e) {
       debugPrint('[RingtoneService] Error playing dialing sound: $e');
     }
   }
 
   Future<void> stop() async {
-    if (!_isPlaying) return;
     try {
       debugPrint('[RingtoneService] Stopping sound...');
-      await _player.stop();
       _isPlaying = false;
+      await _player.stop();
     } catch (e) {
       debugPrint('[RingtoneService] Error stopping sound: $e');
     }
