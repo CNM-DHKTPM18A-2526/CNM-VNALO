@@ -8,6 +8,8 @@ export const AI_ASSISTANT_USER_ID = '__vnalo_ai__'
 export const AI_ASSISTANT_CONVERSATION_ID = 'vnalo-ai-assistant'
 
 const AI_ASSISTANT_META_KEY_PREFIX = 'vnalo_ai_chat_meta:'
+const AI_ASSISTANT_HISTORY_KEY_PREFIX = 'vnalo_ai_chat_history:'
+const AI_ASSISTANT_LEGACY_HISTORY_KEY = 'vnalo_ai_chat_history'
 const DEFAULT_AI_META: AiAssistantMeta = {
   preview: 'Sẵn sàng hỗ trợ',
   timestamp: new Date(0).toISOString(),
@@ -37,11 +39,45 @@ function readMeta(userId?: string | null): AiAssistantMeta {
 
   try {
     const parsed = JSON.parse(localStorage.getItem(key) || 'null') as Partial<AiAssistantMeta> | null
-    if (!parsed?.preview || !parsed?.timestamp) return DEFAULT_AI_META
+    if (!parsed?.preview || !parsed?.timestamp) return readMetaFromHistory(userId)
     return { preview: parsed.preview, timestamp: parsed.timestamp }
   } catch {
-    return DEFAULT_AI_META
+    return readMetaFromHistory(userId)
   }
+}
+
+function readMetaFromHistory(userId?: string | null): AiAssistantMeta {
+  const historyKeys = [
+    userId ? `${AI_ASSISTANT_HISTORY_KEY_PREFIX}${userId}` : null,
+    AI_ASSISTANT_LEGACY_HISTORY_KEY,
+  ].filter((item): item is string => Boolean(item))
+
+  for (const historyKey of historyKeys) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(historyKey) || 'null') as Array<{ content?: string; timestamp?: string }> | null
+      if (!Array.isArray(parsed)) continue
+
+      const latest = [...parsed].reverse().find((message) => typeof message?.content === 'string' && message.content.trim())
+      if (!latest?.content) continue
+
+      const preview = latest.content.trim().replace(/\s+/g, ' ')
+      return {
+        preview: preview.length > 96 ? `${preview.slice(0, 93)}...` : preview,
+        timestamp: normalizeHistoryTimestamp(latest.timestamp),
+      }
+    } catch {
+      // Ignore corrupted local histories and keep the assistant conversation stable.
+    }
+  }
+
+  return DEFAULT_AI_META
+}
+
+function normalizeHistoryTimestamp(timestamp?: string) {
+  if (!timestamp) return new Date().toISOString()
+  const parsed = Date.parse(timestamp)
+  if (!Number.isNaN(parsed)) return new Date(parsed).toISOString()
+  return new Date().toISOString()
 }
 
 function writeMeta(userId: string | undefined, meta: AiAssistantMeta) {

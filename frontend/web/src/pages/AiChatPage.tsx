@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bot, Mic, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react'
+import { Mic, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
 import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
 import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
+import { UserAvatar } from '../shared/components/UserAvatar'
 
 type ProviderStatus =
   | 'LIVE_PROVIDER_ACTIVE'
@@ -325,7 +326,7 @@ function resolveProviderPresentation(messages: AiMessage[]) {
     degraded: false,
     badgeClassName: 'ai-header-status',
     label: 'Sẵn sàng hỗ trợ',
-    helper: 'Trợ lý AI có thể trả lời và gợi ý thao tác an toàn trong VNALO.',
+    helper: 'Đang hoạt động',
     banner: '',
     bannerClassName: 'ai-runtime-banner',
   }
@@ -1030,7 +1031,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
 
   return (
     <div className={embedded ? 'ai-chat-layout ai-chat-layout-embedded' : 'ai-chat-layout'}>
-      <aside className='ai-chat-sidebar'>
+      {!embedded ? <aside className='ai-chat-sidebar'>
         <div className='ai-chat-sidebar-scroll'>
           <section className='ai-assistant-card ai-context-card' aria-label='Ngữ cảnh trợ lý AI'>
             <div>
@@ -1072,21 +1073,20 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
             Xóa lịch sử
           </button>
         </div>
-      </aside>
+      </aside> : null}
 
       <main className='ai-chat-main'>
         <header className={embedded ? 'chat-window-header ai-chat-header ai-chat-header-embedded' : 'ai-chat-header'}>
           <div className={embedded ? 'chat-window-header-main' : 'ai-header-main'}>
-            <div className='ai-header-avatar' aria-hidden='true'>
-              <Bot size={20} />
+            <div className='relative'>
+              <UserAvatar name='VNALO AI Assistant' size='md' isAiAssistant />
+              <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full' />
             </div>
             <div className={embedded ? 'chat-window-header-copy' : 'ai-header-stack'}>
-              <div className='ai-header-info'>
-                <strong className='text-[15px] font-semibold'>VNALO AI Assistant</strong>
-                <span className={runtimeState.badgeClassName} />
-                <span>{runtimeState.label}</span>
+              <h2>VNALO AI Assistant</h2>
+              <div className='chat-window-header-meta'>
+                <p>{runtimeState.degraded ? runtimeState.label : 'Đang hoạt động'}</p>
               </div>
-              <span className='ai-header-helper'>Đang hoạt động</span>
             </div>
           </div>
         </header>
