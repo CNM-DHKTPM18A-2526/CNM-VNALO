@@ -153,6 +153,7 @@ function resolveErrorPresentation(error: unknown): { message: string; providerSt
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
+const AI_HISTORY_UPDATED_EVENT = 'vnalo:ai-history-updated'
 const MAX_API_HISTORY = 20
 
 const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
@@ -635,9 +636,21 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     }
   }, [historyStorageKey])
 
-  const saveMessages = (nextMessages: AiMessage[]) => {
+  useEffect(() => {
+    if (!historyStorageKey) return
+
+    const handleHistoryUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; messages?: AiMessage[] }>).detail
+      if (detail?.key !== historyStorageKey || !Array.isArray(detail.messages)) return
+      setMessages(normalizeStoredMessages(detail.messages))
+    }
+
+    window.addEventListener(AI_HISTORY_UPDATED_EVENT, handleHistoryUpdated)
+    return () => window.removeEventListener(AI_HISTORY_UPDATED_EVENT, handleHistoryUpdated)
+  }, [historyStorageKey])
+
+  const persistMessages = (nextMessages: AiMessage[]) => {
     const normalized = normalizeStoredMessages(nextMessages)
-    setMessages(normalized)
     const latestActivity = [...normalized].reverse().find((message) => message.content.trim())
     if (latestActivity && latestActivity !== INITIAL_ASSISTANT_MESSAGE) {
       const activity = { preview: getAiMessagePreview(latestActivity), timestamp: new Date().toISOString() }
@@ -645,10 +658,21 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       onActivity?.(activity)
     }
     if (!historyStorageKey) {
-      return
+      return normalized
     }
     localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
     localStorage.removeItem(LEGACY_STORAGE_KEY)
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(AI_HISTORY_UPDATED_EVENT, {
+        detail: { key: historyStorageKey, messages: normalized },
+      }))
+    }, 0)
+    return normalized
+  }
+
+  const saveMessages = (nextMessages: AiMessage[]) => {
+    const normalized = persistMessages(nextMessages)
+    setMessages(normalized)
   }
 
   const appendAssistantFeedback = (
@@ -753,10 +777,13 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         actionParams: aiResponse.actionParams ?? null,
       }
 
-      if (!isUnmountedRef.current) {
-        saveMessages([...updatedMessages, assistantMessage])
+        setMessages((currentMessages) => {
+          const baseMessages = currentMessages.some((message) => message.role === 'user' && message.content === query)
+            ? currentMessages
+            : updatedMessages
+          return persistMessages([...baseMessages, assistantMessage])
+        })
         setRetryPrompt('')
-      }
     } catch (error) {
       console.error('AI chat failed:', error)
       const errorPresentation = resolveErrorPresentation(error)
@@ -769,9 +796,12 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         providerStatus: errorPresentation.providerStatus,
       }
 
-      if (!isUnmountedRef.current) {
-        saveMessages([...updatedMessages, errorMessage])
-      }
+        setMessages((currentMessages) => {
+          const baseMessages = currentMessages.some((message) => message.role === 'user' && message.content === query)
+            ? currentMessages
+            : updatedMessages
+          return persistMessages([...baseMessages, errorMessage])
+        })
     } finally {
       if (!isUnmountedRef.current) {
         inFlightRequestRef.current = false
