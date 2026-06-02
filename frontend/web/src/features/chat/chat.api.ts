@@ -12,6 +12,7 @@ type InboxItem = {
   lastMessageSenderId?: string | null
   lastMessageAt?: string | null
   updatedAt?: string | null
+  lastMessageType?: string | null
   conversation?: {
     id?: string
     title?: string | null
@@ -266,9 +267,16 @@ function isHttpUrl(value?: string | null): boolean {
   }
 }
 
-function normalizeInboxPreview(rawPreview?: string | null): string {
+function normalizeInboxPreview(rawPreview?: string | null, messageType?: string | null): string {
   const preview = String(rawPreview ?? '').trim()
   if (!preview) {
+    if (messageType) {
+      const type = messageType.toLowerCase()
+      if (type === 'image') return 'Ảnh'
+      if (type === 'video') return 'Video'
+      if (type === 'file') return 'File'
+      if (type === 'sticker') return 'Sticker'
+    }
     return ''
   }
 
@@ -426,7 +434,7 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
       const partnerUserId = String(peerMember?.userId ?? '').trim() || null
       const peerNickname = peerMember?.nickname?.trim()
       const peerFallback = 'Người dùng'
-      const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
+      const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview, item.lastMessageType)
       const isGroup = item.conversation?.type?.toUpperCase() === 'GROUP' || (item as any).isGroup === true
       const avatarUrl = item.conversation?.avatarUrl ?? (item as any).avatarUrl ?? (item as any).avatar_url ?? null
 
