@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -34,6 +36,7 @@ public class GeminiAiService {
     private final CoreServiceClient coreServiceClient;
     private final OllamaProvider ollamaProvider;
     private final ChatService chatService;
+    private final GeminiKeyManager keyManager;
 
     @Value("${ai.gemini.model:gemini-1.5-flash}")
     private String modelName;
@@ -97,9 +100,8 @@ public class GeminiAiService {
             // Check Global Rate Limit via ChatService
             chatService.enforceGlobalRateLimit();
 
-            // Call Gemini
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload);
-            ResponseEntity<String> response = geminiRestTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            // Call Gemini with key rotation when quota/rate-limit is hit.
+            ResponseEntity<String> response = exchangeGeminiWithRotation(url, payload);
             responseObj = parseGeminiResponse(response.getBody(), request.isAnalyzeIntent());
             answer = responseObj.getTextReply();
         } catch (Exception geminiEx) {
@@ -155,6 +157,34 @@ public class GeminiAiService {
         }
 
         return responseObj;
+    }
+
+    private ResponseEntity<String> exchangeGeminiWithRotation(String url, Map<String, Object> payload) {
+        if (!keyManager.hasKeys()) {
+            throw new RuntimeException("GEMINI_NOT_CONFIGURED");
+        }
+
+        RuntimeException lastError = null;
+        int attempts = Math.max(1, keyManager.keyCount());
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            String activeKey = keyManager.currentKey();
+            try {
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("x-goog-api-key", activeKey);
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+                return geminiRestTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            } catch (RuntimeException e) {
+                lastError = e;
+                if (keyManager.isQuotaOrRateLimitError(e) && attempt < attempts - 1) {
+                    keyManager.rotateAfterFailure(activeKey);
+                    continue;
+                }
+                throw e;
+            }
+        }
+
+        throw lastError != null ? lastError : new RuntimeException("GEMINI_ERROR");
     }
 
     private String normalizeEntryId(String requestedEntryId, String fallbackEntryId) {

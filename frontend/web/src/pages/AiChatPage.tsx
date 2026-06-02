@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Sparkles, Trash2, X } from 'lucide-react'
+import { Copy, Mic, Paperclip, Reply, RotateCcw, Send, Share2, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
+import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
 import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
+import { getFriends } from '../features/friends/friends.api'
+import type { Friend } from '../features/friends/friends.types'
+import { UserAvatar } from '../shared/components/UserAvatar'
 
 type ProviderStatus =
   | 'LIVE_PROVIDER_ACTIVE'
@@ -78,9 +82,82 @@ type ActionFeedbackState = {
   tone: 'info' | 'success' | 'warning' | 'error'
   message: string
 }
+
+const isAxiosLikeError = (error: unknown): error is { response?: { status?: number; data?: unknown } } => {
+  return Boolean(error && typeof error === 'object' && 'response' in error)
+}
+
+const isNetworkError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false
+  const maybeError = error as { response?: unknown; request?: unknown; code?: string; message?: string }
+  return !maybeError.response && (Boolean(maybeError.request) || maybeError.code === 'ERR_NETWORK' || maybeError.message === 'Network Error')
+}
+
+function resolveErrorPresentation(error: unknown): { message: string; providerStatus: ProviderStatus; degraded: boolean } {
+  const response = isAxiosLikeError(error) ? error.response : undefined
+  const status = response?.status ?? null
+  const extracted = extractMessage(response?.data) || extractMessage(error)
+
+  if (status === 401) {
+    return {
+      message: extracted || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục dùng Trợ lý AI.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 403) {
+    return {
+      message: extracted || 'Bạn chưa có quyền truy cập Trợ lý AI từ phiên đăng nhập hiện tại.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 404) {
+    return {
+      message: extracted || 'Đường dẫn AI trên máy chủ chưa sẵn sàng hoặc đang cấu hình sai. Vui lòng kiểm tra deploy gateway.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 429) {
+    return {
+      message: extracted || 'AI đang quá tải hoặc chạm giới hạn tạm thời. Hãy thử lại sau ít phút.',
+      providerStatus: 'FALLBACK_PROVIDER_ACTIVE',
+      degraded: true,
+    }
+  }
+
+  if (status === 503) {
+    return {
+      message: extracted || 'Nhà cung cấp AI hiện chưa sẵn sàng. Hãy thử lại sau ít phút.',
+      providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+      degraded: true,
+    }
+  }
+
+  if (isNetworkError(error)) {
+    return {
+      message: extracted || 'Không kết nối được tới Trợ lý AI. Vui lòng kiểm tra mạng hoặc thử lại sau.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  return {
+    message: extracted || 'Đã xảy ra lỗi khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.',
+    providerStatus: null,
+    degraded: false,
+  }
+}
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
+const AI_HISTORY_UPDATED_EVENT = 'vnalo:ai-history-updated'
+const AI_PENDING_UPDATED_EVENT = 'vnalo:ai-pending-updated'
+const AI_PENDING_KEY_PREFIX = 'vnalo_ai_chat_pending:'
 const MAX_API_HISTORY = 20
 
 const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
@@ -112,7 +189,7 @@ function tryDecodeUtf8Mojibake(value: string) {
   return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes))
 }
 
-function fixMojibakeText(value: string) {
+function normalizeIncomingText(value: string) {
   let best = value
   let bestScore = mojibakeScore(value)
 
@@ -134,6 +211,7 @@ function fixMojibakeText(value: string) {
   return best
 }
 
+
 function buildAiStorageKey(userId?: string | number | null) {
   if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
     return null
@@ -141,15 +219,28 @@ function buildAiStorageKey(userId?: string | number | null) {
   return `${STORAGE_KEY}:${userId}`
 }
 
+function buildAiPendingKey(userId?: string | number | null) {
+  if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
+    return null
+  }
+  return `${AI_PENDING_KEY_PREFIX}${userId}`
+}
+
+function readAiPending(key: string | null) {
+  if (!key) return false
+  return localStorage.getItem(key) === 'true'
+}
+
 const PRESET_PROMPTS = [
   'Tóm tắt nhanh các tính năng chính của VNALO',
   'Giúp tôi soạn một tin nhắn từ chối lịch hẹn lịch sự',
   'Mở cuộc trò chuyện với một người trong danh bạ',
+  'Giải thích ngắn gọn một tính năng bảo mật trong ứng dụng',
 ]
 
 const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   role: 'assistant',
-  content: 'Xin chào! Mình là Trợ lý AI VNALO. Mình có thể trả lời câu hỏi và gợi ý thao tác an toàn trong hệ thống.',
+  content: 'Xin chào! Mình là VNALO AI Assistant. Mình có thể trả lời câu hỏi và gợi ý thao tác an toàn trong hệ thống.',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
@@ -182,6 +273,14 @@ const KNOWN_ACTION_COMMANDS = new Set<AiActionCommand>([
   'NAVIGATE_TO_TIMELINE',
 ])
 
+function isStaleRawAiError(content: string) {
+  const normalized = content.trim().toLowerCase()
+  return normalized === 'request failed with status code 403'
+    || normalized === 'request failed with status code 401'
+    || normalized === 'request failed with status code 404'
+    || normalized === 'request failed with status code 500'
+}
+
 function normalizeStoredMessages(payload: unknown): AiMessage[] {
   if (!Array.isArray(payload)) return [INITIAL_ASSISTANT_MESSAGE]
 
@@ -190,9 +289,9 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
       if (!item || typeof item !== 'object') return null
       const value = item as Record<string, unknown>
       const role = value.role === 'assistant' ? 'assistant' : value.role === 'user' ? 'user' : null
-      const content = typeof value.content === 'string' ? fixMojibakeText(value.content).trim() : ''
+      const content = typeof value.content === 'string' ? normalizeIncomingText(value.content).trim() : ''
       const timestamp = typeof value.timestamp === 'string' && value.timestamp.trim() ? value.timestamp : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      if (!role || !content) return null
+      if (!role || !content || isStaleRawAiError(content)) return null
 
       return {
         role,
@@ -244,7 +343,7 @@ function resolveProviderPresentation(messages: AiMessage[]) {
     degraded: false,
     badgeClassName: 'ai-header-status',
     label: 'Sẵn sàng hỗ trợ',
-    helper: 'Trợ lý AI có thể trả lời và gợi ý thao tác an toàn trong VNALO.',
+    helper: 'Đang hoạt động',
     banner: '',
     bannerClassName: 'ai-runtime-banner',
   }
@@ -313,6 +412,44 @@ function extractActionTarget(params?: Record<string, unknown> | null) {
     params.name ??
     ''
   return String(raw).trim()
+}
+
+function extractGroupTargets(params?: Record<string, unknown> | null) {
+  if (!params) return []
+  const rawCandidates = [
+    params.members,
+    params.memberNames,
+    params.participants,
+    params.participantNames,
+    params.users,
+    params.userNames,
+    params.recipients,
+    params.recipientNames,
+    params.contacts,
+    params.contactNames,
+    params.target,
+  ]
+
+  return rawCandidates.flatMap((raw) => {
+    if (!raw) return []
+    if (Array.isArray(raw)) return raw.map((item) => String(item).trim())
+    return String(raw)
+      .split(/[,;\n]|\s+và\s+|\s+and\s+/i)
+      .map((item) => item.trim())
+  }).filter(Boolean)
+}
+
+function getFriendDisplayName(friend: Friend) {
+  return friend.nickname?.trim() || friend.displayName?.trim() || ''
+}
+
+function findFriendMatches(friends: Friend[], target: string) {
+  const normalizedTarget = normalizeLookupText(target)
+  if (!normalizedTarget) return []
+  return friends
+    .map((friend) => ({ friend, score: computeConversationMatchScore(getFriendDisplayName(friend), normalizedTarget) }))
+    .filter((item) => item.score >= 0)
+    .sort((left, right) => right.score - left.score)
 }
 
 function extractComposeContent(params?: Record<string, unknown> | null) {
@@ -478,13 +615,27 @@ function buildActionSuccessFeedback(command: AiActionCommand) {
   return 'Đã mở đúng cuộc trò chuyện đích.'
 }
 
-export function AiChatPage() {
+type AiChatPageProps = {
+  embedded?: boolean
+  onActivity?: (activity: { preview: string; timestamp: string }) => void
+}
+
+function getAiMessagePreview(message: AiMessage): string {
+  const trimmed = message.content.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return 'Sẵn sàng hỗ trợ'
+  return trimmed.length > 96 ? trimmed.slice(0, 93) + '...' : trimmed
+}
+
+export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {}) {
   const { accessToken, user } = useAuth()
+  const { recordActivity: recordAiAssistantActivity, resetMeta: resetAiAssistantMeta } = useAiAssistant()
   const navigate = useNavigate()
   const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
+  const pendingStorageKey = useMemo(() => buildAiPendingKey(user?.id as string | number | undefined), [user?.id])
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isPersistentPending, setIsPersistentPending] = useState(() => readAiPending(pendingStorageKey))
   const [actionBusyIndex, setActionBusyIndex] = useState<number | null>(null)
   const [activeActionLabel, setActiveActionLabel] = useState<string>('')
   const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState | null>(null)
@@ -501,6 +652,17 @@ export function AiChatPage() {
     return () => {
       isUnmountedRef.current = true
     }
+  }, [])
+
+  useEffect(() => {
+    const pendingPrompt = localStorage.getItem(AI_PENDING_PROMPT_KEY)
+    if (!pendingPrompt?.trim()) return
+
+    localStorage.removeItem(AI_PENDING_PROMPT_KEY)
+    setInputValue(pendingPrompt.trim())
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 50)
   }, [])
 
   useEffect(() => {
@@ -530,14 +692,73 @@ export function AiChatPage() {
     }
   }, [historyStorageKey])
 
-  const saveMessages = (nextMessages: AiMessage[]) => {
+  useEffect(() => {
+    setIsPersistentPending(readAiPending(pendingStorageKey))
+  }, [pendingStorageKey])
+
+  useEffect(() => {
+    if (!pendingStorageKey) return
+
+    const handlePendingUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; pending?: boolean }>).detail
+      if (detail?.key !== pendingStorageKey) return
+      setIsPersistentPending(Boolean(detail.pending))
+    }
+
+    window.addEventListener(AI_PENDING_UPDATED_EVENT, handlePendingUpdated)
+    return () => window.removeEventListener(AI_PENDING_UPDATED_EVENT, handlePendingUpdated)
+  }, [pendingStorageKey])
+
+  const persistPending = (pending: boolean) => {
+    if (!pendingStorageKey) return
+    if (pending) {
+      localStorage.setItem(pendingStorageKey, 'true')
+    } else {
+      localStorage.removeItem(pendingStorageKey)
+    }
+    setIsPersistentPending(pending)
+    window.dispatchEvent(new CustomEvent(AI_PENDING_UPDATED_EVENT, {
+      detail: { key: pendingStorageKey, pending },
+    }))
+  }
+
+  useEffect(() => {
+    if (!historyStorageKey) return
+
+    const handleHistoryUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; messages?: AiMessage[] }>).detail
+      if (detail?.key !== historyStorageKey || !Array.isArray(detail.messages)) return
+      setMessages(normalizeStoredMessages(detail.messages))
+    }
+
+    window.addEventListener(AI_HISTORY_UPDATED_EVENT, handleHistoryUpdated)
+    return () => window.removeEventListener(AI_HISTORY_UPDATED_EVENT, handleHistoryUpdated)
+  }, [historyStorageKey])
+
+  const persistMessages = (nextMessages: AiMessage[]) => {
     const normalized = normalizeStoredMessages(nextMessages)
-    setMessages(normalized)
+    const latestActivity = [...normalized].reverse().find((message) => message.content.trim())
+    if (latestActivity && latestActivity !== INITIAL_ASSISTANT_MESSAGE) {
+      const activity = { preview: getAiMessagePreview(latestActivity), timestamp: new Date().toISOString() }
+      recordAiAssistantActivity(activity)
+      onActivity?.(activity)
+    }
     if (!historyStorageKey) {
-      return
+      return normalized
     }
     localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
     localStorage.removeItem(LEGACY_STORAGE_KEY)
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(AI_HISTORY_UPDATED_EVENT, {
+        detail: { key: historyStorageKey, messages: normalized },
+      }))
+    }, 0)
+    return normalized
+  }
+
+  const saveMessages = (nextMessages: AiMessage[]) => {
+    const normalized = persistMessages(nextMessages)
+    setMessages(normalized)
   }
 
   const appendAssistantFeedback = (
@@ -558,6 +779,9 @@ export function AiChatPage() {
         localStorage.setItem(historyStorageKey, JSON.stringify(nextMessages))
         localStorage.removeItem(LEGACY_STORAGE_KEY)
       }
+      const activity = { preview: getAiMessagePreview(feedbackMessage), timestamp: new Date().toISOString() }
+      recordAiAssistantActivity(activity)
+      onActivity?.(activity)
       return nextMessages
     })
   }
@@ -570,10 +794,11 @@ export function AiChatPage() {
     }
 
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
-  }, [messages, isLoading, actionFeedback])
+  }, [messages, isLoading, isPersistentPending, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
-  const isAssistantBusy = isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null
+  const showTypingIndicator = isLoading || isPersistentPending
+  const isAssistantBusy = showTypingIndicator || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null
 
   useEffect(() => {
     const input = inputRef.current
@@ -594,8 +819,8 @@ export function AiChatPage() {
         role: 'assistant',
         content: 'Bạn cần đăng nhập lại để dùng Trợ lý AI trên web.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        degraded: true,
-        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+        degraded: false,
+        providerStatus: null,
       }
       saveMessages([...messages, authError])
       return
@@ -617,6 +842,7 @@ export function AiChatPage() {
     setActionFeedback(null)
     inFlightRequestRef.current = true
     setIsLoading(true)
+    persistPending(true)
 
     try {
       const apiHistory = updatedMessages.slice(-MAX_API_HISTORY).map((message) => ({
@@ -639,28 +865,31 @@ export function AiChatPage() {
         actionParams: aiResponse.actionParams ?? null,
       }
 
-      if (!isUnmountedRef.current) {
-        saveMessages([...updatedMessages, assistantMessage])
-      }
+      const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
+        ? messages
+        : updatedMessages
+      const persisted = persistMessages([...baseMessages, assistantMessage])
+      setMessages(persisted)
+      setRetryPrompt('')
     } catch (error) {
       console.error('AI chat failed:', error)
-      const fallbackText =
-        extractMessage((error as { response?: { data?: unknown } })?.response?.data) ||
-        extractMessage(error) ||
-        'Đã xảy ra lỗi khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.'
+      const errorPresentation = resolveErrorPresentation(error)
 
       const errorMessage: AiMessage = {
         role: 'assistant',
-        content: fallbackText,
+        content: errorPresentation.message,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        degraded: true,
-        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+        degraded: errorPresentation.degraded,
+        providerStatus: errorPresentation.providerStatus,
       }
 
-      if (!isUnmountedRef.current) {
-        saveMessages([...updatedMessages, errorMessage])
-      }
+      const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
+        ? messages
+        : updatedMessages
+      const persisted = persistMessages([...baseMessages, errorMessage])
+      setMessages(persisted)
     } finally {
+      persistPending(false)
       if (!isUnmountedRef.current) {
         inFlightRequestRef.current = false
         setIsLoading(false)
@@ -692,13 +921,52 @@ export function AiChatPage() {
       }
 
       if (command === 'CREATE_GROUP') {
+        const requestedTargets = extractGroupTargets(params)
+        const groupName = String(params.title ?? params.groupName ?? params.name ?? '').trim()
+
+        if (requestedTargets.length > 0) {
+          const friends = await getFriends(accessToken)
+          const missingTargets: string[] = []
+          const ambiguousTargets: string[] = []
+
+          requestedTargets.forEach((target) => {
+            const matches = findFriendMatches(friends, target)
+            if (matches.length === 0) {
+              missingTargets.push(target)
+              return
+            }
+
+            const bestScore = matches[0]?.score ?? -1
+            const sameBestMatches = matches.filter((item) => item.score === bestScore)
+            if (sameBestMatches.length > 1) {
+              ambiguousTargets.push(target)
+            }
+          })
+
+          if (missingTargets.length > 0) {
+            const messageText = `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không mở tạo nhóm để tránh chọn nhầm người.`
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
+          }
+
+          if (ambiguousTargets.length > 0) {
+            const messageText = `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy mở tạo nhóm và chọn thủ công để an toàn.`
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
+          }
+        }
+
         setPendingActionReview({
           title: 'Mở luồng tạo nhóm',
-          description: 'AI sẽ mở màn hình tạo nhóm. Bạn vẫn cần kiểm tra thành viên và xác nhận tạo nhóm thủ công.',
+          description: requestedTargets.length > 0
+            ? 'Mình đã kiểm tra tên trong danh bạ. Web vẫn sẽ mở modal tạo nhóm để bạn tự chọn và xác nhận lần cuối.'
+            : 'AI chưa xác định rõ thành viên. Web chỉ mở modal tạo nhóm để bạn tự chọn thủ công.',
           confirmLabel: 'Mở tạo nhóm',
           path: '/chat?createGroup=true',
           feedback: 'Đã mở luồng tạo nhóm. Hãy kiểm tra tên nhóm và danh sách thành viên trước khi tạo.',
-          preview: { risk: 'medium', targetLabel: String(params.title ?? params.groupName ?? 'Nhóm mới') },
+          preview: { risk: 'medium', targetLabel: groupName || requestedTargets.join(', ') || 'Nhóm mới' },
         })
         return
       }
@@ -797,9 +1065,10 @@ export function AiChatPage() {
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
-      const errorFeedback = 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.'
+      const errorPresentation = resolveErrorPresentation(error)
+      const errorFeedback = errorPresentation.message || 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.'
       setActionFeedback({ tone: 'error', message: errorFeedback })
-      appendAssistantFeedback(errorFeedback, { degraded: true, providerStatus: 'AI_PROVIDER_UNAVAILABLE' })
+      appendAssistantFeedback(errorFeedback, { degraded: false, providerStatus: null })
     } finally {
       setActionBusyIndex(null)
       setActiveActionLabel('')
@@ -866,8 +1135,8 @@ export function AiChatPage() {
         return
       }
 
-      setPendingActionReview(null)
-      setPendingResolution(null)
+      closePendingActionReview()
+      closePendingResolution()
     }
 
     window.addEventListener('keydown', handleEscape)
@@ -879,7 +1148,22 @@ export function AiChatPage() {
       return
     }
 
+    setActionFeedback(null)
     void handleSend(retryPrompt)
+  }
+
+  const closePendingActionReview = (reason: 'dismiss' | 'cancel' = 'dismiss') => {
+    setPendingActionReview(null)
+    if (reason === 'cancel') {
+      setActionFeedback({ tone: 'info', message: 'Đã hủy bước xác nhận thao tác AI trên web.' })
+    }
+  }
+
+  const closePendingResolution = (reason: 'dismiss' | 'cancel' = 'dismiss') => {
+    setPendingResolution(null)
+    if (reason === 'cancel') {
+      setActionFeedback({ tone: 'info', message: 'Đã hủy bước chọn cuộc trò chuyện. Bạn có thể thử lại với tên cụ thể hơn.' })
+    }
   }
 
   const handleClearHistory = () => {
@@ -891,6 +1175,7 @@ export function AiChatPage() {
       localStorage.removeItem(historyStorageKey)
     }
     localStorage.removeItem(LEGACY_STORAGE_KEY)
+    resetAiAssistantMeta()
     saveMessages([
       {
         role: 'assistant',
@@ -900,29 +1185,70 @@ export function AiChatPage() {
     ])
   }
 
+  const handleCopyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard?.writeText(content)
+      setActionFeedback({ tone: 'success', message: 'Đã sao chép tin nhắn.' })
+    } catch {
+      setActionFeedback({ tone: 'error', message: 'Không thể sao chép tin nhắn trên trình duyệt hiện tại.' })
+    }
+  }
+
+  const handleShareMessage = async (message: AiMessage) => {
+    const text = message.content.trim()
+    if (!text) return
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, title: 'VNALO AI Assistant' })
+        return
+      }
+
+      await navigator.clipboard?.writeText(text)
+      setActionFeedback({ tone: 'success', message: 'Trình duyệt chưa hỗ trợ chia sẻ trực tiếp, nội dung đã được sao chép.' })
+    } catch (error) {
+      if ((error as { name?: string })?.name === 'AbortError') return
+      setActionFeedback({ tone: 'error', message: 'Không thể chia sẻ tin nhắn. Vui lòng thử lại.' })
+    }
+  }
+
+  const handleReplyToMessage = (message: AiMessage) => {
+    const preview = getAiMessagePreview(message)
+    setInputValue((current) => {
+      const existing = current.trim()
+      const quoted = `Trả lời: "${preview}"\n`
+      return existing ? `${quoted}${existing}` : quoted
+    })
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
   return (
-    <div className='ai-chat-layout'>
-      <aside className='ai-chat-sidebar'>
+    <div className={embedded ? 'ai-chat-layout ai-chat-layout-embedded' : 'ai-chat-layout'}>
+      {!embedded ? <aside className='ai-chat-sidebar'>
         <div className='ai-chat-sidebar-scroll'>
-          <section className='ai-assistant-card' aria-label='Thông tin trợ lý AI'>
-            <div className='ai-avatar-glow'>
-              <Sparkles size={28} />
+          <section className='ai-assistant-card ai-context-card' aria-label='Ngữ cảnh trợ lý AI'>
+            <div>
+              <h3>VNALO AI Assistant</h3>
+              <p>Đoạn chat riêng 1:1 với trợ lý trong VNALO.</p>
             </div>
-            <h3>{fixMojibakeText('VNALO AI Assistant')}</h3>
-            <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
+            <div className='ai-context-status'>
+              <span className={runtimeState.badgeClassName} />
+              <strong>{runtimeState.label}</strong>
+            </div>
           </section>
 
           <section className='ai-presets-container' aria-label='Gợi ý câu hỏi AI'>
-            <span className='ai-presets-title'>Gợi ý câu hỏi</span>
+            <span className='ai-presets-title'>Gợi ý nhanh</span>
             {PRESET_PROMPTS.map((prompt) => (
               <button
-                key={fixMojibakeText(prompt)}
+                key={prompt}
                 type='button'
                 className='ai-preset-btn'
-                onClick={() => void handleSend(fixMojibakeText(prompt))}
+                onClick={() => void handleSend(prompt)}
                 disabled={isAssistantBusy}
               >
-                {fixMojibakeText(prompt)}
+                <Sparkles size={14} />
+                <span>{prompt}</span>
               </button>
             ))}
           </section>
@@ -940,24 +1266,29 @@ export function AiChatPage() {
             Xóa lịch sử
           </button>
         </div>
-      </aside>
+      </aside> : null}
 
       <main className='ai-chat-main'>
-        <header className='ai-chat-header'>
-          <div className='ai-header-stack'>
-            <div className='ai-header-info'>
-              <div className={runtimeState.badgeClassName} />
-              <strong className='text-[15px] font-semibold'>{fixMojibakeText(runtimeState.label)}</strong>
+        <header className={embedded ? 'chat-window-header ai-chat-header ai-chat-header-embedded' : 'ai-chat-header'}>
+          <div className={embedded ? 'chat-window-header-main' : 'ai-header-main'}>
+            <div className='relative'>
+              <UserAvatar name='VNALO AI Assistant' size='md' isAiAssistant />
+              <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full' />
             </div>
-            <span className='ai-header-helper'>{fixMojibakeText(runtimeState.helper)}</span>
+            <div className={embedded ? 'chat-window-header-copy' : 'ai-header-stack'}>
+              <h2>VNALO AI Assistant</h2>
+              <div className='chat-window-header-meta'>
+                <p>{runtimeState.degraded ? runtimeState.label : 'Đang hoạt động'}</p>
+              </div>
+            </div>
           </div>
         </header>
 
         <div className='ai-chat-messages' ref={messagesContainerRef} role='log' aria-live='polite' aria-relevant='additions text'>
-          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{fixMojibakeText(runtimeState.banner)}</div>}
+          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
           {actionFeedback ? (
             <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>
-              <span>{fixMojibakeText(actionFeedback.message)}</span>
+              <span>{actionFeedback.message}</span>
               {actionFeedback.tone === 'error' && retryPrompt ? (
                 <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isAssistantBusy}>
                   Thử lại
@@ -969,11 +1300,25 @@ export function AiChatPage() {
           {messages.map((message, index) => (
             <div
               key={`${message.role}-${message.timestamp}-${index}`}
-              className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'}
+              className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'} data-role={message.role}
             >
-              <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
-                {fixMojibakeText(message.content)}
-              </p>
+              <div className='ai-message-action-toolbar' aria-label='Thao tác tin nhắn'>
+                <button type='button' className='ai-message-action-btn' onClick={() => handleReplyToMessage(message)} title='Trả lời tin nhắn' aria-label='Trả lời tin nhắn'>
+                  <Reply size={14} />
+                </button>
+                <button type='button' className='ai-message-action-btn' onClick={() => void handleShareMessage(message)} title='Chia sẻ tin nhắn' aria-label='Chia sẻ tin nhắn'>
+                  <Share2 size={14} />
+                </button>
+                <button type='button' className='ai-message-action-btn' onClick={() => void handleCopyMessage(message.content)} title='Sao chép tin nhắn' aria-label='Sao chép tin nhắn'>
+                  <Copy size={14} />
+                </button>
+                {message.role === 'assistant' && message.degraded && retryPrompt ? (
+                  <button type='button' className='ai-message-action-btn' onClick={handleRetry} disabled={isAssistantBusy} title='Thử lại' aria-label='Thử lại'>
+                    <RotateCcw size={14} />
+                  </button>
+                ) : null}
+              </div>
+              <p className='ai-message-text'>{message.content}</p>
               {message.role === 'assistant' && message.actionCommand ? (
                 <div className='ai-action-row'>
                   <button
@@ -986,12 +1331,10 @@ export function AiChatPage() {
                   </button>
                 </div>
               ) : null}
-              <div className='text-[10px] opacity-60 text-right mt-1.5' style={{ marginTop: '6px' }}>
-                {message.timestamp}
-              </div>
+              <div className='ai-message-time'>{message.timestamp}</div>
             </div>
           ))}
-          {isLoading && (
+          {showTypingIndicator && (
             <div className='ai-typing-indicator'>
               <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} đang được chuẩn bị` : 'Trợ lý AI đang soạn phản hồi'}</span>
               <div className='ai-typing-dot' />
@@ -1010,48 +1353,58 @@ export function AiChatPage() {
               void handleSend()
             }}
           >
-            <textarea
-              ref={inputRef}
-              className='ai-input-field'
-              placeholder='Nhắn điều bạn cần cho Trợ lý AI...'
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              disabled={pendingActionReview !== null || pendingResolution !== null}
-              rows={1}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  void handleSend()
-                }
-              }}
-            />
-            <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho trợ lý AI'>
-              <Send size={18} />
+            <button type='button' className='ai-composer-tool-btn' aria-label='Đính kèm ngữ cảnh' disabled>
+              <Paperclip size={18} />
             </button>
-            <span className='ai-input-hint'>Enter để gửi, Shift + Enter để xuống dòng</span>
+            <div className='ai-composer-field'>
+              <textarea
+                ref={inputRef}
+                className='ai-input-field'
+                placeholder='Nhắn điều bạn cần cho VNALO AI Assistant...'
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
+                disabled={pendingActionReview !== null || pendingResolution !== null}
+                rows={1}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    void handleSend()
+                  }
+                }}
+              />
+              <span className='ai-input-hint'>Enter để gửi · Shift + Enter để xuống dòng</span>
+            </div>
+            <div className='ai-composer-actions'>
+              <button type='button' className='ai-composer-tool-btn' aria-label='Nhập bằng giọng nói' disabled>
+                <Mic size={18} />
+              </button>
+              <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho VNALO AI Assistant'>
+                <Send size={18} />
+              </button>
+            </div>
           </form>
         </footer>
       </main>
 
       {pendingActionReview ? (
-        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-action-review-title' onClick={() => setPendingActionReview(null)}>
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-action-review-title' onClick={() => closePendingActionReview('dismiss')}>
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h3 id='ai-action-review-title'>{fixMojibakeText(pendingActionReview.title)}</h3>
-                <p>{fixMojibakeText(pendingActionReview.description)}</p>
+                <h3 id='ai-action-review-title'>{pendingActionReview.title}</h3>
+                <p>{pendingActionReview.description}</p>
                 {renderActionPreview(pendingActionReview.preview)}
               </div>
-              <button className='modal-close-btn' type='button' onClick={() => setPendingActionReview(null)} aria-label='Close'>
+              <button className='modal-close-btn' type='button' onClick={() => closePendingActionReview('dismiss')} aria-label='Đóng'>
                 <X size={18} />
               </button>
             </div>
             <div className='modal-footer'>
-              <button className='btn btn-subtle' type='button' onClick={() => setPendingActionReview(null)}>
+              <button className='btn btn-subtle' type='button' onClick={() => closePendingActionReview('cancel')}>
                 Hủy
               </button>
               <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
-                {fixMojibakeText(pendingActionReview.confirmLabel)}
+                {pendingActionReview.confirmLabel}
               </button>
             </div>
           </div>
@@ -1059,7 +1412,7 @@ export function AiChatPage() {
       ) : null}
 
       {pendingResolution ? (
-        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-resolution-title' onClick={() => setPendingResolution(null)}>
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-resolution-title' onClick={() => closePendingResolution('dismiss')}>
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
@@ -1067,7 +1420,7 @@ export function AiChatPage() {
                 <p>Hãy xác nhận đúng đối tượng để tránh mở nhầm cuộc trò chuyện hoặc điền nháp sai người.</p>
                 {renderActionPreview({ risk: buildActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
               </div>
-              <button className='modal-close-btn' type='button' onClick={() => setPendingResolution(null)} aria-label='Close'>
+              <button className='modal-close-btn' type='button' onClick={() => closePendingResolution('dismiss')} aria-label='Đóng'>
                 <X size={18} />
               </button>
             </div>
@@ -1088,7 +1441,7 @@ export function AiChatPage() {
               ))}
             </div>
             <div className='modal-footer'>
-              <button className='btn btn-subtle' type='button' onClick={() => setPendingResolution(null)}>
+              <button className='btn btn-subtle' type='button' onClick={() => closePendingResolution('cancel')}>
                 Hủy
               </button>
             </div>

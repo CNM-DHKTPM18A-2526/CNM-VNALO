@@ -49,6 +49,7 @@ export function ChatItem({ conversation, active, onSelect }: ChatItemProps) {
           size='md' 
           isGroup={conversation.isGroup}
           isCloud={conversation.isCloud}
+          isAiAssistant={conversation.isAiAssistant}
           memberAvatars={collageData.avatars}
           extraCount={collageData.extraCount}
         />

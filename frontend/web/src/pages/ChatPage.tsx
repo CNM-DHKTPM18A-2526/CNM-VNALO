@@ -1,20 +1,27 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
+import {
+  AI_ASSISTANT_CONVERSATION_ID,
+  AI_ASSISTANT_USER_ID,
+  AI_PENDING_PROMPT_KEY,
+  useAiAssistant,
+} from '../features/ai-assistant/AiAssistantProvider'
 import { ChatList } from '../features/chat/components/ChatList'
 import { ConversationInfo } from '../features/chat/components/ConversationInfo'
 import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesPanel'
 import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel'
 import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
+import { AiChatPage } from './AiChatPage'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import { useGroupCall } from '../features/chat/components/GroupCallModal'
 import { IncomingCallBanner } from '../features/chat/components/PremiumCallUI'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
-  createGroupConversation,           // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ NEW
+  createGroupConversation,           // NEW
   deleteMessageForMe,
   fetchMessageReactions,
   fetchInbox,
@@ -318,6 +325,14 @@ const EMOJI_TO_REACTION_KEY = REACTION_OPTIONS.reduce<Record<string, ReactionKey
 const RESTRICTED_TEXT = 'Noi dung duoc an tren web do chinh sach dong bo.'
 const DELETE_FOR_ME_STORAGE_PREFIX = 'vnalo:chat:deleted-for-me:'
 
+function isAiAssistantConversationId(conversationId?: string | null): boolean {
+  return conversationId === AI_ASSISTANT_CONVERSATION_ID
+}
+
+function isAiAssistantUserId(userId?: string | null): boolean {
+  return userId === AI_ASSISTANT_USER_ID
+}
+
 function buildDeleteForMeStorageKey(userId?: string | null): string | null {
   const normalized = String(userId ?? '').trim()
   if (!normalized) {
@@ -368,7 +383,7 @@ function persistDeletedMessageIds(userId: string, deletedMap: Record<string, tru
 }
 
 function fallbackUserDisplayName(_userId: string): string {
-  return 'NgÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng'
+  return 'Người dùng'
 }
 
 function applyRestrictedMessage(message: ChatMessage, restricted: boolean): ChatMessage {
@@ -463,7 +478,7 @@ function generateUUID(): string {
 
 const isGenericDirectName = (value: string | undefined | null) => {
   const normalized = String(value ?? '').trim()
-  const isGenericLabel = !normalized || normalized === 'NgÆ°á»i dÃ¹ng' || /^NgÆ°á»i dÃ¹ng\s+[0-9a-f]{6,}$/i.test(normalized)
+  const isGenericLabel = !normalized || normalized === 'Người dùng' || /^Người dùng\s+[0-9a-f]{6,}$/i.test(normalized)
   const isRawId = /^[0-9a-f]{24}$/i.test(normalized) // Common MongoDB ID format
   return isGenericLabel || isRawId
 }
@@ -471,9 +486,11 @@ const isGenericDirectName = (value: string | undefined | null) => {
 export default function ChatPage() {
   const { userMap, upsertUser, ensureUser } = useUserStore()
   const { isBootstrapping, accessToken, user } = useAuth()
+  const { assistantConversation: aiAssistantConversation, recordActivity: recordAiAssistantActivity } = useAiAssistant()
   const currentUserId = user?.id || ''
   const { t } = useLanguage()
   const navigate = useNavigate()
+  const location = useLocation()
   const { conversationId: conversationIdFromUrl } = useParams<{ conversationId?: string }>()
   const routedConversationId = conversationIdFromUrl ?? ''
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
@@ -503,6 +520,12 @@ export default function ChatPage() {
   useEffect(() => {
     localStorage.setItem('vnalo_chat_sidebar_content', rightSidebarContent || 'none')
   }, [rightSidebarContent])
+
+  useEffect(() => {
+    if ((routedConversationId || selectedConversationId) === AI_ASSISTANT_CONVERSATION_ID) {
+      setRightSidebarContent(null)
+    }
+  }, [routedConversationId, selectedConversationId])
 
   const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
   const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, string[]>>({})
@@ -682,13 +705,28 @@ export default function ChatPage() {
     };
   }, [user?.id, messagesByConversation['my-documents']]); // Re-run when messages change
 
+  const handleAiAssistantActivity = useCallback((activity: { preview: string; timestamp: string }) => {
+    recordAiAssistantActivity(activity)
+    setConversations((prev) => {
+      const existing = prev.find((conversation) => conversation.id === AI_ASSISTANT_CONVERSATION_ID) ?? aiAssistantConversation
+      const updated: ConversationSummary = {
+        ...existing,
+        lastMessage: activity.preview,
+        lastMessageAt: activity.timestamp,
+        updatedAt: activity.timestamp,
+      }
+      return [updated, ...prev.filter((conversation) => conversation.id !== AI_ASSISTANT_CONVERSATION_ID)]
+    })
+  }, [aiAssistantConversation, recordAiAssistantActivity])
+
   const selectedConversation = useMemo(
     () => {
       const targetId = routedConversationId || selectedConversationId;
+      if (targetId === AI_ASSISTANT_CONVERSATION_ID) return aiAssistantConversation;
       if (targetId === 'my-documents') return myDocumentsConversation;
       return conversations.find((conversation) => conversation.id === targetId);
     },
-    [conversations, routedConversationId, selectedConversationId, myDocumentsConversation],
+    [conversations, routedConversationId, selectedConversationId, myDocumentsConversation, aiAssistantConversation],
   )
   const selectedMessages = useMemo(() => {
     const resolvedConversationId = routedConversationId || selectedConversationId
@@ -932,6 +970,7 @@ export default function ChatPage() {
   const syncLatestMessages = useCallback(async (targetId?: string) => {
     const conversationId = targetId || selectedConversationIdRef.current
     if (!conversationId || !accessToken) return
+    if (isAiAssistantConversationId(conversationId)) return
 
     // Don't poll for conversations that are no longer in our list (ghost groups)
     if (!targetId && !conversationsRef.current.some(c => c.id === conversationId)) {
@@ -1208,6 +1247,7 @@ export default function ChatPage() {
 
   const syncConversationReactions = useCallback(async () => {
     if (!selectedConversationIdRef.current || !accessToken) return
+    if (isAiAssistantConversationId(selectedConversationIdRef.current)) return
 
     // Limit to only 10 latest messages for initial sync to avoid network flood
     const messageIds = selectedMessagesRef.current
@@ -1226,6 +1266,7 @@ export default function ChatPage() {
   const loadPinnedMessages = useCallback(
     async (conversationId: string) => {
       if (!accessToken || !conversationId) return
+      if (isAiAssistantConversationId(conversationId)) return
 
       // Hard guard: avoid double/simultaneous calls for same conversation
       if (loadingPinnedRef.current[conversationId]) return
@@ -1298,6 +1339,7 @@ export default function ChatPage() {
 
   const syncConversationMetadata = useCallback(async (conversationId: string) => {
     if (!accessToken) return;
+    if (isAiAssistantConversationId(conversationId)) return;
     try {
       const data = await fetchConversation(accessToken, conversationId) as any;
       if (!data) return;
@@ -1336,6 +1378,7 @@ export default function ChatPage() {
   // Fail-Safe Heartbeat: Ensure active conversation settings are always fresh
   useEffect(() => {
     if (!accessToken || !selectedConversationId || !isSocketConnected) return;
+    if (isAiAssistantConversationId(selectedConversationId)) return;
 
     // Only poll if the conversation exists in our list to avoid 404 noise
     // (Wait for inbox to load first)
@@ -1354,14 +1397,17 @@ export default function ChatPage() {
   const { emitSendMessage, emitRecallMessage, joinConversation, joinMultipleConversations, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
-      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚ÂÃ…Â¡ Socket connected event received');
+      console.log('[ChatPage] Socket connected event received');
       setIsSocketConnected(true)
       setIsSocketInitialized(true)
 
       // AUTO-JOIN ALL CONVERSATIONS ON CONNECT
       if (conversationsRef.current.length > 0) {
-        const conversationIds = conversationsRef.current.map(c => c.id);
-        console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Auto-joining', conversationIds.length, 'conversations on connect');
+        const conversationIds = conversationsRef.current
+          .map(c => c.id)
+          .filter((conversationId) => !isAiAssistantConversationId(conversationId));
+        if (conversationIds.length === 0) return;
+        console.log('[ChatPage] Auto-joining', conversationIds.length, 'conversations on connect');
         void joinMultipleConversations(conversationIds);
       }
 
@@ -1373,7 +1419,7 @@ export default function ChatPage() {
     },
     onFriendshipUpdated: async (payload) => {
       if (!user || !accessToken || !payload.friendId) return;
-      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Friendship updated via socket for friendId:', payload.friendId);
+      console.log('[ChatPage] Friendship updated via socket for friendId:', payload.friendId);
 
       try {
         // 1. Ensure conversation is created in message-service
@@ -1400,7 +1446,7 @@ export default function ChatPage() {
       // - Server auto-joined us, OR
       // - This is a message from our own send
 
-      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
+      // 0. SYSTEM MESSAGES (CRITICAL SIGNALS)
       // Handle both SYSTEM messages and TEXT messages that contain JSON signals (like poll sync)
       if (mapped.type === 'system' || (mapped.text && (mapped.text.includes('"action":') || mapped.text.startsWith('{')))) {
         try {
@@ -1478,7 +1524,7 @@ export default function ChatPage() {
 
             // Group Info Sync: Essential for permissions/settings
             if (sys.action === 'UPDATE_GROUP_INFO') {
-              console.log('[ChatPage] ðŸ”„ Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
+              console.log('[ChatPage] Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
 
               // 1. Optimistic update from payload
               setConversations(prev => prev.map(c => {
@@ -1495,7 +1541,7 @@ export default function ChatPage() {
 
               // 4. UI Hint
               if (sys.metadata && Object.keys(sys.metadata).length > 0) {
-                toast.success('CÃ i Ä‘áº·t nhÃ³m Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t');
+                toast.success('Cài đặt nhóm đã được cập nhật');
               }
 
               // 5. Silent Update: If it's just settings (no rename), don't show a bubble in chat
@@ -1506,7 +1552,7 @@ export default function ChatPage() {
 
             // Reaction Sync (Poll Voting)
             if (sys.action === 'UPDATE_MESSAGE_REACTIONS') {
-              console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
+              console.log('[ChatPage] Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
               if (sys.messageId) {
                 applyReactionSocketEvent(
                   sys.messageId,
@@ -1519,7 +1565,7 @@ export default function ChatPage() {
 
             // FRIEND_ACCEPTED Sync: Proactively fetch and show the new conversation
             if (sys.action === 'FRIEND_ACCEPTED' || mapped.text.includes('FRIEND_ACCEPTED')) {
-              console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Handling FRIEND_ACCEPTED signal');
+              console.log('[ChatPage] Handling FRIEND_ACCEPTED signal');
               void loadInbox(accessToken);
             }
           }
@@ -1540,19 +1586,19 @@ export default function ChatPage() {
         }
       }
 
-      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
+      // 1. DEDUPLICATION (PREVENT DOUBLE RENDERING)
       if (mapped.id && processedMessageIds.current.has(mapped.id)) {
-        console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã¢â‚¬Å“Ã‚Â¨ÃƒÂ¯Ã‚Â¿Ã‚Â½ Skipping duplicate message:', mapped.id);
+        console.log('[ChatPage] Skipping duplicate message:', mapped.id);
         return;
       }
       if (mapped.id) processedMessageIds.current.add(mapped.id);
 
-      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¦Ã…â€™Ã‚Â· Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
+      console.log('[ChatPage] Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
 
-      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 2. INSTANT UI UPDATE (FAST PATH) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
+      // 2. INSTANT UI UPDATE (FAST PATH)
       const senderId = mapped.senderId;
       const senderProfile = userMapRef.current[senderId];
-      const senderDisplayName = senderId === user.id ? 'BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹' : (senderProfile?.displayName || 'NgÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng');
+      const senderDisplayName = senderId === user.id ? 'Bạn' : (senderProfile?.displayName || 'Người dùng');
 
       // Fast conversation update (Blind Discovery)
       const exists = conversationsRef.current.some(c => c.id === mapped.conversationId);
@@ -1595,7 +1641,7 @@ export default function ChatPage() {
         conversationSeed,
       );
 
-      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 3. BACKGROUND SYNC ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
+      // 3. BACKGROUND SYNC
       if (isActive && mapped.serverSeq !== undefined) {
         markAsRead({ conversationId: mapped.conversationId, lastReadSeq: mapped.serverSeq });
         refreshNotificationBadges();
@@ -1783,8 +1829,8 @@ export default function ChatPage() {
         return
       }
 
-      console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¦Ã‚Â sÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ kiÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ presence:', payload)
-      console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ang tÃƒÂ§Ã‚Â©Ã‚Â«m userId:', payload.userId, 'trong danh sÃƒÂ§Ã‚ÂÃ‚Âºch conversations...')
+      console.log('Nhận sự kiện presence:', payload)
+      console.log('Đang tìm userId:', payload.userId, 'trong danh sách conversations...')
       console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
       console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
       setConversations((prev) => {
@@ -1857,7 +1903,7 @@ export default function ChatPage() {
       void syncPinnedMessages(conversationId)
     },
     onGroupUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] ðŸ‘¥ Group Updated (Socket):', payload);
+      console.log('[ChatPage.socket] Group Updated (Socket):', payload);
       const conversationId = payload.conversationId || payload.conversation_id;
       if (!conversationId) return;
 
@@ -1946,7 +1992,7 @@ export default function ChatPage() {
       }))
     },
     onMessageError: (payload) => {
-      console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Message error:', payload);
+      console.error('[ChatPage] Message error:', payload);
       if (payload.code === 'AUTH_DENIED' && payload.clientMessageId) {
         setMessagesByConversation(prev => {
           const cid = payload.conversationId || selectedConversationIdRef.current;
@@ -1956,13 +2002,13 @@ export default function ChatPage() {
             [cid]: markLocalMessageFailed(prev[cid], payload.clientMessageId!)
           };
         });
-        toast.error('BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â€žÂ¢Ã‚Â¹ tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ nÃƒÂ¯Ã‚Â¿Ã‚Â½y.');
+        toast.error('Bạn không có quyền gửi tin nhắn này.');
       } else {
-        toast.error(payload.message || 'LÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â€žÂ¢Ã‚Â¹ tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸.');
+        toast.error(payload.message || 'Lỗi gửi tin nhắn.');
       }
     },
     onConversationError: (payload) => {
-      console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Conversation error:', payload);
+      console.error('[ChatPage] Conversation error:', payload);
       if (payload.code === 'FORBIDDEN' || payload.code === 'NOT_MEMBER' || payload.code === 'CONVERSATION_NOT_FOUND') {
         if (payload.conversationId) {
           setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
@@ -1970,9 +2016,9 @@ export default function ChatPage() {
             navigate('/chat');
           }
         }
-        toast.error('BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ thÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¸Ã‚Â· hiÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ hÃƒÂ¯Ã‚Â¿Ã‚Â½nh ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ£Ã‚Â·Ã…â€™g nÃƒÂ¯Ã‚Â¿Ã‚Â½y hoÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¦Ã‚ÂÃ‚Â¾ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ trÃƒÂ§Ã‚Â°Ã‚Â· chuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Âº tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â.');
+        toast.error('Bạn không có quyền thực hiện hành động này hoặc cuộc trò chuyện không tồn tại.');
       } else {
-        toast.error(payload.message || 'LÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ trÃƒÂ§Ã‚Â°Ã‚Â· chuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾.');
+        toast.error(payload.message || 'Lỗi cuộc trò chuyện.');
       }
     }
   })
@@ -1983,12 +2029,13 @@ export default function ChatPage() {
     if (!isSocketConnected) return
     if (!conversations || conversations.length === 0) return
 
-    const ids = conversations.map(c => c.id)
-    console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Auto-joining conversations after inbox load:', ids.length)
+    const ids = conversations.map(c => c.id).filter(id => !isAiAssistantConversationId(id))
+    if (ids.length === 0) return
+    console.log('[ChatPage] Auto-joining conversations after inbox load:', ids.length)
     void joinMultipleConversations(ids)
   }, [accessToken, isSocketConnected, conversations, joinMultipleConversations])
 
-  // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ GROUP CALL (SEPARATE LAYER - does not touch single call) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
+  // GROUP CALL (SEPARATE LAYER - does not touch single call)
   const {
 
     incomingCall: incomingGroupCall,
@@ -2407,7 +2454,7 @@ export default function ChatPage() {
         const canPin = isModerator || currentConv.allowMemberPin
 
         if (!canPin) {
-          toast.error('Báº¡n khÃ´ng cÃ³ quyá»n ghim tin nháº¯n trong nhÃ³m nÃ y')
+          toast.error('Bạn không có quyền ghim tin nhắn trong nhóm này')
           return
         }
       }
@@ -2473,7 +2520,7 @@ export default function ChatPage() {
         }
 
         if (currentPins.length >= 3) {
-          toast.error('Chá»‰ Ä‘Æ°á»£c phÃ©p ghim tá»‘i Ä‘a 3 tin nháº¯n')
+          toast.error('Chỉ được phép ghim tối đa 3 tin nhắn')
           return
         }
 
@@ -2536,9 +2583,9 @@ export default function ChatPage() {
           ...prev,
           [conversationId]: previousPins,
         }))
-        const action = isPinned ? 'bá» ghim' : 'ghim'
+        const action = isPinned ? 'bỏ ghim' : 'ghim'
         console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
-        toast.error(`KhÃ´ng thá»ƒ ${action} tin nháº¯n. Vui lÃ²ng thá»­ láº¡i sau.`)
+        toast.error(`Không thể ${action} tin nhắn. Vui lòng thử lại sau.`)
       }
     },
     [accessToken, pinnedMessageIds, user, emitSendMessage],
@@ -3187,9 +3234,9 @@ export default function ChatPage() {
     if (!accessToken || !activeConversationId) return;
 
     const selected = conversations.find(c => c.id === activeConversationId);
-    const memberIds = selected?.members?.map(member => member.userId).filter(Boolean)
+    const memberIds = (selected?.members?.map(member => member.userId).filter(Boolean)
       ?? selected?.participantUserIds
-      ?? [];
+      ?? []).filter(id => !isAiAssistantUserId(id));
 
     memberIds.forEach(id => void ensureUser(accessToken, id));
   }, [accessToken, routedConversationId, selectedConversationId, conversations, ensureUser]);
@@ -3210,12 +3257,14 @@ export default function ChatPage() {
 
         // Collect IDs to proactively fetch
         const proactiveIds = new Set<string>();
-        if (targetId) proactiveIds.add(targetId);
+        if (targetId && !isAiAssistantConversationId(targetId)) proactiveIds.add(targetId);
 
         try {
           const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
           const pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
-          pendingIds.forEach(id => proactiveIds.add(id));
+          pendingIds
+            .filter(id => !isAiAssistantConversationId(id))
+            .forEach(id => proactiveIds.add(id));
         } catch (e) {
           console.warn("Failed to load pending group IDs:", e);
         }
@@ -3233,7 +3282,7 @@ export default function ChatPage() {
                 const status = err.response?.status;
                 // If it's a 404/403, cleanup localStorage so we don't keep trying forever
                 if (status === 404 || status === 403) {
-                  console.log(`[ChatPage] ðŸ§¹ Purging ghost group ID: ${id}`);
+                  console.log(`[ChatPage] Purging ghost group ID: ${id}`);
 
                   // 1. Cleanup localStorage
                   const stored = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
@@ -3337,7 +3386,7 @@ export default function ChatPage() {
           ...new Set(
             items
               .flatMap((item) => (item as any).participantUserIds ?? [])
-              .filter((peerId): peerId is string => typeof peerId === 'string' && peerId !== user?.id && !friendNameById.has(peerId)),
+              .filter((peerId): peerId is string => typeof peerId === 'string' && peerId !== user?.id && !isAiAssistantUserId(peerId) && !friendNameById.has(peerId)),
           ),
         ]
 
@@ -3367,12 +3416,12 @@ export default function ChatPage() {
             it.conversation.members.forEach((m: any) => {
               const mid = String(m.userId ?? '').trim()
               const realName = (m.nickname || m.displayName || m.name || '').trim();
-              if (mid && realName && realName !== 'NgÆ°á»i dÃ¹ng má»›i' && realName !== (mid === user?.id ? 'Báº¡n' : 'NgÆ°á»i dÃ¹ng má»›i')) {
+              if (mid && realName && realName !== 'Người dùng mới' && realName !== (mid === user?.id ? 'Bạn' : 'Người dùng mới')) {
                 upsertUser(mid, {
                   displayName: realName,
                   avatarUrl: m.avatarUrl || null
                 })
-              } else if (mid) {
+              } else if (mid && !isAiAssistantUserId(mid)) {
                 // Background fetch for missing names
                 void ensureUser(token, mid);
               }
@@ -3390,8 +3439,8 @@ export default function ChatPage() {
             ? (previewNameById.get(item.lastMessageSenderId) ?? null)
             : null
           const getName = (id: string) => {
-            if (id === user?.id) return 'Báº¡n'
-            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'NgÆ°á»i dÃ¹ng má»›i'
+            if (id === user?.id) return 'Bạn'
+            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'Người dùng mới'
           }
           const formattedLastMessage = formatConversationPreview(
             resolvedLastMessageSenderName,
@@ -3426,6 +3475,9 @@ export default function ChatPage() {
 
 
         const finalMappedItems = [...mappedItems];
+        if (!finalMappedItems.some(c => c.id === AI_ASSISTANT_CONVERSATION_ID)) {
+          finalMappedItems.push(aiAssistantConversation);
+        }
         if (!finalMappedItems.some(c => c.id === 'my-documents' || c.isCloud)) {
           finalMappedItems.push(myDocumentsConversation);
         }
@@ -3451,10 +3503,13 @@ export default function ChatPage() {
           if (preferredConversationId) {
             return preferredConversationId
           }
-          if (routedConversationIdRef.current && mappedItems.some((item) => item.id === routedConversationIdRef.current)) {
+          if (routedConversationIdRef.current === AI_ASSISTANT_CONVERSATION_ID) {
+            return AI_ASSISTANT_CONVERSATION_ID
+          }
+          if (routedConversationIdRef.current && finalMappedItems.some((item) => item.id === routedConversationIdRef.current)) {
             return routedConversationIdRef.current
           }
-          if (prev && mappedItems.some((item) => item.id === prev)) {
+          if (prev && finalMappedItems.some((item) => item.id === prev)) {
             return prev
           }
           return ''
@@ -3467,7 +3522,7 @@ export default function ChatPage() {
         setIsLoadingConversations(false)
       }
     },
-    [(user ? user.id : ""), user?.name, upsertUser],
+    [(user ? user.id : ""), user?.name, upsertUser, aiAssistantConversation, myDocumentsConversation],
   )
 
 
@@ -3559,7 +3614,7 @@ export default function ChatPage() {
               }
             } else {
               // Newer summary detected, trigger message sync (Mobile-like fallback)
-              console.log('[ChatPage] ðŸ”„ Out-of-sync summary for:', conversation.id, 'Triggering message sync');
+              console.log('[ChatPage] Out-of-sync summary for:', conversation.id, 'Triggering message sync');
               void syncLatestMessages(conversation.id);
             }
 
@@ -3587,7 +3642,7 @@ export default function ChatPage() {
               ? (incoming.avatarUrl ?? cachedPeer?.avatarUrl ?? null)
               : (incoming.avatarUrl ?? null)
 
-            if (peerId && !cachedPeer) {
+            if (peerId && !isAiAssistantUserId(peerId) && !cachedPeer) {
               void ensureUser(accessToken, peerId)
             }
 
@@ -3626,7 +3681,7 @@ export default function ChatPage() {
   const handleCreateGroup = useCallback(
     async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
       if (!accessToken || !user) {
-        toast.error("Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i");
+        toast.error("Vui lòng đăng nhập lại");
         return;
       }
 
@@ -3660,7 +3715,7 @@ export default function ChatPage() {
           name: groupName,
           isGroup: true,
           avatarUrl: finalAvatarUrl,
-          lastMessage: "Báº¡n Ä‘Ã£ táº¡o nhÃ³m",
+          lastMessage: "Bạn đã tạo nhóm",
           unreadCount: 0,
           participantUserIds: memberIds,
           memberCount: memberIds.length + 1,
@@ -3677,7 +3732,7 @@ export default function ChatPage() {
 
         // Seed cache for myself too
         upsertUser(user.id, {
-          displayName: user.name || "Báº¡n",
+          displayName: user.name || "Bạn",
           avatarUrl: user.avatarUrl || null
         });
 
@@ -3731,8 +3786,8 @@ export default function ChatPage() {
         navigate(`/chat/${groupId}`);
         setIsCreateGroupOpen(false);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "KhÃ´ng thá»ƒ táº¡o nhÃ³m. Vui lÃ²ng thá»­ láº¡i.";
-        console.error("âš¡ [CREATE GROUP] Lá»—i:", error);
+        const errorMessage = error instanceof Error ? error.message : "Không thể tạo nhóm. Vui lòng thử lại.";
+        console.error("[CREATE GROUP] Lỗi:", error);
         toast.error(errorMessage);
       } finally {
         setIsCreatingGroup(false);
@@ -3816,6 +3871,11 @@ export default function ChatPage() {
       navigate('/chat/' + conversationId)
 
       // Proactively refresh metadata for the selected conversation
+      if (conversationId === AI_ASSISTANT_CONVERSATION_ID) {
+        setRightSidebarContent(null)
+        return
+      }
+
       if (accessToken && conversationId && conversationId !== 'my-documents') {
         try {
           const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
@@ -3848,7 +3908,7 @@ export default function ChatPage() {
             }));
 
             // Fetch missing profiles for members
-            const missingProfiles = participantIds.filter((id: string) => !userMapRef.current[id]);
+            const missingProfiles = participantIds.filter((id: string) => !isAiAssistantUserId(id) && !userMapRef.current[id]);
             if (missingProfiles.length > 0) {
               const fetched = await Promise.all(
                 missingProfiles.map((id: string) => getUserById(accessToken, id).catch(() => null))
@@ -3876,6 +3936,16 @@ export default function ChatPage() {
     setPreselectedMemberIds([]);
     setIsCreateGroupOpen(true)
   }, [])
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search)
+    if (searchParams.get('createGroup') !== 'true') return
+
+    handleOpenCreateGroupModal()
+    searchParams.delete('createGroup')
+    const nextSearch = searchParams.toString()
+    navigate({ pathname: '/chat', search: nextSearch ? `?${nextSearch}` : '' }, { replace: true })
+  }, [handleOpenCreateGroupModal, location.search, navigate])
 
   const handleCreateGroupFromDirect = useCallback(() => {
     if (selectedConversation && !selectedConversation.isGroup) {
@@ -3939,6 +4009,11 @@ export default function ChatPage() {
       return
     }
 
+    if (isAiAssistantConversationId(conversationId)) {
+      setIsLoadingMessages(false)
+      return
+    }
+
     const loadKey = `${conversationId}:${isRestrictedMode ? 'restricted' : 'full'}`
     if (lastLoadedMessagesKeyRef.current === loadKey) {
       return
@@ -3994,7 +4069,7 @@ export default function ChatPage() {
                 }));
 
                 // Fetch missing profiles
-                const missingProfiles = participantIds.filter((id: string) => !userMapRef.current[id]);
+                const missingProfiles = participantIds.filter((id: string) => !isAiAssistantUserId(id) && !userMapRef.current[id]);
                 if (missingProfiles.length > 0) {
                   const fetched = await Promise.all(
                     missingProfiles.map((id: string) => getUserById(accessToken, id).catch(() => null))
@@ -4112,14 +4187,16 @@ export default function ChatPage() {
 
 
   const joinAllConversations = useCallback(async (list: ConversationSummary[]) => {
-    const conversationIds = list.map((conversation) => conversation.id)
+    const conversationIds = list
+      .map((conversation) => conversation.id)
+      .filter((conversationId) => !isAiAssistantConversationId(conversationId))
 
     if (conversationIds.length === 0) {
       return
     }
 
-    console.log('--- ÄANG THá»°C HIá»†N JOIN ROOM CHO', list.length, 'Há»˜I THOáº I ---')
-    console.log('Tá»± Ä‘á»™ng Join vá» cÃ¡c room:', conversationIds)
+    console.log('--- ĐANG THỰC HIỆN JOIN ROOM CHO', list.length, 'HỘI THOẠI ---')
+    console.log('Tự động Join về các room:', conversationIds)
 
     await joinMultipleConversations(conversationIds)
   }, [joinMultipleConversations])
@@ -4131,7 +4208,7 @@ export default function ChatPage() {
     const currentConnected = Boolean(socket?.connected)
 
     if (!previousSocketConnectedRef.current && currentConnected && conversations.length > 0) {
-      console.log('[ChatPage.retryJoin] Socket vá»«a chuyá»ƒn false -> true, join láº¡i rooms')
+      console.log('[ChatPage.retryJoin] Socket vừa chuyển false -> true, join lại rooms')
       void joinAllConversations(conversations)
     }
 
@@ -4269,6 +4346,10 @@ export default function ChatPage() {
       return
     }
 
+    if (isAiAssistantConversationId(activeConversationId)) {
+      return
+    }
+
     const convMessages = messagesByConversation[activeConversationId] || []
     const latestSeq = convMessages.at(-1)?.serverSeq
 
@@ -4290,6 +4371,10 @@ export default function ChatPage() {
       return
     }
 
+    if (isAiAssistantConversationId(selectedConversationId)) {
+      return
+    }
+
     void syncPinnedMessages(selectedConversationId)
   }, [accessToken, selectedConversationId, syncPinnedMessages])
 
@@ -4305,6 +4390,23 @@ export default function ChatPage() {
   const handleSend = useCallback(
     async (draft: ChatComposePayload) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
+      const mentionsAiAssistant = draft.mentions?.some((mention) => mention.userId === AI_ASSISTANT_USER_ID) || /(^|\s)@VNALO(\s|$)/i.test(draft.text ?? '')
+
+      if (mentionsAiAssistant) {
+        const cleanedPrompt = (draft.text ?? '')
+          .replace(/\u200B@VNALO\|__vnalo_ai__\u200B/gi, '')
+          .replace(/(^|\s)@VNALO(\s|$)/gi, ' ')
+          .trim()
+        const conversationName = selectedConversation?.name?.trim() || 'hội thoại hiện tại'
+        const prompt = cleanedPrompt
+          ? 'Trong ngữ cảnh "' + conversationName + '", ' + cleanedPrompt
+          : 'Hỗ trợ tôi trong ngữ cảnh hội thoại "' + conversationName + '".'
+
+        window.localStorage.setItem(AI_PENDING_PROMPT_KEY, prompt)
+        handleAiAssistantActivity({ preview: cleanedPrompt || 'Đã chuyển yêu cầu từ @VNALO', timestamp: new Date().toISOString() })
+        navigate('/chat/' + AI_ASSISTANT_CONVERSATION_ID)
+        return
+      }
 
       if (!conversationId || !user || !accessToken) {
         console.warn('[ChatPage.send] Precondition failed:', {
@@ -4541,7 +4643,7 @@ export default function ChatPage() {
           // We keep attachments in local state only for the UI to potentially group them
           attachments: [{
             url: res.url,
-            name: allFiles[i]?.name || "Tá»‡p",
+            name: allFiles[i]?.name || "Tệp",
             mimeType: res.mimeType,
             sizeBytes: res.sizeBytes,
             thumbnailUrl: res.thumbnailUrl
@@ -4612,7 +4714,7 @@ export default function ChatPage() {
         }
       }
     },
-    [accessToken, emitSendMessage, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
+    [accessToken, emitSendMessage, handleAiAssistantActivity, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
   )
 
   const handleSendPoll = useCallback(
@@ -4629,7 +4731,7 @@ export default function ChatPage() {
         senderId: user.id,
         type: 'poll',
         isLocal: true,
-        text: `ðŸ“Š BÃ¬nh chá»n: ${poll.question}`,
+        text: `📊 Bình chọn: ${poll.question}`,
         pollData: poll,
         timestamp: formatMessageTimestamp(),
         deliveryState: 'sending',
@@ -4829,7 +4931,7 @@ export default function ChatPage() {
       const role = String(myMember?.role || '').toUpperCase()
       const isModerator = role === 'ADMIN' || role === 'DEPUTY'
       if (!isModerator && !selectedConversation.allowMemberEditInfo) {
-        toast.error('Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i tÃªn nhÃ³m')
+        toast.error('Bạn không có quyền thay đổi tên nhóm')
         return
       }
     }
@@ -4840,7 +4942,7 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newName } : c
         )
       )
-      toast.success('Cáº­p nháº­t tÃªn nhÃ³m thÃ nh cÃ´ng')
+      toast.success('Cập nhật tên nhóm thành công')
 
       const systemPayload = JSON.stringify({
         action: 'UPDATE_GROUP_INFO',
@@ -4881,7 +4983,7 @@ export default function ChatPage() {
         [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
       }));
     } catch (err) {
-      toast.error('CÃ³ lá»—i xáº£y ra khi cáº­p nháº­t tÃªn nhÃ³m')
+      toast.error('Có lỗi xảy ra khi cập nhật tên nhóm')
       console.error(err)
     }
   }
@@ -4895,7 +4997,7 @@ export default function ChatPage() {
       const isModerator = (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'ADMIN' || (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'DEPUTY'
       if (currentConv?.isGroup) {
         if (!isModerator && !currentConv.allowMemberEditInfo) {
-          toast.error('Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i áº£nh nhÃ³m')
+          toast.error('Bạn không có quyền thay đổi ảnh nhóm')
           return
         }
       }
@@ -4948,7 +5050,7 @@ export default function ChatPage() {
       // 5. Success - Silent per user request
     } catch (err: any) {
       console.error('Failed to update group avatar:', err);
-      toast.error(err.message || 'CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂÃ¢â‚¬Å¾h ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â diÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
+      toast.error(err.message || 'Cập nhật ảnh đại diện thất bại');
     }
   };
 
@@ -4956,7 +5058,7 @@ export default function ChatPage() {
     if (!selectedConversationId || !accessToken) return
     const targetUserId = selectedConversation?.userId || selectedConversation?.participantUserIds?.[0]
     if (!targetUserId) {
-      toast.error('KhÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ§Ã‚Â©Ã‚Â«m thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¥ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½')
+      toast.error('Không tìm thấy người dùng để cập nhật tên gợi nhớ')
       return;
     }
     try {
@@ -4966,9 +5068,9 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newNickname } : c
         )
       )
-      toast.success('CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ thÃƒÂ¯Ã‚Â¿Ã‚Â½nh cÃƒÂ§Ã‚Â¹Ã‚Â«ng')
+      toast.success('Cập nhật tên gợi nhớ thành công')
     } catch (err) {
-      toast.error('CÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ lÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ xÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â‚¬Å¾Ã…Â  ra khi cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½')
+      toast.error('Có lỗi xảy ra khi cập nhật tên gợi nhớ')
       console.error(err)
     }
   }
@@ -5018,7 +5120,7 @@ export default function ChatPage() {
       setIsAddMembersOpen(false);
     } catch (error) {
       console.error('Failed to add members:', error);
-      toast.error('ThÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢m thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
+      toast.error('Thêm thành viên thất bại');
     } finally {
       setIsAddingMembers(false);
     }
@@ -5073,10 +5175,10 @@ export default function ChatPage() {
       navigate('/chat');
     } catch (error: any) {
       console.error('Failed to leave group:', error);
-      if (error.message === 'Báº¡n chÆ°a chuyá»ƒn quyá»n trÆ°á»Ÿng nhÃ³m khi rá»i nhÃ³m') {
-        toast.error('Báº¡n chÆ°a chuyá»ƒn quyá»n trÆ°á»Ÿng nhÃ³m khi rá»i nhÃ³m');
+      if (error.message === 'Bạn chưa chuyển quyền trưởng nhóm khi rời nhóm') {
+        toast.error('Bạn chưa chuyển quyền trưởng nhóm khi rời nhóm');
       } else {
-        toast.error('Rá»i nhÃ³m tháº¥t báº¡i');
+        toast.error('Rời nhóm thất bại');
       }
     }
   };
@@ -5106,13 +5208,13 @@ export default function ChatPage() {
           content: systemPayload,
           clientMessageId: crypto.randomUUID()
         });
-        console.log('[ChatPage] ðŸ“¤ Group sync signal sent successfully');
+        console.log('[ChatPage] Group sync signal sent successfully');
       } catch (e) {
         console.warn('[ChatPage] âš ï¸ Failed to emit group sync signal');
       }
     } catch (error) {
       console.error('Failed to update group settings', error);
-      toast.error('KhÃ´ng thá»ƒ cáº­p nháº­t cÃ i Ä‘áº·t nhÃ³m');
+      toast.error('Không thể cập nhật cài đặt nhóm');
     }
   };
 
@@ -5138,7 +5240,7 @@ export default function ChatPage() {
 
       // Then call API
       await disbandConversation(accessToken, selectedConversationId);
-      toast.success('Giáº£i tÃ¡n nhÃ³m thÃ nh cÃ´ng');
+      toast.success('Giải tán nhóm thành công');
 
       // Update local state
       setConversations(prev => prev.filter(conv => conv.id !== selectedConversationId));
@@ -5146,7 +5248,7 @@ export default function ChatPage() {
       setRightSidebarContent(null);
       navigate('/chat');
     } catch (err) {
-      console.error('KhÃ´ng thá»ƒ giáº£i tÃ¡n nhÃ³m', err);
+      console.error('Không thể giải tán nhóm', err);
     }
   };
 
@@ -5157,7 +5259,7 @@ export default function ChatPage() {
       const selectedConv = conversations.find(c => c.id === selectedConversationId);
       if (!selectedConv) return;
 
-      const targetDisplayName = userMap[targetUserId]?.displayName || 'ThÃ nh viÃªn';
+      const targetDisplayName = userMap[targetUserId]?.displayName || 'Thành viên';
 
       // Emit SYSTEM message for UI
       const systemPayload = JSON.stringify({
@@ -5210,10 +5312,10 @@ export default function ChatPage() {
         return c;
       }));
 
-      toast.success(`ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  xÃƒÂ§Ã‚Â±Ã¢â€šÂ¬a ${targetDisplayName} khÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â‚¬â„¢Ã‚Â¨ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m`);
+      toast.success(`Đã xóa ${targetDisplayName} khỏi nhóm`);
     } catch (error) {
       console.error('Failed to remove member:', error);
-      toast.error('KhÃƒÂ§Ã‚Â¹Ã‚Â«ng thÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ xÃƒÂ§Ã‚Â±Ã¢â€šÂ¬a thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n');
+      toast.error('Không thể xóa thành viên');
     }
   };
 
@@ -5267,11 +5369,11 @@ export default function ChatPage() {
         return c;
       }));
 
-      const roleDisplay = role === 'DEPUTY' ? 'phÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m' : 'thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n';
-      toast.success(`ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  vai trÃƒÂ§Ã‚Â°Ã‚Â· thÃƒÂ¯Ã‚Â¿Ã‚Â½nh ${roleDisplay}`);
+      const roleDisplay = role === 'DEPUTY' ? 'phó nhóm' : 'thành viên';
+      toast.success(`Đã cập nhật vai trò thành ${roleDisplay}`);
     } catch (error) {
       console.error('Failed to update member role:', error);
-      toast.error('CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  vai trÃƒÂ§Ã‚Â°Ã‚Â· thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
+      toast.error('Cập nhật vai trò thất bại');
     }
   };
 
@@ -5317,12 +5419,15 @@ export default function ChatPage() {
       await doLeaveGroup();
     } catch (error) {
       console.error('Failed to transfer ownership and leave:', error);
-      toast.error('ChuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ vÃƒÂ¯Ã‚Â¿Ã‚Â½ rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
+      toast.error('Chuyển quyền và rời nhóm thất bại');
     }
   };
 
   const sortedConversations = useMemo(() => {
     const list = [...conversations];
+    if (!list.some(c => c.id === AI_ASSISTANT_CONVERSATION_ID)) {
+      list.push(aiAssistantConversation);
+    }
     if (!list.some(c => c.id === 'my-documents' || c.isCloud)) {
       list.push(myDocumentsConversation);
     }
@@ -5337,7 +5442,7 @@ export default function ChatPage() {
       if (lastMsgTime <= deleteTime) {
         return {
           ...conv,
-          lastMessage: t('chat.historyDeletedPreview') || 'Báº¡n Ä‘Ã£ xÃ³a lá»‹ch sá»­ trÃ² chuyá»‡n',
+          lastMessage: t('chat.historyDeletedPreview') || 'Bạn đã xóa lịch sử trò chuyện',
           unreadCount: 0 // Hide unread count for deleted history conversations
         };
       }
@@ -5354,7 +5459,7 @@ export default function ChatPage() {
       const timeB = new Date(b.lastMessageAt || b.updatedAt || 0).getTime()
       return timeB - timeA
     })
-  }, [conversations, deletedTimestamps, pinnedConversationIds, t])
+  }, [conversations, deletedTimestamps, pinnedConversationIds, t, aiAssistantConversation, myDocumentsConversation])
 
   const visibleConversations = useMemo(() => {
     return sortedConversations.map(conv => ({
@@ -5431,6 +5536,9 @@ export default function ChatPage() {
         onSelectConversation={handleSelectConversation}
         onCreateGroupClick={handleOpenCreateGroupModal}
       />
+      {(routedConversationId || selectedConversationId) === AI_ASSISTANT_CONVERSATION_ID ? (
+        <AiChatPage embedded onActivity={handleAiAssistantActivity} />
+      ) : (
       <ChatWindow
         conversation={selectedConversation}
         messages={selectedMessages}
@@ -5465,6 +5573,7 @@ export default function ChatPage() {
         onInitiateCall={handleInitiateCall}
         onOpenAddMembers={() => setIsAddMembersOpen(true)}
       />
+      )}
 
       <CreateGroupModal
         isOpen={isCreateGroupOpen}
@@ -5656,7 +5765,7 @@ export default function ChatPage() {
 
 
 
-      {/* INCOMING GROUP CALL NOTIFICATION ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ shown to non-callers */}
+      {/* INCOMING GROUP CALL NOTIFICATION shown to non-callers */}
       {(incomingGroupCall && !isInGroupCall) ? (
         <IncomingCallBanner
           peerName={incomingGroupCall.callerName}
@@ -5729,6 +5838,11 @@ function PinnedLogicHooks({
       return;
     }
 
+    if (isAiAssistantConversationId(selectedConversationId)) {
+      console.log('[PinnedLogicHooks.effect] Skipping pinned fetch for AI assistant conversation');
+      return;
+    }
+
     // Avoid re-fetching same conversation (Double Guard)
     if (lastConvRef.current === selectedConversationId) {
       console.log('[PinnedLogicHooks.effect] Skipping pinned fetch - same conversation');
@@ -5757,8 +5871,8 @@ function PinnedLogicHooks({
       return {
         id,
         conversationId: selectedConversationId,
-        content: 'Tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  ghim',
-        text: 'Tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  ghim',
+        content: 'Tin nhắn đã ghim',
+        text: 'Tin nhắn đã ghim',
         type: 'text' as any,
         sender: 'system' as any,
         senderId: 'system',
@@ -5797,11 +5911,5 @@ function PinnedLogicHooks({
 
   return null;
 }
-
-
-
-
-
-
 
 

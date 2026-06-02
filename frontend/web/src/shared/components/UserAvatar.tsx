@@ -1,4 +1,4 @@
-import { Users, Cloud } from 'lucide-react'
+import { Bot, Users, Cloud } from 'lucide-react'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 type UserAvatarProps = {
@@ -8,6 +8,7 @@ type UserAvatarProps = {
   className?: string
   isGroup?: boolean
   isCloud?: boolean
+  isAiAssistant?: boolean
   // New props for collage
   memberAvatars?: (string | null)[]
   extraCount?: number
@@ -36,11 +37,21 @@ export function UserAvatar({
   className, 
   isGroup, 
   isCloud,
+  isAiAssistant,
   memberAvatars = [],
   extraCount = 0
 }: UserAvatarProps) {
   const mergedClassName = `user-avatar ${isGroup ? 'user-avatar-group' : ''} ${sizeClass[size]}${className ? ` ${className}` : ''}`
   const resolvedImageUrl = resolveMediaUrl(imageUrl);
+
+  if (isAiAssistant) {
+    const iconSize = size === 'sm' ? 15 : size === 'lg' ? 38 : size === 'xl' ? 60 : 22
+    return (
+      <span className={`${mergedClassName} user-avatar-ai flex items-center justify-center`}>
+        <Bot size={iconSize} />
+      </span>
+    )
+  }
 
   if (isCloud) {
     const iconSize = size === 'sm' ? 16 : size === 'lg' ? 40 : size === 'xl' ? 64 : 24

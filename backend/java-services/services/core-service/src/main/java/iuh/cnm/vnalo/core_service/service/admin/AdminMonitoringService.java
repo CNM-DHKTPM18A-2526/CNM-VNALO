@@ -1,6 +1,5 @@
 package iuh.cnm.vnalo.core_service.service.admin;
 
-import iuh.cnm.vnalo.core_service.config.AdminMonitoringProperties;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventPageResponse;
@@ -15,6 +14,7 @@ import iuh.cnm.vnalo.core_service.repository.ai.AiChatHistoryRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthLegalConsentRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthOtpRepository;
+import iuh.cnm.vnalo.core_service.repository.auth.AuthPermissionRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthQrLoginSessionRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthSessionAuditRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
@@ -34,6 +34,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AdminMonitoringService {
+    public static final String ACCESS_MODE_RBAC = "RBAC_DB";
+    public static final String PERMISSION_MONITORING_VIEW = "ADMIN_MONITORING_VIEW";
+    public static final String PERMISSION_MONITORING_EXPORT = "ADMIN_MONITORING_EXPORT";
     private static final int DEFAULT_WINDOW_HOURS = 24;
     private static final int MIN_WINDOW_HOURS = 1;
     private static final int MAX_WINDOW_HOURS = 168;
@@ -47,7 +50,7 @@ public class AdminMonitoringService {
     private final AuthOtpRepository authOtpRepository;
     private final AuthQrLoginSessionRepository authQrLoginSessionRepository;
     private final AiChatHistoryRepository aiChatHistoryRepository;
-    private final AdminMonitoringProperties adminMonitoringProperties;
+    private final AuthPermissionRepository authPermissionRepository;
 
     @Transactional(readOnly = true)
     public AdminMonitoringSummaryResponse getSummary(UUID requesterId, Integer windowHours) {
@@ -58,7 +61,7 @@ public class AdminMonitoringService {
 
         return new AdminMonitoringSummaryResponse(
                 now,
-                "ADMIN_ALLOWLIST",
+                ACCESS_MODE_RBAC,
                 new AdminMonitoringSummaryResponse.AccountStats(
                         authAccountRepository.count(),
                         authAccountRepository.countByStatus(AccountStatus.ACTIVE),
@@ -112,14 +115,7 @@ public class AdminMonitoringService {
     }
 
     @Transactional(readOnly = true)
-    public AdminMonitoringEventPageResponse getRecentEvents(
-            UUID requesterId,
-            Integer limit,
-            Integer page,
-            Integer windowHours,
-            String eventType,
-            String platform
-    ) {
+    public AdminMonitoringEventPageResponse getRecentEvents(UUID requesterId, Integer limit, Integer page, Integer windowHours, String eventType, String platform) {
         assertMonitoringAccess(requesterId);
         int safeLimit = limit == null ? DEFAULT_EVENT_LIMIT : Math.max(1, Math.min(limit, MAX_EVENT_LIMIT));
         int safePage = page == null ? 0 : Math.max(0, page);
@@ -144,12 +140,7 @@ public class AdminMonitoringService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminMonitoringTrendPointResponse> getEventTrend(
-            UUID requesterId,
-            Integer windowHours,
-            String eventType,
-            String platform
-    ) {
+    public List<AdminMonitoringTrendPointResponse> getEventTrend(UUID requesterId, Integer windowHours, String eventType, String platform) {
         assertMonitoringAccess(requesterId);
         Instant since = resolveSince(windowHours, Instant.now());
         String normalizedEventType = normalizeOptionalFilter(eventType, true);
@@ -157,26 +148,23 @@ public class AdminMonitoringService {
 
         return authSessionAuditRepository.findMonitoringTrend(since, "hour", normalizedEventType, normalizedPlatform)
                 .stream()
-                .map(point -> new AdminMonitoringTrendPointResponse(
-                        point.getBucket(),
-                        point.getTotal(),
-                        point.getWarning(),
-                        point.getError()
-                ))
+                .map(point -> new AdminMonitoringTrendPointResponse(point.getBucket(), point.getTotal(), point.getWarning(), point.getError()))
                 .toList();
     }
 
     public boolean canAccess(UUID requesterId) {
-        if (requesterId == null || adminMonitoringProperties.allowedEmails().isEmpty()) {
+        return hasPermission(requesterId, PERMISSION_MONITORING_VIEW);
+    }
+
+    public boolean canExport(UUID requesterId) {
+        return hasPermission(requesterId, PERMISSION_MONITORING_EXPORT);
+    }
+
+    private boolean hasPermission(UUID requesterId, String permissionCode) {
+        if (requesterId == null || !StringUtils.hasText(permissionCode)) {
             return false;
         }
-        return authAccountRepository.findById(requesterId)
-                .map(account -> normalizeEmail(account.getEmail()))
-                .filter(email -> !email.isBlank())
-                .map(email -> adminMonitoringProperties.allowedEmails().stream()
-                        .map(this::normalizeEmail)
-                        .anyMatch(email::equals))
-                .orElse(false);
+        return authPermissionRepository.accountHasPermission(requesterId, permissionCode);
     }
 
     private void assertMonitoringAccess(UUID requesterId) {
@@ -186,9 +174,7 @@ public class AdminMonitoringService {
     }
 
     private Instant resolveSince(Integer windowHours, Instant now) {
-        int safeWindowHours = windowHours == null
-                ? DEFAULT_WINDOW_HOURS
-                : Math.max(MIN_WINDOW_HOURS, Math.min(windowHours, MAX_WINDOW_HOURS));
+        int safeWindowHours = windowHours == null ? DEFAULT_WINDOW_HOURS : Math.max(MIN_WINDOW_HOURS, Math.min(windowHours, MAX_WINDOW_HOURS));
         return now.minusSeconds(safeWindowHours * 60L * 60L);
     }
 
@@ -201,10 +187,6 @@ public class AdminMonitoringService {
             return null;
         }
         return uppercase ? normalized.toUpperCase(Locale.ROOT) : normalized;
-    }
-
-    private String normalizeEmail(String email) {
-        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private AdminMonitoringEventResponse toEventResponse(AuthSessionAudit event) {

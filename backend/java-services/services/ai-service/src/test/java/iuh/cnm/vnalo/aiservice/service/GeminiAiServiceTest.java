@@ -40,6 +40,8 @@ class GeminiAiServiceTest {
     @Mock
     private ChatService chatService;
 
+    private GeminiKeyManager geminiKeyManager;
+
     private GeminiAiService geminiAiService;
 
     @BeforeEach
@@ -49,9 +51,13 @@ class GeminiAiServiceTest {
                 new ObjectMapper(),
                 coreServiceClient,
                 ollamaProvider,
-                chatService
+                chatService,
+                geminiKeyManager = new GeminiKeyManager()
         );
         ReflectionTestUtils.setField(geminiAiService, "modelName", "gemini-2.5-flash");
+        ReflectionTestUtils.setField(geminiKeyManager, "primaryApiKey", "key-primary");
+        ReflectionTestUtils.setField(geminiKeyManager, "apiKeysProperty", "key-primary,key-rotated");
+        geminiKeyManager.init();
 
         doNothing().when(chatService).enforceUserRateLimit("user-1");
         doNothing().when(chatService).enforceGlobalRateLimit();
@@ -322,5 +328,40 @@ class GeminiAiServiceTest {
         assertTrue(response.isDegraded());
         assertFalse(response.getRequiresConfirmation());
         assertEquals("low", response.getRiskLevel());
+    }
+
+    @Test
+    void interactWithGemini_rotatesGeminiKeyWhenQuotaExceeded() {
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "{\\\"textReply\\\":\\\"Ready.\\\",\\\"actionCommand\\\":\\\"NAVIGATE_TO_CONTACTS\\\",\\\"actionParams\\\":{},\\\"emotion\\\":\\\"neutral\\\"}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenThrow(new RuntimeException("429 RESOURCE_EXHAUSTED quota exceeded"))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("Open contacts")
+                        .analyzeIntent(true)
+                        .build()
+        );
+
+        assertEquals("NAVIGATE_TO_CONTACTS", response.getActionCommand());
+        assertEquals("LIVE_PROVIDER_ACTIVE", response.getProviderStatus());
+        assertFalse(response.isDegraded());
     }
 }

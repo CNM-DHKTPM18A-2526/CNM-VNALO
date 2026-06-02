@@ -44,6 +44,14 @@ type FilePreviewItem = {
   previewUrl: string | null
 }
 
+const AI_ASSISTANT_MENTION = {
+  userId: '__vnalo_ai__',
+  displayName: 'VNALO',
+  avatarUrl: null,
+  icon: 'at',
+  subText: 'Hỏi trợ lý AI riêng, không gửi vào hội thoại',
+}
+
 function getFileIdentity(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}`
 }
@@ -64,6 +72,11 @@ export function MessageInput({
   const [messageText, setMessageText] = React.useState('')
   const [mentions, setMentions] = React.useState<Array<{ displayName: string; userId: string }>>([])
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
+
+  const mentionOptions = React.useMemo(() => {
+    const normalizedMembers = members.filter(member => member.userId !== AI_ASSISTANT_MENTION.userId)
+    return [AI_ASSISTANT_MENTION, ...normalizedMembers]
+  }, [members])
 
   const handleSelectSuggestedReply = (reply: string) => {
     setMessageText(reply)
@@ -279,6 +292,7 @@ export function MessageInput({
       text: processedText,
       files: selectedFiles,
       sticker: null,
+      mentions,
     }
 
     if (!draft.text.trim() && !draft.files?.length && !draft.sticker) return
@@ -371,7 +385,7 @@ export function MessageInput({
       )}
       {mentionState.isOpen && (
         <MentionPopover 
-          members={members}
+          members={mentionOptions}
           filter={mentionState.filter}
           position={{ top: 0, left: mentionState.left }}
           onSelect={handleSelectMention}

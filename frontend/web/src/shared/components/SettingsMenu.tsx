@@ -1,5 +1,7 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 
+import { canAccessAdminMonitoring } from '../../features/auth/adminAccess'
 import { useAuth } from '../../features/auth/useAuth'
 import { useLanguage } from '../i18n/LanguageContext'
 import { Icon } from './Icon'
@@ -8,11 +10,11 @@ type SettingsMenuProps = {
   onOpenSettings: () => void
 }
 
-export function SettingsMenu({
-  onOpenSettings,
-}: SettingsMenuProps) {
+export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
   const { t } = useLanguage()
-  const { logout } = useAuth()
+  const { accessToken, logout, user } = useAuth()
+  const navigate = useNavigate()
+  const canOpenDashboard = canAccessAdminMonitoring(user, accessToken)
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
   const buttonRef = React.useRef<HTMLButtonElement>(null)
@@ -29,31 +31,21 @@ export function SettingsMenu({
   }, [])
 
   React.useEffect(() => {
-    if (!isMenuOpen) {
-      return
-    }
+    if (!isMenuOpen) return
 
     document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isMenuOpen, handleClickOutside])
 
   React.useEffect(() => {
-    if (!isMenuOpen) {
-      return
-    }
+    if (!isMenuOpen) return
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsMenuOpen(false)
-      }
+      if (event.key === 'Escape') setIsMenuOpen(false)
     }
 
     window.addEventListener('keydown', handleEscape)
-    return () => {
-      window.removeEventListener('keydown', handleEscape)
-    }
+    return () => window.removeEventListener('keydown', handleEscape)
   }, [isMenuOpen])
 
   const handleMenuItemClick = (action: () => void) => {
@@ -61,8 +53,11 @@ export function SettingsMenu({
     action()
   }
 
+  const handleOpenDashboard = () => {
+    navigate('/admin/monitoring')
+  }
+
   const handleLogout = () => {
-    setIsMenuOpen(false)
     logout()
   }
 
@@ -88,6 +83,23 @@ export function SettingsMenu({
       {isMenuOpen ? (
         <div ref={menuRef} className='settings-menu-popover' role='menu'>
           <div className='settings-menu-items'>
+            {canOpenDashboard ? (
+              <>
+                <button
+                  className='settings-menu-item'
+                  role='menuitem'
+                  onClick={() => handleMenuItemClick(handleOpenDashboard)}
+                >
+                  <span className='settings-menu-item-icon' aria-hidden='true'>
+                    <Icon name='layoutDashboard' />
+                  </span>
+                  <span className='settings-menu-item-label'>Dashboard</span>
+                </button>
+
+                <div className='settings-menu-divider' />
+              </>
+            ) : null}
+
             <button
               className='settings-menu-item'
               role='menuitem'
