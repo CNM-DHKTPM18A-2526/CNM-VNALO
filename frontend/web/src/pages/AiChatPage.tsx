@@ -439,7 +439,7 @@ function extractGroupTargets(params?: Record<string, unknown> | null) {
     if (!raw) return []
     if (Array.isArray(raw)) return raw.map((item) => String(item).trim())
     return String(raw)
-      .split(/[,;\n]|\s+và\s+|\s+and\s+/i)
+      .split(/[,;\n]|\s+và\s+|\s+va\s+|\s+and\s+/i)
       .map((item) => item.trim())
   }).filter(Boolean)
 }
@@ -1029,37 +1029,40 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       }
 
       if (command === 'CREATE_GROUP') {
-        const requestedTargets = extractGroupTargets(params)
+        const requestedTargets = [...new Set(extractGroupTargets(params).map((target) => target.trim()).filter(Boolean))]
         const groupName = String(params.title ?? params.groupName ?? params.name ?? '').trim()
 
-        if (requestedTargets.length > 0) {
-          const friends = await getFriends(accessToken)
-          const { missingTargets, ambiguousTargets } = validateCreateGroupTargets(friends, requestedTargets)
+        if (requestedTargets.length < 2) {
+          const messageText = 'Cần ít nhất 2 thành viên khác ngoài bạn để tạo nhóm. Hãy cung cấp thêm thành viên trước khi mình mở luồng tạo nhóm.'
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
 
-          if (missingTargets.length > 0) {
-            const messageText = `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không mở tạo nhóm để tránh chọn nhầm người.`
-            setActionFeedback({ tone: 'warning', message: messageText })
-            appendAssistantFeedback(messageText)
-            return
-          }
+        const friends = await getFriends(accessToken)
+        const { missingTargets, ambiguousTargets } = validateCreateGroupTargets(friends, requestedTargets)
 
-          if (ambiguousTargets.length > 0) {
-            const messageText = `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy mở tạo nhóm và chọn thủ công để an toàn.`
-            setActionFeedback({ tone: 'warning', message: messageText })
-            appendAssistantFeedback(messageText)
-            return
-          }
+        if (missingTargets.length > 0) {
+          const messageText = `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không mở tạo nhóm để tránh chọn nhầm người.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        if (ambiguousTargets.length > 0) {
+          const messageText = `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy mở tạo nhóm và chọn thủ công để an toàn.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
         }
 
         const createGroupQuery = new URLSearchParams({ createGroup: 'true' })
         if (groupName) createGroupQuery.set('groupName', groupName)
-        if (requestedTargets.length > 0) createGroupQuery.set('members', requestedTargets.join(','))
+        createGroupQuery.set('members', requestedTargets.join(','))
 
         setPendingActionReview({
           title: 'Mở luồng tạo nhóm',
-          description: requestedTargets.length > 0
-            ? 'Mình đã kiểm tra tên trong danh bạ. Web vẫn sẽ mở modal tạo nhóm để bạn tự chọn và xác nhận lần cuối.'
-            : 'AI chưa xác định rõ thành viên. Web chỉ mở modal tạo nhóm để bạn tự chọn thủ công.',
+          description: 'Mình đã kiểm tra tên trong danh bạ. Web vẫn sẽ mở modal tạo nhóm để bạn tự chọn và xác nhận lần cuối.',
           confirmLabel: 'Mở tạo nhóm',
           path: `/chat?${createGroupQuery.toString()}`,
           feedback: 'Đã mở luồng tạo nhóm. Hãy kiểm tra tên nhóm và danh sách thành viên trước khi tạo.',

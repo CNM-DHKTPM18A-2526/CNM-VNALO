@@ -126,6 +126,16 @@ export class ConversationService {
 
   /** Create a group conversation with initial members. Creator becomes ADMIN. */
   async createGroup(userId: string, dto: CreateGroupConversationDto) {
+    const uniqueInitialMembers = [...new Set(dto.memberIds ?? [])].filter(
+      (memberId) => memberId !== userId,
+    );
+
+    if (uniqueInitialMembers.length < 2) {
+      throw new BadRequestException(
+        'A group conversation requires at least 2 other initial members',
+      );
+    }
+
     const conversationId = await this.dataSource.transaction(
       async (manager) => {
         const conversation = manager.create(Conversation, {
@@ -144,9 +154,6 @@ export class ConversationService {
           { conversationId: saved.id, userId, role: MemberRole.ADMIN },
         ];
 
-        const uniqueInitialMembers = [...new Set(dto.memberIds)].filter(
-          (memberId) => memberId !== userId,
-        );
         const effectiveMemberLimit = saved.memberLimit ?? 100;
         if (uniqueInitialMembers.length + 1 > effectiveMemberLimit) {
           throw new BadRequestException(
