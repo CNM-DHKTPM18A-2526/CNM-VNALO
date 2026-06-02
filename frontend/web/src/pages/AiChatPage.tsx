@@ -730,10 +730,10 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         }
 
         setPendingActionReview({
-          title: 'Xac nhan tao nhom',
-          description: `Tro ly se tao nhom "${resolution.groupName}" voi ${resolution.memberLabels.join(', ')}. Ban van co the huy neu danh sach chua dung.`,
-          confirmLabel: 'Tao nhom',
-          feedback: `Da tao nhom "${resolution.groupName}".`,
+          title: 'Xác nhận tạo nhóm',
+          description: `Trợ lý sẽ tạo nhóm "${resolution.groupName}" với ${resolution.memberLabels.join(', ')}. Bạn vẫn có thể hủy nếu danh sách chưa đúng.`,
+          confirmLabel: 'Tạo nhóm',
+          feedback: `Đã tạo nhóm "${resolution.groupName}".`,
           preview: { risk: 'medium', targetLabel: resolution.groupName, draft: resolution.memberLabels.join(', ') },
           execute: async () => {
             const conversationId = await createGroupConversation(accessToken, {
@@ -749,7 +749,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       if (command === 'SEND_FRIEND_REQUEST') {
         const target = extractActionTarget(params)
         if (!target) {
-          const messageText = 'Minh chua xac dinh duoc nguoi can ket ban. Hay noi ro ten, email hoac so dien thoai.'
+          const messageText = 'Mình chưa xác định được người cần kết bạn. Hãy nói rõ tên, email hoặc số điện thoại.'
           setActionFeedback({ tone: 'warning', message: messageText })
           appendAssistantFeedback(messageText)
           return
@@ -765,10 +765,10 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         }
 
         setPendingActionReview({
-          title: 'Xac nhan gui ket ban',
-          description: `Tro ly se gui loi moi ket ban toi ${resolution.targetLabel}.`,
-          confirmLabel: 'Gui ket ban',
-          feedback: `Da gui loi moi ket ban toi ${resolution.targetLabel}.`,
+          title: 'Xác nhận gửi kết bạn',
+          description: `Trợ lý sẽ gửi lời mời kết bạn tới ${resolution.targetLabel}.`,
+          confirmLabel: 'Gửi kết bạn',
+          feedback: `Đã gửi lời mời kết bạn tới ${resolution.targetLabel}.`,
           preview: { risk: 'medium', targetLabel: resolution.targetLabel, draft: resolution.message },
           execute: async () => {
             await sendFriendRequest(accessToken, {
@@ -784,7 +784,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         const target = extractActionTarget(params)
         if (!target) {
           navigate('/chat')
-          const messageText = 'Minh chua xac dinh duoc nguoi nhan hoac cuoc tro chuyen cu the, nen da mo Chat de ban tu chon thu cong.'
+          const messageText = 'Mình chưa xác định được người nhận hoặc cuộc trò chuyện cụ thể, nên đã mở Chat để bạn tự chọn thủ công.'
           setActionFeedback({ tone: 'info', message: messageText })
           appendAssistantFeedback(messageText)
           return

@@ -220,7 +220,7 @@ export function resolveCreateGroupAction(params: AiActionParams | null | undefin
   }
 
   if (validation.memberIds.length < 2) {
-    issues.push({ code: 'NOT_ENOUGH_GROUP_MEMBERS', message: 'Can resolve fewer than 2 distinct friends for this group.', targets: memberNames })
+    issues.push({ code: 'NOT_ENOUGH_GROUP_MEMBERS', message: 'Chỉ resolve được dưới 2 bạn bè khác nhau cho nhóm này.', targets: memberNames })
   }
 
   if (issues.length > 0) return { issues }
@@ -248,7 +248,7 @@ export function resolveConversationAction(command: AiActionCommand, params: AiAc
   const bestScore = matches[0].score
   const closeMatches = matches.filter((item) => bestScore - item.score <= AMBIGUOUS_SCORE_DELTA)
   if (closeMatches.length > 1) {
-    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Co nhieu cuoc tro chuyen khop voi "${target}". Hay chon thu cong de tranh nham.`, targets: [target] }] }
+    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Có nhiều cuộc trò chuyện khớp với "${target}". Hãy chọn thủ công để tránh nhầm.`, targets: [target] }] }
   }
 
   if (command === 'START_CALL' && matches[0].value.isGroup) {
@@ -275,7 +275,7 @@ export function resolveFriendRequestAction(params: AiActionParams | null | undef
   const bestScore = matches[0].score
   const closeMatches = matches.filter((item) => bestScore - item.score <= AMBIGUOUS_SCORE_DELTA)
   if (closeMatches.length > 1) {
-    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Co nhieu nguoi dung khop voi "${target}". Hay noi ro hon.`, targets: [target] }] }
+    return { issues: [{ code: 'TARGET_AMBIGUOUS', message: `Có nhiều người dùng khớp với "${target}". Hãy nói rõ hơn.`, targets: [target] }] }
   }
   return {
     issues: [],
