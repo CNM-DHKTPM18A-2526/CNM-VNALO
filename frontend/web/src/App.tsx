@@ -53,7 +53,7 @@ function App() {
             <Route path='profile' element={<ProfilePage />} />
             <Route path='chat-ai' element={<Navigate replace to='/chat/vnalo-ai-assistant' />} />
             <Route path='social' element={<SocialPage />} />
-
+            <Route path='admin/monitoring' element={<AdminDashboardPage />} />
             <Route path='stories/create' element={<CreateStoryPage />} />
             <Route path='stories/:storyId' element={<StoryViewerPage />} />
           </Route>
