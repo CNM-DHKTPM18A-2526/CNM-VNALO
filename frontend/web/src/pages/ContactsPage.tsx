@@ -33,6 +33,7 @@ import {
 import type { Friend, FriendRequest, FriendStats, UserLookupResult } from '../features/friends/friends.types'
 import { EmptyState } from '../shared/components/EmptyState'
 import { Icon } from '../shared/components/Icon'
+import { SearchInput } from '../shared/components/SearchInput'
 import { LoadingState } from '../shared/components/LoadingState'
 import { UserAvatar } from '../shared/components/UserAvatar'
 import { Button } from '../shared/components/ui/Button'
@@ -40,7 +41,7 @@ import { Card } from '../shared/components/ui/Card'
 import { Modal } from '../shared/components/ui/Modal'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import { refreshNotificationBadges } from '../features/notifications/NotificationContext'
-import '../styles/contacts-page.css'
+
 
 type FeedbackState = {
   type: 'success' | 'error'
@@ -757,48 +758,37 @@ export function ContactsPage() {
   }
 
   return (
-    <section className='contacts-page panel-page'>
+    <section className='contacts-page'>
       <div className='contacts-shell'>
         <aside
           className={`contacts-sidebar ${isSidebarOpen ? 'contacts-sidebar-open' : ''}`}
         >
           <div className='contacts-sidebar-head'>
-            <div className='contacts-brand'>
-              <div className='contacts-brand-icon'>
-                <Icon name='chat' />
-              </div>
-              <div className='contacts-brand-copy'>
-                <div className='contacts-brand-sub'>VNALO</div>
-                <div className='contacts-brand-title'>Danh bạ</div>
-              </div>
-            </div>
-
-            <div className='contacts-sidebar-search-row'>
-              <div className='contacts-sidebar-search-box'>
-                <Icon name='search' className='contacts-icon-sm' />
-                <input
-                  className='contacts-input'
-                  placeholder='Tìm kiếm'
-                  value={sidebarKeyword}
-                  onChange={(event) => setSidebarKeyword(event.target.value)}
-                />
-              </div>
-              <div className='contacts-sidebar-actions'>
+            <div className='chat-toolbar-row'>
+              <SearchInput
+                className='chat-list-search-input'
+                placeholder={t('chat.searchPlaceholder')}
+                value={sidebarKeyword}
+                onChange={setSidebarKeyword}
+              />
+              <div className='chat-toolbar-actions' aria-label={t('chat.quickActions')}>
                 <button
                   type='button'
-                  className='contacts-sidebar-action-btn'
-                  title='Thêm bạn'
+                  className='chat-toolbar-btn'
+                  title={t('chat.addFriend')}
                   onClick={() => openAddFriendModal()}
                 >
-                  <Icon name='userPlusZalo' size={20} />
+                  <Icon name='userPlusZalo' size={22} />
+                  <span className='chat-toolbar-tooltip'>{t('chat.addFriend')}</span>
                 </button>
                 <button
                   type='button'
-                  className='contacts-sidebar-action-btn'
-                  title='Tạo nhóm chat'
+                  className='chat-toolbar-btn'
+                  title={t('chat.createGroup')}
                   onClick={() => navigate('/chat?createGroup=true')}
                 >
                   <Icon name='groupPlusZalo' size={22} />
+                  <span className='chat-toolbar-tooltip'>{t('chat.createGroup')}</span>
                 </button>
               </div>
             </div>

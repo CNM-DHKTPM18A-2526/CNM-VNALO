@@ -149,7 +149,10 @@ logging:
 
 app:
   sync-policy:
-    enforce-web-restriction: false
+    enforce-web-restriction: ${APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION:false}
+  admin:
+    monitoring:
+      bootstrap-emails: ${ADMIN_MONITORING_BOOTSTRAP_EMAILS:}
 
 ---
 # =============================================================================

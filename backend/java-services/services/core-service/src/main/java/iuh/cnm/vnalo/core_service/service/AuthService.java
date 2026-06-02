@@ -27,6 +27,7 @@ import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,9 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final OtpService otpService;
     private final SessionAuditService sessionAuditService;
+
+    @Value("${app.sync-policy.enforce-web-restriction:false}")
+    private boolean enforceWebRestriction;
 
     @Transactional(readOnly = true)
     public boolean isPhoneRegistered(String phone) {
@@ -162,7 +166,7 @@ public class AuthService {
         }
 
         final String normalizedPlatform = resolvePlatform(request.getPlatform(), httpRequest);
-        if (classifyPlatform(normalizedPlatform) == DeviceGroup.WEB && !isQrWebDevice(request.getDeviceId())) {
+        if (enforceWebRestriction && classifyPlatform(normalizedPlatform) == DeviceGroup.WEB && !isQrWebDevice(request.getDeviceId())) {
             enforceKnownWebDeviceOrQrApproval(account.getId(), request.getDeviceId());
         }
 
@@ -514,6 +518,9 @@ public class AuthService {
     private boolean isWebRestrictedForSession(UserSetting setting, String platform, String deviceId) {
         final String normalizedPlatform = normalizePlatform(platform);
         if (!"WEB".equals(normalizedPlatform) && !"PC".equals(normalizedPlatform)) {
+            return false;
+        }
+        if (!enforceWebRestriction) {
             return false;
         }
         // Null syncEnabled should behave as enabled for backward compatibility.

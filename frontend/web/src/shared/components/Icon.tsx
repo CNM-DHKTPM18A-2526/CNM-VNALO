@@ -21,7 +21,9 @@ type IconName =
   | 'file'
   | 'more'
   | 'spark'
+  | 'bot'
   | 'database'
+  | 'layoutDashboard'
   | 'help'
   | 'close'
   | 'play'
@@ -189,8 +191,8 @@ export function Icon({ name, className, size = 24 }: IconProps) {
   if (name === 'settings') {
     return (
       <svg {...commonProps}>
-        <circle cx='12' cy='12' r='3' />
-        <path d='M19.4 15a1 1 0 0 0 .2 1.1l.03.03a1.5 1.5 0 0 1-2.12 2.12l-.03-.03a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.92V19a1.5 1.5 0 0 1-3 0v-.06a1 1 0 0 0-.6-.92 1 1 0 0 0-1.1.2l-.03.03a1.5 1.5 0 1 1-2.12-2.12l.03-.03a1 1 0 0 0 .2-1.1 1 1 0 0 0-.92-.6H5a1.5 1.5 0 0 1 0-3h.06a1 1 0 0 0 .92-.6 1 1 0 0 0-.2-1.1l-.03-.03a1.5 1.5 0 1 1 2.12-2.12l.03.03a1 1 0 0 0 1.1.2h0a1 1 0 0 0 .6-.92V5a1.5 1.5 0 0 1 3 0v.06a1 1 0 0 0 .6.92h0a1 1 0 0 0 1.1-.2l.03-.03a1.5 1.5 0 1 1 2.12 2.12l-.03.03a1 1 0 0 0-.2 1.1v0a1 1 0 0 0 .92.6H19a1.5 1.5 0 0 1 0 3h-.06a1 1 0 0 0-.92.6Z' />
+        <path d='M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z' />
+        <path d='M18.9 13.8c.08-.58.08-1.02 0-1.6l2-1.55-2-3.46-2.36.95a7.2 7.2 0 0 0-1.38-.8L14.8 4.8h-5.6l-.36 2.54c-.5.2-.96.47-1.38.8L5.1 7.19l-2 3.46 2 1.55a6.4 6.4 0 0 0 0 1.6l-2 1.55 2 3.46 2.36-.95c.42.33.88.6 1.38.8l.36 2.54h5.6l.36-2.54c.5-.2.96-.47 1.38-.8l2.36.95 2-3.46-2-1.55Z' />
       </svg>
     )
   }
@@ -285,6 +287,17 @@ export function Icon({ name, className, size = 24 }: IconProps) {
         <circle cx='6' cy='12' r='1.3' />
         <circle cx='12' cy='12' r='1.3' />
         <circle cx='18' cy='12' r='1.3' />
+      </svg>
+    )
+  }
+
+  if (name === 'layoutDashboard') {
+    return (
+      <svg {...commonProps}>
+        <rect x='3.5' y='4' width='7' height='7' rx='1.8' />
+        <rect x='13.5' y='4' width='7' height='4.8' rx='1.6' />
+        <rect x='13.5' y='11.8' width='7' height='8.2' rx='1.8' />
+        <rect x='3.5' y='14' width='7' height='6' rx='1.8' />
       </svg>
     )
   }
@@ -472,6 +485,20 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     return (
       <svg {...commonProps}>
         <path d='M20.8 4.6c-1.8-1.7-4.6-1.8-6.5-.2L12 6.5l-2.3-2.1C7.9 2.8 5.1 2.9 3.3 4.6A5.6 5.6 0 0 0 3 9c0 3.3 2.7 6 6 9l3 2 3-2c3.3-3 6-5.7 6-9 0-1.6-.6-3.1-1.2-3.4z' fill='currentColor' stroke='none' />
+      </svg>
+    )
+  }
+
+  if (name === 'bot') {
+    return (
+      <svg {...commonProps}>
+        <rect x='5' y='7' width='14' height='11' rx='3' />
+        <path d='M12 7V4' />
+        <circle cx='9.5' cy='12.5' r='1' fill='currentColor' stroke='none' />
+        <circle cx='14.5' cy='12.5' r='1' fill='currentColor' stroke='none' />
+        <path d='M9 16h6' />
+        <path d='M4 11h1' />
+        <path d='M19 11h1' />
       </svg>
     )
   }

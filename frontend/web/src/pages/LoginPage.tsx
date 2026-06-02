@@ -9,6 +9,7 @@ import { useLanguage } from '../shared/i18n/LanguageContext'
 import { useTheme } from '../shared/contexts/ThemeContext'
 
 const POLL_INTERVAL_MS = 2000
+const WEB_LOGIN_QR_REQUIRED = import.meta.env.VITE_WEB_LOGIN_QR_REQUIRED === 'true'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -17,7 +18,7 @@ export function LoginPage() {
   const { setLanguage, language, t } = useLanguage()
   const { theme, toggleTheme } = useTheme()
 
-  const [loginMode, setLoginMode] = React.useState<'qr' | 'password'>('qr')
+  const [loginMode, setLoginMode] = React.useState<'qr' | 'password'>(WEB_LOGIN_QR_REQUIRED ? 'qr' : 'password')
   const [showMenu, setShowMenu] = React.useState(false)
   
   // Password login states

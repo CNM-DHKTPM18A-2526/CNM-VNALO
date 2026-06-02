@@ -7,6 +7,16 @@ type CachedUserProfile = {
   bio?: string | null
 }
 
+const AI_ASSISTANT_USER_ID = '__vnalo_ai__'
+const AI_ASSISTANT_PROFILE: CachedUserProfile = {
+  displayName: 'VNALO AI Assistant',
+  avatarUrl: null,
+}
+const UNKNOWN_USER_PROFILE: CachedUserProfile = {
+  displayName: 'Người dùng',
+  avatarUrl: null,
+}
+
 type UserStoreContextType = {
   userMap: Record<string, CachedUserProfile>
   getDisplayName: (userId: string) => string
@@ -22,25 +32,30 @@ export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const upsertUser = React.useCallback((userId: string, profile: CachedUserProfile) => {
     setUserMap((prev) => {
-      // Avoid unnecessary updates if data is identical
       if (
-        prev[userId]?.displayName === profile.displayName && 
+        prev[userId]?.displayName === profile.displayName &&
         prev[userId]?.avatarUrl === profile.avatarUrl &&
         prev[userId]?.bio === profile.bio
       ) {
         return prev
       }
-      console.log(`[UserStore] Seeding/Updating user ${userId}:`, profile.displayName)
+
       return { ...prev, [userId]: profile }
     })
   }, [])
 
   const getDisplayName = React.useCallback((userId: string) => {
-    return userMap[userId]?.displayName || 'Người dùng'
+    if (userId === AI_ASSISTANT_USER_ID) return AI_ASSISTANT_PROFILE.displayName
+    return userMap[userId]?.displayName || UNKNOWN_USER_PROFILE.displayName
   }, [userMap])
 
   const ensureUser = React.useCallback(async (token: string, userId: string): Promise<CachedUserProfile> => {
-    if (userMap[userId] && userMap[userId].displayName !== 'Người dùng') return userMap[userId]
+    if (userId === AI_ASSISTANT_USER_ID) {
+      upsertUser(userId, AI_ASSISTANT_PROFILE)
+      return AI_ASSISTANT_PROFILE
+    }
+
+    if (userMap[userId] && userMap[userId].displayName !== UNKNOWN_USER_PROFILE.displayName) return userMap[userId]
 
     const pending = pendingRequests.current.get(userId)
     if (pending) return pending
@@ -49,13 +64,13 @@ export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         const profile = await getUserById(token, userId)
         const resolved: CachedUserProfile = {
-          displayName: profile?.displayName?.trim() || profile?.phone || profile?.email || 'Người dùng',
+          displayName: profile?.displayName?.trim() || profile?.phone || profile?.email || UNKNOWN_USER_PROFILE.displayName,
           avatarUrl: profile?.avatarUrl ?? null,
         }
         upsertUser(userId, resolved)
         return resolved
-      } catch (error) {
-        return { displayName: 'Người dùng', avatarUrl: null }
+      } catch {
+        return UNKNOWN_USER_PROFILE
       } finally {
         pendingRequests.current.delete(userId)
       }

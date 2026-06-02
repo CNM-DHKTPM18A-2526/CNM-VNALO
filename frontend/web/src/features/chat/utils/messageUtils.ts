@@ -144,6 +144,126 @@ export function formatDurationZalo(seconds: number): string {
 /**
  * Formats a preview string for the chat list (sidebar).
  */
+function parseJsonObject(value: unknown): Record<string, any> | null {
+  if (!value) {
+    return null
+  }
+
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, any>
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value.trim())
+      return parseJsonObject(parsed)
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+function extractReactionSyncEmoji(rawText: string): string {
+  const match =
+    rawText.match(/"emoji"\s*:\s*"([^"]+)"/)?.[1] ??
+    rawText.match(/"emoji":"([^"]+)"/)?.[1]
+  if (match) {
+    return match
+  }
+  if (rawText.includes('vote:') || rawText.includes('"vote:')) {
+    return 'vote:'
+  }
+  if (rawText.includes('"v:') || /"v:\d/.test(rawText)) {
+    return 'v:'
+  }
+  return ''
+}
+
+function isPollReactionSyncPayload(payload: Record<string, any>, rawText: string): boolean {
+  if (payload.isPollVote === true || payload.pollVote === true) {
+    return true
+  }
+  return /"(isPollVote|pollVote)"\s*:\s*true/.test(rawText)
+}
+
+function isVoteReactionEmoji(emoji: string): boolean {
+  const normalized = emoji.trim()
+  return normalized.startsWith('vote:') || normalized.startsWith('v:')
+}
+
+export function buildReactionSyncContent(params: {
+  messageId: string
+  conversationId: string
+  actorId: string
+  type: 'ADD' | 'REMOVE'
+  emoji: string
+  isPollVote?: boolean
+}): string {
+  const signal = {
+    action: 'UPDATE_MESSAGE_REACTIONS',
+    emoji: params.emoji,
+    type: params.type,
+    isPollVote: params.isPollVote === true,
+    messageId: params.messageId,
+    conversationId: params.conversationId,
+    actorId: params.actorId,
+  }
+  return JSON.stringify(signal).replace(/\s/g, '')
+}
+
+function getReactionSyncPayload(value: string | Record<string, any>): Record<string, any> | null {
+  const directPayload = parseJsonObject(value)
+  const rawText = typeof value === 'string' ? value : JSON.stringify(value)
+
+  if (rawText.includes('UPDATE_MESSAGE_REACTIONS')) {
+    if (directPayload?.action === 'UPDATE_MESSAGE_REACTIONS') {
+      return directPayload
+    }
+
+    const nestedKeys = ['content', 'text', 'message', 'payload', 'data', 'metadata', 'lastMessagePreview']
+    for (const key of nestedKeys) {
+      const nested = directPayload ? getReactionSyncPayload(directPayload[key]) : null
+      if (nested) {
+        return nested
+      }
+    }
+
+    return {
+      action: 'UPDATE_MESSAGE_REACTIONS',
+      emoji: extractReactionSyncEmoji(rawText),
+      type: rawText.match(/"type"\s*:\s*"([^"]+)"/)?.[1] ?? rawText.match(/"type":"([^"]+)"/)?.[1] ?? '',
+      isPollVote: /"(isPollVote|pollVote)"\s*:\s*true/.test(rawText),
+    }
+  }
+
+  return null
+}
+
+export function formatReactionSyncPreview(value: string | Record<string, any>, actorName?: string | null): string | null {
+  const payload = getReactionSyncPayload(value)
+
+  if (!payload) {
+    return null
+  }
+
+  const rawText = typeof value === 'string' ? value : JSON.stringify(value)
+  const emoji = String(payload.emoji ?? payload.reaction ?? payload.reactionKey ?? '').trim()
+  const updateType = String(payload.type ?? payload.actionType ?? '').trim().toUpperCase()
+  const isVote = isVoteReactionEmoji(emoji) || isPollReactionSyncPayload(payload, rawText)
+  
+  if (isVote) {
+    const preview = updateType === 'REMOVE' ? 'Đã cập nhật bình chọn' : 'Đã bình chọn'
+    return actorName ? `${actorName}: ${preview}` : preview
+  }
+
+  const preview = updateType === 'REMOVE' ? 'Đã gỡ cảm xúc' : 'Đã thả cảm xúc'
+  return actorName ? `${actorName}: ${preview}` : preview
+
+  
+}
+
 export function formatMessagePreview(
   text: string | null | undefined,
   isMe: boolean,
@@ -195,10 +315,15 @@ export function formatMessagePreview(
 
   // Support for system-like strings that might be raw JSON in the fallback text
   const trimmed = content.trim();
+  const reactionSyncPreview = formatReactionSyncPreview(trimmed, isMe ? 'Bạn' : sender)
+  if (reactionSyncPreview) {
+    return reactionSyncPreview
+  }
+
   if (trimmed.startsWith('{') && trimmed.includes('"action":')) {
     try {
       const sys = JSON.parse(trimmed);
-      if (sys.action === 'UPDATE_MESSAGE_REACTIONS') return '';
+      if (sys.action === 'UPDATE_MESSAGE_REACTIONS') return formatReactionSyncPreview(sys) ?? 'Đã cập nhật cảm xúc';
       if (sys.action === 'REMOVE_MEMBER') return '[Thông báo] Xóa thành viên';
       if (sys.action === 'ADD_MEMBERS') return '[Thông báo] Thêm thành viên';
       if (sys.action === 'PROMOTE_ADMIN') return '[Thông báo] Chỉ định phó nhóm';

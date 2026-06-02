@@ -17,6 +17,7 @@ type CreateGroupModalProps = {
     selectedMemberIds: string[]
   ) => Promise<void>;
   initialMemberIds?: string[];
+  initialGroupName?: string;
   existingMemberIds?: string[];
 };
 
@@ -65,6 +66,7 @@ export function CreateGroupModal({
   onClose,
   onCreate,
   initialMemberIds = [],
+  initialGroupName = '',
   existingMemberIds = [],
 }: CreateGroupModalProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -85,13 +87,13 @@ export function CreateGroupModal({
 
     // Use requestAnimationFrame to avoid synchronous setState in effect warning
     requestAnimationFrame(() => {
-      setGroupName('');
+      setGroupName(initialGroupName);
       setSearchKeyword('');
       setSelectedMemberIds(initialMemberIds);
       setActiveFilter('all');
       setAvatarPreviewUrl(null);
     });
-  }, [isOpen, initialMemberIds]);
+  }, [isOpen, initialMemberIds, initialGroupName]);
 
   const filterTabs: Array<{ id: FilterType; label: string }> = [
     { id: 'all', label: 'Tất cả' },
@@ -398,4 +400,4 @@ function ContactRow({ friend, isSelected, isLocked, onToggle }: {
       {isLocked && <span className="text-[12px] text-[var(--muted)] font-medium">Đã vào nhóm</span>}
     </div>
   );
-}
+}

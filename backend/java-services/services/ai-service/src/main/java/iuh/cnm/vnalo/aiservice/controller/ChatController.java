@@ -9,6 +9,9 @@ import iuh.cnm.vnalo.aiservice.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +26,15 @@ public class ChatController {
     private final ChatService chatService;
 
     private String getCurrentUserId() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken
+                || authentication.getName() == null
+                || authentication.getName().isBlank()) {
+            throw new InsufficientAuthenticationException("Authentication is required");
+        }
+        return authentication.getName();
     }
 
     @PostMapping("/ask")

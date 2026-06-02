@@ -26,6 +26,7 @@ ai:
   internal-secret: ${AI_INTERNAL_SECRET}
   gemini:
     api-key: ${GEMINI_API_KEY:}
+    api-keys: ${GEMINI_API_KEYS:}
     model: ${GEMINI_MODEL:gemini-2.5-flash}
   ollama:
     enabled: ${OLLAMA_ENABLED:true}

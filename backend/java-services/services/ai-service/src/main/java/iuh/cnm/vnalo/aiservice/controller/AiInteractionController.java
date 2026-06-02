@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,16 +36,24 @@ public class AiInteractionController {
     private final ChatService chatService;
 
     private String getCurrentUserId() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken
+                || authentication.getName() == null
+                || authentication.getName().isBlank()) {
+            throw new InsufficientAuthenticationException("Authentication is required");
+        }
+        return authentication.getName();
     }
 
     @PostMapping("/chat")
     public ResponseEntity<?> interactWithMascot(@Valid @RequestBody AiChatRequest request) {
         log.info("Received AI Command for mascot {}. Analyze intent: {}, Deep summary: {}", 
                 request.getMascotId(), request.isAnalyzeIntent(), request.isEnableDeepSummary());
+        String userId = getCurrentUserId();
         
         try {
-            String userId = getCurrentUserId();
             AiChatResponse response = geminiAiService.interactWithGemini(userId, request);
             return ResponseEntity.ok(ApiResponse.ok(response));
             

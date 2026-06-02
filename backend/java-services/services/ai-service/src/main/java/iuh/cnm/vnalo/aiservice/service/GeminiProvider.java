@@ -7,6 +7,7 @@ import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import iuh.cnm.vnalo.aiservice.dto.Message;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,37 +15,27 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Gemini Provider — Primary LLM.
- * Uses Google GenAI Java SDK.
- * Throws RuntimeException on quota exhaustion for fallback.
- */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class GeminiProvider {
 
-    @Value("${ai.gemini.api-key:}")
-    private String apiKey;
+    private final GeminiKeyManager keyManager;
 
     @Value("${ai.gemini.model:gemini-2.5-flash}")
     private String modelName;
 
-    private Client client;
     private boolean available = false;
 
     @PostConstruct
     public void init() {
-        if (apiKey != null && !apiKey.isBlank()) {
-            try {
-                this.client = Client.builder().apiKey(apiKey).build();
-                this.available = true;
-                log.info("Gemini initialized — model: {}", modelName);
-            } catch (Exception e) {
-                log.warn("Failed to initialize Gemini: {}", e.getMessage());
-            }
-        } else {
-            log.warn("GEMINI_API_KEY not set — Gemini provider disabled");
+        if (!keyManager.hasKeys()) {
+            log.warn("GEMINI_API_KEY not set; Gemini provider disabled");
+            return;
         }
+
+        available = true;
+        log.info("Gemini initialized - model: {}, keys: {}", modelName, keyManager.keyCount());
     }
 
     public boolean isAvailable() {
@@ -56,45 +47,47 @@ public class GeminiProvider {
             throw new RuntimeException("Gemini not configured");
         }
 
-        try {
-            // Build conversation content
-            List<Content> contents = new ArrayList<>();
-            for (Message msg : messages) {
-                String role = "user".equals(msg.getRole()) ? "user" : "model";
-                contents.add(Content.builder()
-                        .role(role)
-                        .parts(List.of(Part.fromText(msg.getContent())))
-                        .build());
-
-            }
-
-            // Build config with system instruction
-            GenerateContentConfig config = GenerateContentConfig.builder()
-                    .systemInstruction(Content.fromParts(Part.fromText(systemPrompt)))
-                    .build();
-
-            // Call Gemini API
-            GenerateContentResponse response = client.models.generateContent(
-                    modelName,
-                    contents,
-                    config
-            );
-
-            String answer = response.text();
-            log.debug("Gemini response length: {} chars", answer != null ? answer.length() : 0);
-            return answer;
-
-        } catch (Exception e) {
-            String message = e.getMessage() != null ? e.getMessage() : "Unknown error";
-
-            if (message.contains("429") || message.contains("RESOURCE_EXHAUSTED")
-                    || message.contains("quota") || message.contains("rate")) {
-                log.warn("Gemini quota exhausted: {}", message);
-                throw new RuntimeException("GEMINI_QUOTA_EXHAUSTED", e);
-            }
-
-            log.error("Gemini error: {}", message);
-            throw new RuntimeException("GEMINI_ERROR: " + message, e);
+        List<Content> contents = new ArrayList<>();
+        for (Message msg : messages) {
+            String role = "user".equals(msg.getRole()) ? "user" : "model";
+            contents.add(Content.builder()
+                    .role(role)
+                    .parts(List.of(Part.fromText(msg.getContent())))
+                    .build());
         }
+
+        GenerateContentConfig config = GenerateContentConfig.builder()
+                .systemInstruction(Content.fromParts(Part.fromText(systemPrompt)))
+                .build();
+
+        Exception lastError = null;
+        int attempts = Math.max(1, keyManager.keyCount());
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            String activeKey = keyManager.currentKey();
+            try {
+                Client client = Client.builder().apiKey(activeKey).build();
+                GenerateContentResponse response = client.models.generateContent(modelName, contents, config);
+                String answer = response.text();
+                log.debug("Gemini response length: {} chars", answer != null ? answer.length() : 0);
+                return answer;
+            } catch (Exception e) {
+                lastError = e;
+                if (keyManager.isQuotaOrRateLimitError(e) && attempt < attempts - 1) {
+                    keyManager.rotateAfterFailure(activeKey);
+                    continue;
+                }
+
+                String message = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                if (keyManager.isQuotaOrRateLimitError(e)) {
+                    log.warn("Gemini quota exhausted after {} attempt(s): {}", attempt + 1, message);
+                    throw new RuntimeException("GEMINI_QUOTA_EXHAUSTED", e);
+                }
+
+                log.error("Gemini error: {}", message);
+                throw new RuntimeException("GEMINI_ERROR: " + message, e);
+            }
+        }
+
+        throw new RuntimeException("GEMINI_ERROR", lastError);
     }
 }
