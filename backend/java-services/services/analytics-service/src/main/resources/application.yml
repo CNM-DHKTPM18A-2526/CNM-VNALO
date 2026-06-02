@@ -39,3 +39,19 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      base-path: /actuator
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true

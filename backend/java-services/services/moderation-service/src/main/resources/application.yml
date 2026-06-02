@@ -19,6 +19,21 @@ server:
   servlet:
     context-path: /api/v1
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+
 # JWT Configuration - REQUIRED for all profiles
 jwt:
   secret: ${JWT_SECRET}

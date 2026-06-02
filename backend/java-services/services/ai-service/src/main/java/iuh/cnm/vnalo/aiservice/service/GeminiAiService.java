@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -81,7 +82,7 @@ public class GeminiAiService {
         iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot = coreServiceClient.getUserMascotSettings(userId);
 
         // 3. Build Dynamic System Prompt based on Mascot Settings
-        String dynamicSystemPrompt = buildSystemPrompt(mascot, request.isEnableDeepSummary());
+        String dynamicSystemPrompt = buildSystemPrompt(mascot, request.isEnableDeepSummary(), request.getClientPlatform());
         String stableConvId = UUID.nameUUIDFromBytes(
                 ("AI_ASSISTANT_" + userId).getBytes(java.nio.charset.StandardCharsets.UTF_8)
         ).toString();
@@ -103,6 +104,7 @@ public class GeminiAiService {
             // Call Gemini with key rotation when quota/rate-limit is hit.
             ResponseEntity<String> response = exchangeGeminiWithRotation(url, payload);
             responseObj = parseGeminiResponse(response.getBody(), request.isAnalyzeIntent());
+            enforcePlatformActionCapabilities(responseObj, request.getClientPlatform());
             answer = responseObj.getTextReply();
         } catch (Exception geminiEx) {
             log.warn("Gemini failed in GeminiAiService ({}), falling back to Ollama...", geminiEx.getMessage());
@@ -117,6 +119,7 @@ public class GeminiAiService {
 
                 String ollamaAnswer = ollamaProvider.generate(dynamicSystemPrompt, historyMessages);
                 responseObj = parseFallbackResponse(ollamaAnswer, request.isAnalyzeIntent());
+                enforcePlatformActionCapabilities(responseObj, request.getClientPlatform());
                 answer = responseObj.getTextReply();
                 provider = "ollama";
             } catch (Exception ollamaEx) {
@@ -194,7 +197,7 @@ public class GeminiAiService {
         return requestedEntryId.trim();
     }
 
-    private String buildSystemPrompt(iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot, boolean enableDeepSummary) {
+    private String buildSystemPrompt(iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot, boolean enableDeepSummary, String clientPlatform) {
         StringBuilder sb = new StringBuilder(iuh.cnm.vnalo.aiservice.knowledge.SystemPrompt.VNALO_SYSTEM_PROMPT);
         if (enableDeepSummary) {
             sb.append("\n\nLƯU Ý: Người dùng đã yêu cầu phản hồi sâu (Deep Summary). Hãy phân tích kỹ và trả lời chi tiết hơn bình thường.");
@@ -207,7 +210,47 @@ public class GeminiAiService {
                 sb.append("\n- Chỉ dẫn đặc biệt từ người dùng: ").append(mascot.getCustomInstructions());
             }
         }
+        appendPlatformCapabilityPrompt(sb, clientPlatform);
         return sb.toString();
+    }
+
+    private void enforcePlatformActionCapabilities(AiChatResponse response, String clientPlatform) {
+        if (response == null || response.getActionCommand() == null || response.getActionCommand().isBlank()) {
+            return;
+        }
+        String platform = clientPlatform == null ? "" : clientPlatform.trim().toUpperCase(Locale.ROOT);
+        if (!"WEB".equals(platform)) {
+            return;
+        }
+        String command = normalizeActionAlias(response.getActionCommand().trim().toUpperCase(Locale.ROOT));
+        if (isWebExecutableAction(command)) {
+            response.setActionCommand(command);
+            return;
+        }
+        log.warn("Blocked action command '{}' because clientPlatform=WEB does not support a safe executor yet", command);
+        blockActionCommand(response, command);
+    }
+
+    private boolean isWebExecutableAction(String command) {
+        return switch (command) {
+            case "OPEN_CHAT", "COMPOSE_MESSAGE", "START_CALL", "CREATE_GROUP", "SEND_FRIEND_REQUEST",
+                    "RECALL_MESSAGE", "PIN_MESSAGE", "UNPIN_MESSAGE", "OPEN_GROUP_SETTINGS", "NAVIGATE_TO", "NAVIGATE_TO_CHAT",
+                    "NAVIGATE_TO_CONTACTS", "NAVIGATE_TO_SETTINGS", "NAVIGATE_TO_SCANNER", "NAVIGATE_TO_TIMELINE" -> true;
+            default -> false;
+        };
+    }
+
+    private void appendPlatformCapabilityPrompt(StringBuilder sb, String clientPlatform) {
+        String platform = clientPlatform == null ? "" : clientPlatform.trim().toUpperCase(Locale.ROOT);
+        if (!"WEB".equals(platform)) {
+            return;
+        }
+
+        sb.append("\n\n## PLATFORM ACTION CAPABILITIES - WEB");
+        sb.append("\n- Web chi duoc tra actionCommand cho: OPEN_CHAT, COMPOSE_MESSAGE, START_CALL, CREATE_GROUP, SEND_FRIEND_REQUEST, OPEN_GROUP_SETTINGS, RECALL_MESSAGE, PIN_MESSAGE, UNPIN_MESSAGE, NAVIGATE_TO, NAVIGATE_TO_CHAT, NAVIGATE_TO_CONTACTS, NAVIGATE_TO_SETTINGS, NAVIGATE_TO_SCANNER, NAVIGATE_TO_TIMELINE.");
+        sb.append("\n- Tren web, khong tra actionCommand cho MUTE_CONVERSATION, UNMUTE_CONVERSATION, BLOCK_USER, UNBLOCK_USER, CHANGE_GROUP_NAME, ADD_GROUP_MEMBER, REMOVE_GROUP_MEMBER, TRANSFER_GROUP_OWNER, LEAVE_GROUP, DISBAND_GROUP vi chua co executor an toan.");
+        sb.append("\n- Neu nguoi dung yeu cau action web chua ho tro, hay tra loi huong dan thao tac thu cong ngan gon va dat actionCommand null.");
+        sb.append("\n- Tuyet doi khong noi rang da thuc hien thanh cong action neu client web chua xac nhan hoac executor chua hoan tat.");
     }
 
     private Map<String, Object> buildGeminiPayload(AiChatRequest request, String systemPrompt) {
@@ -322,7 +365,7 @@ public class GeminiAiService {
                 if (memberNames.isEmpty()) {
                     memberNames = extractStringList(cp.get("members"));
                 }
-                if (groupName == null || groupName.isBlank() || memberNames.isEmpty()) {
+                if (groupName == null || groupName.isBlank() || memberNames.size() < 2) {
                     valid = false;
                 } else {
                     cp.put("groupName", groupName.trim());
@@ -565,21 +608,31 @@ public class GeminiAiService {
 
     private List<String> extractStringList(Object rawValue) {
         if (rawValue instanceof List<?> rawList) {
-            return rawList.stream()
+            return normalizeDistinctStrings(rawList.stream()
                     .map(String::valueOf)
-                    .map(String::trim)
-                    .filter(item -> !item.isEmpty())
-                    .distinct()
-                    .toList();
+                    .toList());
         }
         if (rawValue instanceof String rawString && !rawString.isBlank()) {
-            return Arrays.stream(rawString.split(","))
-                    .map(String::trim)
-                    .filter(item -> !item.isEmpty())
-                    .distinct()
-                    .toList();
+            return normalizeDistinctStrings(Arrays.stream(rawString.split(","))
+                    .toList());
         }
         return List.of();
+    }
+
+    private List<String> normalizeDistinctStrings(List<String> values) {
+        LinkedHashSet<String> normalizedKeys = new LinkedHashSet<>();
+        List<String> result = new ArrayList<>();
+        for (String value : values) {
+            String trimmed = value == null ? "" : value.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            String normalizedKey = trimmed.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            if (normalizedKeys.add(normalizedKey)) {
+                result.add(trimmed);
+            }
+        }
+        return result;
     }
 
     private Map<String, Object> createContent(String role, String text) {

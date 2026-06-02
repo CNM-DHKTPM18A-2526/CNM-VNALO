@@ -1,0 +1,8 @@
+fix: resolve analytics-service CORS and web CI/CD build failures
+
+- Add missing corsConfigurationSource() bean to analytics-service SecurityConfig
+- Fix AdminMonitoringService stream() compilation error
+- Fix AdminMonitoringServiceTest mock stub values
+- Add AdminDashboardPage to App.tsx with correct import paths
+- Fix Tooltip formatter type in AdminDashboardPage
+- Fix extract() generic type and remove unused import

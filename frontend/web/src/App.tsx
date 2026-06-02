@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AdminRoute } from './features/auth/AdminRoute'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
 import { useAuth } from './features/auth/useAuth'
+import { AdminDashboardPage } from './features/analytics/AdminDashboardPage'
 import { MainLayout } from './layouts/MainLayout'
 import { AdminLayout } from './layouts/AdminLayout'
 import { LoginPage } from './pages/LoginPage'
@@ -51,7 +52,7 @@ function App() {
             <Route path='profile' element={<ProfilePage />} />
             <Route path='chat-ai' element={<Navigate replace to='/chat/vnalo-ai-assistant' />} />
             <Route path='social' element={<SocialPage />} />
-
+            <Route path='admin/monitoring' element={<AdminDashboardPage />} />
             <Route path='stories/create' element={<CreateStoryPage />} />
             <Route path='stories/:storyId' element={<StoryViewerPage />} />
           </Route>

@@ -270,8 +270,8 @@ export function AdminMonitoringPage() {
   const labels = language === 'vi'
     ? {
         title: 'Giám sát vận hành',
-        subtitle: 'Theo dõi sức khỏe dịch vụ, hành vi đăng nhập và tín hiệu rủi ro bằng metadata an toàn.',
-        accessNote: 'Trang này yêu cầu quyền ADMIN_MONITORING_VIEW trong RBAC. Backend là lớp kiểm soát quyền bắt buộc.',
+        subtitle: 'Theo dõi sức khỏe dịch vụ, hành vi đăng nhập và tín hiệu rủi ro mà không lộ dữ liệu nhạy cảm.',
+        accessNote: 'Trang này yêu cầu email nằm trong allowlist admin ở backend. UI chỉ là gợi ý; backend mới là lớp kiểm soát thực sự.',
         refresh: 'Làm mới',
         refreshing: 'Đang tải...',
         exportCsv: 'Xuất CSV',
@@ -280,20 +280,20 @@ export function AdminMonitoringPage() {
         summary: 'Tổng quan',
         trend: 'Xu hướng sự kiện',
         dataGuard: 'Nguyên tắc dữ liệu an toàn',
-        healthyServices: 'Dịch vụ ổn định',
+        healthyServices: 'Dịch vụ khỏe mạnh',
         needsAttention: 'Cần chú ý',
-        sessionEvents: 'Sự kiện đăng nhập',
+        sessionEvents: 'Sự kiện đang hiển thị',
         updated: 'Cập nhật',
         noAudits: 'Chưa có sự kiện phù hợp với bộ lọc hiện tại.',
-        totalAccounts: 'Tổng tài khoản',
+        totalAccounts: 'Tài khoản toàn hệ thống',
         failedLoginCount: 'Tổng số lần đăng nhập lỗi',
         failedLoginDetail: 'Theo dõi rủi ro brute-force và lockout',
         qrApproved: 'QR được duyệt',
-        qrApprovedDetail: 'Số phiên QR được duyệt trong khung thời gian đã chọn',
+        qrApprovedDetail: 'Số phiên QR duyệt trong khung thời gian đã chọn',
         consentFresh: 'Consent mới',
         activeAccounts: 'Tài khoản hoạt động',
         activeRefreshTokens: 'Refresh token hoạt động',
-        loginFailures: 'Đăng nhập lỗi',
+        loginFailures: 'Login lỗi',
         otpVerified: 'OTP xác thực',
         consentGranted: 'Consent đã cấp',
         filters: 'Bộ lọc',
@@ -326,7 +326,7 @@ export function AdminMonitoringPage() {
     : {
         title: 'Operations Monitoring',
         subtitle: 'Track service health, sign-in behavior, and operational risk signals without exposing sensitive data.',
-        accessNote: 'This page requires ADMIN_MONITORING_VIEW in backend RBAC. Authorization is enforced by the API, not by the UI.',
+        accessNote: 'This page requires backend allowlist access. The UI hint is not a security boundary; the backend remains authoritative.',
         refresh: 'Refresh',
         refreshing: 'Refreshing...',
         exportCsv: 'Export CSV',
@@ -446,6 +446,7 @@ export function AdminMonitoringPage() {
     setLastUpdated(new Date())
     setIsLoading(false)
   }, [accessToken, page, pageLimit, selectedEventType, selectedPlatform, windowHours])
+
   const loadRbacAssignments = React.useCallback(async () => {
     setIsRbacLoading(true)
     setRbacError(null)
@@ -658,6 +659,7 @@ export function AdminMonitoringPage() {
           ))}
         </div>
       </section>
+
       <section className='admin-monitoring-grid'>
         <article className='admin-monitoring-card'>
           <span>{labels.healthyServices}</span>
@@ -772,7 +774,7 @@ export function AdminMonitoringPage() {
                     <strong>{audit.eventType ?? 'SESSION_EVENT'}</strong>
                     <span className={`admin-monitoring-severity ${audit.severity ?? 'info'}`}>{audit.severity ?? 'info'}</span>
                   </div>
-                  <span>{[audit.platform ?? 'WEB', audit.deviceName ?? 'Unknown device', audit.detail ?? 'session update'].join(' · ')}</span>
+                  <span>{audit.platform ?? 'WEB'} · {audit.deviceName ?? 'Unknown device'} · {audit.detail ?? 'session update'}</span>
                 </div>
                 <div className='admin-monitoring-event-meta'>
                   <small>{audit.deviceIdMasked ?? 'N/A'}</small>

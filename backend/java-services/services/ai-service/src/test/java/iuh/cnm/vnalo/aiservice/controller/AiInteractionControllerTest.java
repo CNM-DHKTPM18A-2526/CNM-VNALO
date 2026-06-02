@@ -81,7 +81,7 @@ class AiInteractionControllerTest {
     }
 
     @Test
-    void interactWithMascot_shouldPreserveLocalCallCommandWhenProvidersFail() {
+    void interactWithMascot_shouldNotEmitCallCommandWithoutClearTargetWhenProvidersFail() {
         authenticateTestUser();
         AiInteractionController controller = new AiInteractionController(geminiAiService, chatService);
         AiChatRequest request = AiChatRequest.builder()
@@ -98,18 +98,19 @@ class AiInteractionControllerTest {
         assertNotNull(body);
         AiChatResponse data = (AiChatResponse) body.getData();
         assertNotNull(data);
-        assertEquals("START_CALL", data.getActionCommand());
-        assertEquals("video", data.getActionParams().get("callType"));
+        assertNull(data.getActionCommand());
+        assertNull(data.getActionParams());
+        assertTrue(data.getTextReply().contains("chua xac dinh duoc nguoi can goi"));
         assertTrue(data.isDegraded());
         assertEquals("AI_PROVIDER_UNAVAILABLE", data.getProviderStatus());
     }
 
     @Test
-    void interactWithMascot_shouldDetectVietnameseAccentedCallIntentWhenProvidersFail() {
+    void interactWithMascot_shouldPreserveLocalCallCommandWithClearTargetWhenProvidersFail() {
         authenticateTestUser();
         AiInteractionController controller = new AiInteractionController(geminiAiService, chatService);
         AiChatRequest request = AiChatRequest.builder()
-                .prompt("Hãy gọi video cho mẹ giúp mình")
+                .prompt("Hay goi video cho me giup minh")
                 .analyzeIntent(true)
                 .build();
         when(geminiAiService.interactWithGemini(eq("user-1"), any(AiChatRequest.class)))
@@ -123,6 +124,11 @@ class AiInteractionControllerTest {
         AiChatResponse data = (AiChatResponse) body.getData();
         assertNotNull(data);
         assertEquals("START_CALL", data.getActionCommand());
+        assertEquals("me", data.getActionParams().get("target"));
         assertEquals("video", data.getActionParams().get("callType"));
+        assertEquals(Boolean.TRUE, data.getRequiresConfirmation());
+        assertEquals("medium", data.getRiskLevel());
+        assertTrue(data.isDegraded());
+        assertEquals("AI_PROVIDER_UNAVAILABLE", data.getProviderStatus());
     }
 }

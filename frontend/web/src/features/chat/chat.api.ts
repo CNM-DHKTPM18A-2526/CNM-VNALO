@@ -1132,6 +1132,7 @@ export async function sendAiChatMessage(
     enableDeepSummary?: boolean
     clientUserEntryId?: string
     clientAssistantEntryId?: string
+    clientPlatform?: 'WEB' | 'MOBILE' | 'DESKTOP'
   },
 ): Promise<{
   textReply: string
@@ -1162,6 +1163,7 @@ export async function sendAiChatMessage(
       history,
       analyzeIntent: Boolean(options?.analyzeIntent),
       enableDeepSummary: Boolean(options?.enableDeepSummary),
+      clientPlatform: options?.clientPlatform ?? 'WEB',
       ...(options?.contextId ? { contextId: options.contextId } : {}),
       ...(options?.clientUserEntryId ? { clientUserEntryId: options.clientUserEntryId } : {}),
       ...(options?.clientAssistantEntryId ? { clientAssistantEntryId: options.clientAssistantEntryId } : {}),
