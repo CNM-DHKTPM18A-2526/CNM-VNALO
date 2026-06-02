@@ -35,11 +35,11 @@ import type {
   DateRangePreset,
 } from './analytics.types'
 import { dateRangeFromPreset } from './analytics.types'
-import { analyticsFetchWithTimeout } from './analytics.client'
+import { analyticsFetchWithTimeout, extractAnalyticsData } from './analytics.client'
 import { API_BASE_URL, AI_API_URL, MEDIA_API_URL, MESSAGE_API_URL } from '../../api.client'
 import './analytics.css'
 
-// ─── Utility ────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Utility ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 const FETCH_TIMEOUT = 10000
 
@@ -107,11 +107,11 @@ function StatusDot({ status }: { status: ServiceProbe['status'] }) {
   return <span className={`status-dot ${status}`} />
 }
 
-// ─── Chart Colors ──────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Chart Colors ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
-// ─── Reusable KPI Card ─────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Reusable KPI Card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function KpiCard({ label, value, sub, tone }: { label: string; value: string | number; sub?: string; tone?: 'neutral' | 'success' | 'danger' | 'warning' }) {
   return (
@@ -123,7 +123,7 @@ function KpiCard({ label, value, sub, tone }: { label: string; value: string | n
   )
 }
 
-// ─── Custom Tooltip ─────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Custom Tooltip ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string; lang: string }) {
   if (!active || !payload?.length) return null
@@ -139,7 +139,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
   )
 }
 
-// ─── Trend Area Chart ────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Trend Area Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function TrendChart({ data, lang, height = 220 }: { data: DailyTrendPointResponse[]; lang: string; height?: number }) {
   if (!data?.length) return <div className="chart-empty">No data available</div>
@@ -182,7 +182,7 @@ function TrendChart({ data, lang, height = 220 }: { data: DailyTrendPointRespons
   )
 }
 
-// ─── Multi-Series Line Chart ───────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Multi-Series Line Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function MultiLineChart({
   data,
@@ -233,7 +233,7 @@ function MultiLineChart({
   )
 }
 
-// ─── Bar Chart ─────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Bar Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function BarChartComp({
   data,
@@ -272,7 +272,7 @@ function BarChartComp({
   )
 }
 
-// ─── Donut Chart ───────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Donut Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }) {
   if (!data?.length) return <div className="chart-empty">No data available</div>
@@ -295,10 +295,7 @@ function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }
               <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(v: unknown) => {
-            const n = typeof v === 'number' ? v : 0
-            return [`${formatNumber(n)} (${((n / total) * 100).toFixed(1)}%)`, '']
-          }} />
+          <Tooltip formatter={(v, name) => [`${formatNumber((v as number) ?? 0)} (${(((v as number) ?? 0) / total * 100).toFixed(1)}%)`, name]} />
         </PieChart>
       </ResponsiveContainer>
       <div className="donut-legend">
@@ -314,7 +311,7 @@ function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }
   )
 }
 
-// ─── Activity Sparkline (mini bar) ────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Activity Sparkline (mini bar) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function ActivitySparkline({ points }: { points: EventTrendPoint[]; lang: string }) {
   if (!points?.length) return null
@@ -337,7 +334,7 @@ function ActivitySparkline({ points }: { points: EventTrendPoint[]; lang: string
   )
 }
 
-// ─── Service Health List ───────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Service Health List ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function ServiceHealthList({ services, lang }: { services: ServiceProbe[]; lang: string }) {
   return (
@@ -361,7 +358,7 @@ function ServiceHealthList({ services, lang }: { services: ServiceProbe[]; lang:
   )
 }
 
-// ─── Tab Navigation ────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Tab Navigation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 type TabId = 'overview' | 'users' | 'health' | 'auth'
 
@@ -388,13 +385,13 @@ function TabNav({ active, onChange, lang }: { active: TabId; onChange: (t: TabId
   )
 }
 
-// ─── Skeleton Loader ───────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Skeleton Loader ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function Skeleton({ width = '100%', height = 20 }: { width?: string; height?: number }) {
   return <div className="skeleton" style={{ width, height }} />
 }
 
-// ─── Date Range Picker ─────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Date Range Picker ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function DateRangePicker({
   value,
@@ -426,7 +423,7 @@ function DateRangePicker({
   )
 }
 
-// ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ MAIN COMPONENT ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 export function AdminDashboardPage() {
   const { language } = useLanguage()
@@ -438,7 +435,7 @@ export function AdminDashboardPage() {
 
   const L = language === 'vi' ? VI_LABELS : EN_LABELS
 
-  // ─── State ──────────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ State ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const [activeTab, setActiveTab] = React.useState<TabId>('overview')
   const [dateRange, setDateRange] = React.useState<DateRangePreset>('30d')
   const [autoRefresh, setAutoRefresh] = React.useState(true)
@@ -471,7 +468,7 @@ export function AdminDashboardPage() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [loadError, setLoadError] = React.useState<string | null>(null)
 
-  // ─── Data Fetching ───────────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Data Fetching ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const loadAnalytics = React.useCallback(async () => {
     const { from, to } = dateRangeFromPreset(dateRange)
     const params = { from, to }
@@ -494,23 +491,23 @@ export function AdminDashboardPage() {
     ])
 
     const extract = <T,>(r: PromiseSettledResult<T>): T | null => {
-      if (r.status === 'fulfilled') return r.value as T
+      if (r.status === 'fulfilled') return extractAnalyticsData<T>(r.value)
       return null
     }
 
-    setDashboard(extract(dashResult))
-    setOverview(extract(overviewResult))
-    setReportReasons(extract(reasonsResult) ?? [])
-    setMessageTypes(extract(typesResult) ?? [])
-    setUserTrend(extract(userTResult) ?? [])
-    setConvTrend(extract(convTResult) ?? [])
-    setMsgTrend(extract(msgTResult) ?? [])
-    setMediaTrend(extract(mediaTResult) ?? [])
-    setReportTrend(extract(reportTResult) ?? [])
-    setActionTrend(extract(actionTResult) ?? [])
+    setDashboard(extract<AnalyticsDashboardResponse>(dashResult))
+    setOverview(extract<AnalyticsOverviewResponse>(overviewResult))
+    setReportReasons(extract<ReasonCountResponse[]>(reasonsResult) ?? [])
+    setMessageTypes(extract<MessageTypeCountResponse[]>(typesResult) ?? [])
+    setUserTrend(extract<DailyTrendPointResponse[]>(userTResult) ?? [])
+    setConvTrend(extract<DailyTrendPointResponse[]>(convTResult) ?? [])
+    setMsgTrend(extract<DailyTrendPointResponse[]>(msgTResult) ?? [])
+    setMediaTrend(extract<DailyTrendPointResponse[]>(mediaTResult) ?? [])
+    setReportTrend(extract<DailyTrendPointResponse[]>(reportTResult) ?? [])
+    setActionTrend(extract<DailyTrendPointResponse[]>(actionTResult) ?? [])
 
     if (dashResult.status === 'fulfilled') {
-      const d = dashResult.value
+      const d = extractAnalyticsData<AnalyticsDashboardResponse>(dashResult.value)
       if (d?.activeUsers) setActiveUsers(d.activeUsers)
     }
   }, [dateRange])
@@ -597,7 +594,7 @@ export function AdminDashboardPage() {
     }
   }, [loadAnalytics, loadCoreService])
 
-  // ─── Effects ─────────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Effects ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   React.useEffect(() => { void loadAll() }, [loadAll])
 
   React.useEffect(() => {
@@ -613,7 +610,7 @@ export function AdminDashboardPage() {
     adminMonitoringEmails.includes(user.email?.toLowerCase() ?? '')
   )
 
-  // ─── Derived ─────────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Derived ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const okCount = services.filter(s => s.status === 'ok').length
   const warnCount = services.filter(s => s.status === 'warning').length
   const errCount = services.filter(s => s.status === 'error').length
@@ -631,7 +628,7 @@ export function AdminDashboardPage() {
     }))
   }, [userTrend, convTrend, msgTrend])
 
-  // ─── Export CSV ───────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Export CSV ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const handleExport = () => {
     if (!audits.length) return
     const csv = toCsv(audits)
@@ -639,10 +636,10 @@ export function AdminDashboardPage() {
     downloadCsv(csv, `auth-events-${eventPage + 1}-${stamp}.csv`)
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Render ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   return (
     <div className="adm-page">
-      {/* ── Header ── */}
+      {/* ΓöÇΓöÇ Header ΓöÇΓöÇ */}
       <header className="adm-header">
         <div className="adm-header-left">
           <p className="adm-eyebrow">VNALO Enterprise</p>
@@ -670,7 +667,7 @@ export function AdminDashboardPage() {
         <div className="adm-note adm-note--error">{loadError}</div>
       )}
 
-      {/* ── Controls ── */}
+      {/* ΓöÇΓöÇ Controls ΓöÇΓöÇ */}
       <div className="adm-controls">
         <DateRangePicker value={dateRange} onChange={setDateRange} />
         {lastUpdated && (
@@ -680,10 +677,10 @@ export function AdminDashboardPage() {
         )}
       </div>
 
-      {/* ── Tab Nav ── */}
+      {/* ΓöÇΓöÇ Tab Nav ΓöÇΓöÇ */}
       <TabNav active={activeTab} onChange={setActiveTab} lang={language} />
 
-      {/* ── TAB: OVERVIEW ── */}
+      {/* ΓöÇΓöÇ TAB: OVERVIEW ΓöÇΓöÇ */}
       {activeTab === 'overview' && (
         <div className="adm-tab-content">
           {/* KPI Row */}
@@ -718,7 +715,7 @@ export function AdminDashboardPage() {
                 <KpiCard
                   label={L.activeUsers}
                   value={activeUsers?.dau ?? 0}
-                  sub={`${L.dauLabel} • ${L.wauLabel}: ${formatNumber(activeUsers?.wau ?? 0)}`}
+                  sub={`${L.dauLabel} ΓÇó ${L.wauLabel}: ${formatNumber(activeUsers?.wau ?? 0)}`}
                   tone="success"
                 />
                 <KpiCard
@@ -739,7 +736,7 @@ export function AdminDashboardPage() {
           <section className="adm-panel">
             <div className="adm-panel-header">
               <h2>{L.growthOverview}</h2>
-              <span>{dateRangeFromPreset(dateRange).from} — {dateRangeFromPreset(dateRange).to}</span>
+              <span>{dateRangeFromPreset(dateRange).from} ΓÇö {dateRangeFromPreset(dateRange).to}</span>
             </div>
             {isLoading ? <Skeleton height={220} /> : (
               <MultiLineChart
@@ -797,7 +794,7 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── TAB: USER ANALYTICS ── */}
+      {/* ΓöÇΓöÇ TAB: USER ANALYTICS ΓöÇΓöÇ */}
       {activeTab === 'users' && (
         <div className="adm-tab-content">
           {/* DAU/WAU/MAU */}
@@ -876,7 +873,7 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── TAB: SYSTEM HEALTH ── */}
+      {/* ΓöÇΓöÇ TAB: SYSTEM HEALTH ΓöÇΓöÇ */}
       {activeTab === 'health' && (
         <div className="adm-tab-content">
           {/* Service Health KPIs */}
@@ -925,7 +922,7 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── TAB: AUTH & EVENTS ── */}
+      {/* ΓöÇΓöÇ TAB: AUTH & EVENTS ΓöÇΓöÇ */}
       {activeTab === 'auth' && (
         <div className="adm-tab-content">
           {/* Auth KPIs */}
@@ -951,7 +948,7 @@ export function AdminDashboardPage() {
                 <div className="event-sparkline-meta">
                   <span>
                     {eventTrend.length > 0
-                      ? `${formatDate(eventTrend[0].bucket, language)} — ${formatDate(eventTrend[eventTrend.length - 1].bucket, language)}`
+                      ? `${formatDate(eventTrend[0].bucket, language)} ΓÇö ${formatDate(eventTrend[eventTrend.length - 1].bucket, language)}`
                       : L.noData}
                   </span>
                 </div>
@@ -1012,7 +1009,7 @@ export function AdminDashboardPage() {
                               <span className="td-date">{formatDate(a.createdAt, language)}</span>
                               <span className="td-clock">{formatTime(a.createdAt)}</span>
                             </>
-                          ) : '—'}
+                          ) : 'ΓÇö'}
                         </td>
                         <td><code className="event-type">{a.eventType ?? 'SESSION_EVENT'}</code></td>
                         <td><SeverityBadge value={a.severity ?? 'info'} /></td>
@@ -1048,7 +1045,7 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── Footer ── */}
+      {/* ΓöÇΓöÇ Footer ΓöÇΓöÇ */}
       <footer className="adm-footer">
         <p>{L.footerNote}</p>
       </footer>
@@ -1056,7 +1053,7 @@ export function AdminDashboardPage() {
   )
 }
 
-// ─── Labels ────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Labels ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 const EN_LABELS = {
   dashboardTitle: 'Operations Dashboard',
@@ -1137,11 +1134,11 @@ const EN_LABELS = {
   page: 'Page',
   // Common
   noData: 'No data available',
-  footerNote: 'VNALO Admin Dashboard — data is for operational monitoring only. Sensitive information is never exposed.',
+  footerNote: 'VNALO Admin Dashboard ΓÇö data is for operational monitoring only. Sensitive information is never exposed.',
 }
 
 const VI_LABELS = {
-  dashboardTitle: 'Bảng điều khiển vận hành',
+  dashboardTitle: 'Tổng quan điều khiển vận hành',
   dashboardSubtitle: 'Phân tích thời gian thực, insight người dùng và giám sát sức khỏe hệ thống cho VNALO enterprise.',
   autoRefresh: 'Tự động làm mới 30s',
   refresh: 'Làm mới',
@@ -1158,11 +1155,11 @@ const VI_LABELS = {
   reportsFiled: 'Báo cáo đã gửi',
   actionsTaken: 'Hành động kiểm duyệt',
   // Overview charts
-  growthOverview: 'Tổng quan tăng trưởng',
-  users: 'Người dùng',
-  conversations: 'Hội thoại',
-  messages: 'Tin nhắn',
-  messagesOverTime: 'Tin nhắn theo thời gian',
+  growthOverview: 'Tß╗òng quan t─âng tr╞░ß╗ƒng',
+  users: 'Ng╞░ß╗¥i d├╣ng',
+  conversations: 'Hß╗Öi thoß║íi',
+  messages: 'Tin nhß║»n',
+  messagesOverTime: 'Tin nhß║»n theo thß╗¥i gian',
   mediaUploads: 'Tải lên media',
   reportsTrend: 'Xu hướng báo cáo',
   moderationActions: 'Hành động kiểm duyệt',
