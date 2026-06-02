@@ -19,7 +19,7 @@ import {
 
 import { useAuth } from '../features/auth/useAuth'
 import { useLanguage } from '../shared/i18n/LanguageContext'
-import {
+import type {
   AnalyticsOverviewResponse,
   AnalyticsDashboardResponse,
   DailyTrendPointResponse,
@@ -33,12 +33,9 @@ import {
   ReasonCountResponse,
   MessageTypeCountResponse,
   DateRangePreset,
-  dateRangeFromPreset,
 } from './analytics.types'
-import {
-  analyticsFetchWithTimeout,
-  extractAnalyticsData,
-} from './analytics.client'
+import { dateRangeFromPreset } from './analytics.types'
+import { analyticsFetchWithTimeout, extractAnalyticsData } from './analytics.client'
 import { API_BASE_URL, AI_API_URL, MEDIA_API_URL, MESSAGE_API_URL } from '../../api.client'
 import './analytics.css'
 
@@ -298,7 +295,7 @@ function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }
               <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(v: number, name: string) => [`${formatNumber(v)} (${((v / total) * 100).toFixed(1)}%)`, name]} />
+          <Tooltip formatter={(v: number | undefined, name: string) => [`${formatNumber(v ?? 0)} (${((v ?? 0) / total * 100).toFixed(1)}%)`, name]} />
         </PieChart>
       </ResponsiveContainer>
       <div className="donut-legend">
@@ -430,7 +427,7 @@ function DateRangePicker({
 
 export function AdminDashboardPage() {
   const { language } = useLanguage()
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
   const adminMonitoringEmails = (import.meta.env.VITE_ADMIN_MONITORING_ALLOWED_EMAILS ?? '')
     .split(',')
     .map((e: string) => e.trim().toLowerCase())
@@ -477,8 +474,8 @@ export function AdminDashboardPage() {
     const params = { from, to }
 
     // Fetch all analytics data in parallel
-    const [, , , ,
-           , , , ,
+    const [dashResult, overviewResult, reasonsResult, typesResult,
+           userTResult, convTResult, msgTResult, mediaTResult,
            , reportTResult, actionTResult] = await Promise.allSettled([
       analyticsFetchWithTimeout<AnalyticsDashboardResponse>('/dashboard', params),
       analyticsFetchWithTimeout<AnalyticsOverviewResponse>('/overview', params),
@@ -827,7 +824,7 @@ export function AdminDashboardPage() {
                 <h2>{L.messageTypes}</h2>
               </div>
               {isLoading ? <Skeleton height={220} /> : (
-                <DonutChart data={messageTypes} />
+                <DonutChart data={messageTypes} lang={language} />
               )}
             </section>
           </div>
@@ -1087,8 +1084,10 @@ const EN_LABELS = {
   // Users tab
   dau: 'DAU',
   dauDesc: 'Daily active users',
+  dauLabel: 'DAU',
   wau: 'WAU',
   wauDesc: 'Weekly active users',
+  wauLabel: 'WAU',
   mau: 'MAU',
   mauDesc: 'Monthly active users',
   userRegistrations: 'User Registrations',
@@ -1127,6 +1126,7 @@ const EN_LABELS = {
   colTime: 'Time',
   colEvent: 'Event',
   colSeverity: 'Severity',
+  colPlatform: 'Platform',
   colDevice: 'Device',
   colDetail: 'Detail',
   prevPage: 'Previous',
@@ -1166,8 +1166,10 @@ const VI_LABELS = {
   // Users tab
   dau: 'DAU',
   dauDesc: 'Người dùng hoạt động hàng ngày',
+  dauLabel: 'DAU',
   wau: 'WAU',
   wauDesc: 'Người dùng hoạt động hàng tuần',
+  wauLabel: 'WAU',
   mau: 'MAU',
   mauDesc: 'Người dùng hoạt động hàng tháng',
   userRegistrations: 'Đăng ký người dùng',
@@ -1206,6 +1208,7 @@ const VI_LABELS = {
   colTime: 'Thời gian',
   colEvent: 'Sự kiện',
   colSeverity: 'Mức độ',
+  colPlatform: 'Nền tảng',
   colDevice: 'Thiết bị',
   colDetail: 'Chi tiết',
   prevPage: 'Trước',
