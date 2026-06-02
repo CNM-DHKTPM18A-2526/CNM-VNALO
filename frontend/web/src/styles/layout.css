@@ -28,7 +28,13 @@
   flex-direction: column;
 }
 
-.workspace-main.workspace-main-contacts,
+.workspace-main.workspace-main-contacts {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .workspace-main.workspace-main-documents {
   padding: 0;
   overflow-y: auto;
@@ -44,6 +50,11 @@
 }
 
 .workspace-main-chat > .chat-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.workspace-main-contacts > .contacts-page {
   flex: 1 1 auto;
   min-height: 0;
 }

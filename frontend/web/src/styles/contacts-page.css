@@ -1,5 +1,7 @@
 .contacts-page {
-  min-height: 100vh;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
   padding: 0;
 }
@@ -7,7 +9,8 @@
 .contacts-shell {
   margin: 0;
   width: 100%;
-  min-height: calc(100vh - 78px);
+  flex: 1;
+  min-height: 0;
   display: flex;
   overflow: hidden;
   border: 0;
@@ -17,13 +20,16 @@
 }
 
 .contacts-sidebar {
-  width: 270px;
-  flex: 0 0 270px;
+  width: 344px;
+  flex: 0 0 344px;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   color: var(--text);
   border-right: 1px solid var(--border);
+  /* Kéo sidebar kéo dài xuống chân trang: đảm bảo sidebar chiếm đủ chiều cao của layout */
+  min-height: 100vh;
 }
 
 .contacts-sidebar-head {
@@ -77,7 +83,8 @@
   gap: 8px;
   padding: 6px 12px;
   border-radius: 6px;
-  background: var(--bg);
+  /* xám đậm hơn nhẹ cho thanh tìm kiếm (search box) */
+  background: color-mix(in srgb, var(--bg) 100%, #0b1220 40%);
   border: 1px solid var(--border);
   transition: all 0.2s;
 }
@@ -438,7 +445,7 @@
   background: var(--surface);
 }
 
-.contacts-friends-list > .contacts-friend-row + .contacts-friend-row {
+.contacts-friends-list>.contacts-friend-row+.contacts-friend-row {
   border-top: 1px solid var(--border);
 }
 
@@ -602,7 +609,7 @@
   transition: background 0.15s ease;
 }
 
-.contacts-group-row + .contacts-group-row {
+.contacts-group-row+.contacts-group-row {
   border-top: 1px solid var(--border);
 }
 
@@ -910,8 +917,11 @@
 }
 
 .contacts-sidebar-search-item:hover {
+  /* hover nhẹ kiểu Zalo cho list kết quả tìm kiếm */
   background: var(--surface-hover);
+  transform: translateX(2px);
 }
+
 
 .contacts-sidebar-search-item-label {
   font-size: 13px;
