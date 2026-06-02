@@ -3252,12 +3252,14 @@ export default function ChatPage() {
 
         // Collect IDs to proactively fetch
         const proactiveIds = new Set<string>();
-        if (targetId) proactiveIds.add(targetId);
+        if (targetId && !isAiAssistantConversationId(targetId)) proactiveIds.add(targetId);
 
         try {
           const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
           const pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
-          pendingIds.forEach(id => proactiveIds.add(id));
+          pendingIds
+            .filter(id => !isAiAssistantConversationId(id))
+            .forEach(id => proactiveIds.add(id));
         } catch (e) {
           console.warn("Failed to load pending group IDs:", e);
         }
@@ -5894,7 +5896,6 @@ function PinnedLogicHooks({
 
   return null;
 }
-
 
 
 
