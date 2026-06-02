@@ -329,6 +329,10 @@ function isAiAssistantConversationId(conversationId?: string | null): boolean {
   return conversationId === AI_ASSISTANT_CONVERSATION_ID
 }
 
+function isAiAssistantUserId(userId?: string | null): boolean {
+  return userId === AI_ASSISTANT_USER_ID
+}
+
 function buildDeleteForMeStorageKey(userId?: string | null): string | null {
   const normalized = String(userId ?? '').trim()
   if (!normalized) {
@@ -3229,9 +3233,9 @@ export default function ChatPage() {
     if (!accessToken || !activeConversationId) return;
 
     const selected = conversations.find(c => c.id === activeConversationId);
-    const memberIds = selected?.members?.map(member => member.userId).filter(Boolean)
+    const memberIds = (selected?.members?.map(member => member.userId).filter(Boolean)
       ?? selected?.participantUserIds
-      ?? [];
+      ?? []).filter(id => !isAiAssistantUserId(id));
 
     memberIds.forEach(id => void ensureUser(accessToken, id));
   }, [accessToken, routedConversationId, selectedConversationId, conversations, ensureUser]);
@@ -3381,7 +3385,7 @@ export default function ChatPage() {
           ...new Set(
             items
               .flatMap((item) => (item as any).participantUserIds ?? [])
-              .filter((peerId): peerId is string => typeof peerId === 'string' && peerId !== user?.id && !friendNameById.has(peerId)),
+              .filter((peerId): peerId is string => typeof peerId === 'string' && peerId !== user?.id && !isAiAssistantUserId(peerId) && !friendNameById.has(peerId)),
           ),
         ]
 
@@ -3416,7 +3420,7 @@ export default function ChatPage() {
                   displayName: realName,
                   avatarUrl: m.avatarUrl || null
                 })
-              } else if (mid) {
+              } else if (mid && !isAiAssistantUserId(mid)) {
                 // Background fetch for missing names
                 void ensureUser(token, mid);
               }
@@ -3637,7 +3641,7 @@ export default function ChatPage() {
               ? (incoming.avatarUrl ?? cachedPeer?.avatarUrl ?? null)
               : (incoming.avatarUrl ?? null)
 
-            if (peerId && !cachedPeer) {
+            if (peerId && !isAiAssistantUserId(peerId) && !cachedPeer) {
               void ensureUser(accessToken, peerId)
             }
 
@@ -3903,7 +3907,7 @@ export default function ChatPage() {
             }));
 
             // Fetch missing profiles for members
-            const missingProfiles = participantIds.filter((id: string) => !userMapRef.current[id]);
+            const missingProfiles = participantIds.filter((id: string) => !isAiAssistantUserId(id) && !userMapRef.current[id]);
             if (missingProfiles.length > 0) {
               const fetched = await Promise.all(
                 missingProfiles.map((id: string) => getUserById(accessToken, id).catch(() => null))
@@ -4054,7 +4058,7 @@ export default function ChatPage() {
                 }));
 
                 // Fetch missing profiles
-                const missingProfiles = participantIds.filter((id: string) => !userMapRef.current[id]);
+                const missingProfiles = participantIds.filter((id: string) => !isAiAssistantUserId(id) && !userMapRef.current[id]);
                 if (missingProfiles.length > 0) {
                   const fetched = await Promise.all(
                     missingProfiles.map((id: string) => getUserById(accessToken, id).catch(() => null))
@@ -5896,7 +5900,5 @@ function PinnedLogicHooks({
 
   return null;
 }
-
-
 
 
