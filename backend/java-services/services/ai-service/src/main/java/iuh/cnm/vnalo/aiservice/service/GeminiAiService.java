@@ -488,6 +488,9 @@ public class GeminiAiService {
                 || normalized.contains("đã thu hồi")
                 || normalized.contains("da thu hoi")
                 || normalized.contains("sent the message")
+                || normalized.contains("message sent")
+                || normalized.contains("started the call")
+                || normalized.contains("call started")
                 || normalized.contains("created the group")
                 || normalized.contains("called ");
     }
