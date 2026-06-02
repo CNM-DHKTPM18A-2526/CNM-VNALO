@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,16 +36,24 @@ public class AiInteractionController {
     private final ChatService chatService;
 
     private String getCurrentUserId() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken
+                || authentication.getName() == null
+                || authentication.getName().isBlank()) {
+            throw new InsufficientAuthenticationException("Authentication is required");
+        }
+        return authentication.getName();
     }
 
     @PostMapping("/chat")
     public ResponseEntity<?> interactWithMascot(@Valid @RequestBody AiChatRequest request) {
         log.info("Received AI Command for mascot {}. Analyze intent: {}, Deep summary: {}", 
                 request.getMascotId(), request.isAnalyzeIntent(), request.isEnableDeepSummary());
+        String userId = getCurrentUserId();
         
         try {
-            String userId = getCurrentUserId();
             AiChatResponse response = geminiAiService.interactWithGemini(userId, request);
             return ResponseEntity.ok(ApiResponse.ok(response));
             
@@ -118,12 +129,21 @@ public class AiInteractionController {
 
         String prompt = normalizeIntentText(request.getPrompt());
         if (looksLikeCallIntent(prompt)) {
+            String target = extractCallTarget(prompt);
+            if (target == null || target.isBlank()) {
+                fallback.setTextReply("AI dang gap su co va minh chua xac dinh duoc nguoi can goi. Ban hay noi ro ten nguoi trong danh ba de minh chuan bi buoc xac nhan goi.");
+                return fallback;
+            }
+
             Map<String, Object> params = new HashMap<>();
+            params.put("target", target);
             params.put("callType", isVideoCallIntent(prompt) ? "video" : "voice");
 
             fallback.setActionCommand("START_CALL");
             fallback.setActionParams(params);
-            fallback.setTextReply("AI dang gap su co, nhung minh van co the bat dau cuoc goi cho ban.");
+            fallback.setRequiresConfirmation(true);
+            fallback.setRiskLevel("medium");
+            fallback.setTextReply("AI dang gap su co, nhung minh co the chuan bi buoc xac nhan goi cho " + target + ".");
         }
 
         return fallback;
@@ -148,6 +168,25 @@ public class AiInteractionController {
                 || prompt.contains("cam");
     }
 
+    private String extractCallTarget(String prompt) {
+        String target = prompt
+                .replaceFirst("^(hay\\s+)?(goi|call|phone|dien\\s+thoai|cuoc\\s+goi)(\\s+(video|voice|thoai|dien))?\\s+(cho|toi|den|with|to|for)\\s+", "")
+                .replaceFirst("^(hay\\s+)?(goi|call|phone)(\\s+(video|voice|thoai|dien))?\\s+", "")
+                .replaceAll("\\s+(giup\\s+minh|giup\\s+toi|nhe|voi|please)$", "")
+                .trim();
+
+        if (target.isBlank()
+                || target.equals("ban")
+                || target.equals("toi")
+                || target.equals("minh")
+                || target.equals("this friend")
+                || target.equals("friend")
+                || target.equals("nguoi nay")) {
+            return null;
+        }
+        return target;
+    }
+
     private String normalizeIntentText(String input) {
         if (input == null || input.isBlank()) {
             return "";
@@ -156,7 +195,7 @@ public class AiInteractionController {
         String normalized = Normalizer.normalize(input.toLowerCase(Locale.ROOT), Normalizer.Form.NFD);
         return DIACRITICS_PATTERN.matcher(normalized)
                 .replaceAll("")
-                .replace('đ', 'd')
-                .replace('Đ', 'D');
+                .replace('\u0111', 'd')
+                .replace('\u0110', 'D');
     }
 }

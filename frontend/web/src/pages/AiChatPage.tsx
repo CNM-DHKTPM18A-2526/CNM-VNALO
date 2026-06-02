@@ -1,45 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Sparkles, Trash2, X } from 'lucide-react'
+import { Copy, Mic, Paperclip, Reply, RotateCcw, Send, Share2, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
-import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
+import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
+import { createGroupConversation, fetchInbox, fetchMessages, fetchPinnedMessages, pinMessage, recallMessage, sendAiChatMessage, unpinMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
+import { getFriends, searchUsers, sendFriendRequest } from '../features/friends/friends.api'
+import { UserAvatar } from '../shared/components/UserAvatar'
+import {
+  buildAiDeferredActionReply,
+  getAiActionLabel,
+  getAiActionRisk,
+  isKnownAiActionCommand,
+  type AiActionCommand,
+  type AiActionPreview,
+} from '../features/ai-assistant/runtime/aiActionContract'
+import {
+  extractActionTarget,
+  extractCreateGroupIntentTargets,
+  buildUnsupportedActionIssue,
+  resolveConversationAction,
+  resolveCreateGroupAction,
+  resolveFriendRequestAction,
+  validateCreateGroupTargets,
+} from '../features/ai-assistant/runtime/aiActionRuntime'
 
 type ProviderStatus =
   | 'LIVE_PROVIDER_ACTIVE'
   | 'FALLBACK_PROVIDER_ACTIVE'
   | 'AI_PROVIDER_UNAVAILABLE'
   | null
-
-type AiActionCommand =
-  | 'OPEN_CHAT'
-  | 'COMPOSE_MESSAGE'
-  | 'START_CALL'
-  | 'RECALL_MESSAGE'
-  | 'CREATE_GROUP'
-  | 'MUTE_CONVERSATION'
-  | 'UNMUTE_CONVERSATION'
-  | 'PIN_MESSAGE'
-  | 'UNPIN_MESSAGE'
-  | 'OPEN_GROUP_SETTINGS'
-  | 'OPEN_PROFILE'
-  | 'SEND_FRIEND_REQUEST'
-  | 'BLOCK_USER'
-  | 'UNBLOCK_USER'
-  | 'CHANGE_GROUP_NAME'
-  | 'ADD_GROUP_MEMBER'
-  | 'REMOVE_GROUP_MEMBER'
-  | 'TRANSFER_GROUP_OWNER'
-  | 'LEAVE_GROUP'
-  | 'DISBAND_GROUP'
-  | 'NAVIGATE_TO'
-  | 'NAVIGATE_TO_SETTINGS'
-  | 'NAVIGATE_TO_CHAT'
-  | 'NAVIGATE_TO_CONTACTS'
-  | 'NAVIGATE_TO_SCANNER'
-  | 'NAVIGATE_TO_TIMELINE'
 
 type AiMessage = {
   role: 'user' | 'assistant'
@@ -49,6 +41,8 @@ type AiMessage = {
   providerStatus?: ProviderStatus
   actionCommand?: AiActionCommand | null
   actionParams?: Record<string, unknown> | null
+  requiresConfirmation?: boolean | null
+  riskLevel?: string | null
 }
 
 
@@ -66,21 +60,94 @@ type PendingActionReview = {
   path?: string
   feedback: string
   preview?: AiActionPreview
-}
-
-type AiActionPreview = {
-  targetLabel?: string
-  draft?: string
-  risk: 'low' | 'medium' | 'high'
+  execute?: () => Promise<void> | void
 }
 
 type ActionFeedbackState = {
   tone: 'info' | 'success' | 'warning' | 'error'
   message: string
 }
+
+const isAxiosLikeError = (error: unknown): error is { response?: { status?: number; data?: unknown } } => {
+  return Boolean(error && typeof error === 'object' && 'response' in error)
+}
+
+const isNetworkError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false
+  const maybeError = error as { response?: unknown; request?: unknown; code?: string; message?: string }
+  return !maybeError.response && (Boolean(maybeError.request) || maybeError.code === 'ERR_NETWORK' || maybeError.message === 'Network Error')
+}
+
+function isRawHttpErrorMessage(message?: string | null) {
+  return /^request failed with status code \d{3}$/i.test((message ?? '').trim())
+}
+
+function resolveErrorPresentation(error: unknown): { message: string; providerStatus: ProviderStatus; degraded: boolean } {
+  const response = isAxiosLikeError(error) ? error.response : undefined
+  const status = response?.status ?? null
+  const extractedRaw = extractMessage(response?.data) || extractMessage(error)
+  const extracted = isRawHttpErrorMessage(extractedRaw) ? '' : extractedRaw
+
+  if (status === 401) {
+    return {
+      message: extracted || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục dùng Trợ lý AI.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 403) {
+    return {
+      message: extracted || 'Bạn chưa có quyền truy cập Trợ lý AI từ phiên đăng nhập hiện tại.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 404) {
+    return {
+      message: extracted || 'Dịch vụ AI trên máy chủ chưa sẵn sàng hoặc đang cấu hình lại. Vui lòng thử lại sau ít phút.',
+      providerStatus: null,
+      degraded: true,
+    }
+  }
+
+  if (status === 429) {
+    return {
+      message: extracted || 'AI đang quá tải hoặc chạm giới hạn tạm thời. Hãy thử lại sau ít phút.',
+      providerStatus: 'FALLBACK_PROVIDER_ACTIVE',
+      degraded: true,
+    }
+  }
+
+  if (status === 500 || status === 502 || status === 503 || status === 504) {
+    return {
+      message: extracted || 'VNALO AI hiện đang bảo trì hoặc gặp bất tiện tạm thời. Bạn vui lòng thử lại sau ít phút.',
+      providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+      degraded: true,
+    }
+  }
+
+  if (isNetworkError(error)) {
+    return {
+      message: extracted || 'Không kết nối được tới Trợ lý AI. Vui lòng kiểm tra mạng hoặc thử lại sau.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  return {
+    message: extracted || 'Đã xảy ra lỗi khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.',
+    providerStatus: null,
+    degraded: false,
+  }
+}
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
+const AI_HISTORY_UPDATED_EVENT = 'vnalo:ai-history-updated'
+const AI_PENDING_UPDATED_EVENT = 'vnalo:ai-pending-updated'
+const AI_PENDING_KEY_PREFIX = 'vnalo_ai_chat_pending:'
 const MAX_API_HISTORY = 20
 
 const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
@@ -112,7 +179,7 @@ function tryDecodeUtf8Mojibake(value: string) {
   return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes))
 }
 
-function fixMojibakeText(value: string) {
+function normalizeIncomingText(value: string) {
   let best = value
   let bestScore = mojibakeScore(value)
 
@@ -134,6 +201,7 @@ function fixMojibakeText(value: string) {
   return best
 }
 
+
 function buildAiStorageKey(userId?: string | number | null) {
   if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
     return null
@@ -141,46 +209,42 @@ function buildAiStorageKey(userId?: string | number | null) {
   return `${STORAGE_KEY}:${userId}`
 }
 
+function buildAiPendingKey(userId?: string | number | null) {
+  if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
+    return null
+  }
+  return `${AI_PENDING_KEY_PREFIX}${userId}`
+}
+
+function buildClientEntryId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+function readAiPending(key: string | null) {
+  if (!key) return false
+  return localStorage.getItem(key) === 'true'
+}
+
 const PRESET_PROMPTS = [
   'Tóm tắt nhanh các tính năng chính của VNALO',
   'Giúp tôi soạn một tin nhắn từ chối lịch hẹn lịch sự',
   'Mở cuộc trò chuyện với một người trong danh bạ',
+  'Giải thích ngắn gọn một tính năng bảo mật trong ứng dụng',
 ]
 
 const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   role: 'assistant',
-  content: 'Xin chào! Mình là Trợ lý AI VNALO. Mình có thể trả lời câu hỏi và gợi ý thao tác an toàn trong hệ thống.',
+  content: 'Xin chào! Mình là VNALO AI Assistant. Mình có thể trả lời câu hỏi và gợi ý thao tác an toàn trong hệ thống.',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
-const KNOWN_ACTION_COMMANDS = new Set<AiActionCommand>([
-  'OPEN_CHAT',
-  'COMPOSE_MESSAGE',
-  'START_CALL',
-  'RECALL_MESSAGE',
-  'CREATE_GROUP',
-  'MUTE_CONVERSATION',
-  'UNMUTE_CONVERSATION',
-  'PIN_MESSAGE',
-  'UNPIN_MESSAGE',
-  'OPEN_GROUP_SETTINGS',
-  'OPEN_PROFILE',
-  'SEND_FRIEND_REQUEST',
-  'BLOCK_USER',
-  'UNBLOCK_USER',
-  'CHANGE_GROUP_NAME',
-  'ADD_GROUP_MEMBER',
-  'REMOVE_GROUP_MEMBER',
-  'TRANSFER_GROUP_OWNER',
-  'LEAVE_GROUP',
-  'DISBAND_GROUP',
-  'NAVIGATE_TO',
-  'NAVIGATE_TO_SETTINGS',
-  'NAVIGATE_TO_CHAT',
-  'NAVIGATE_TO_CONTACTS',
-  'NAVIGATE_TO_SCANNER',
-  'NAVIGATE_TO_TIMELINE',
-])
+
+function isStaleRawAiError(content: string) {
+  const normalized = content.trim().toLowerCase()
+  return /^request failed with status code \d{3}$/.test(normalized)
+}
 
 function normalizeStoredMessages(payload: unknown): AiMessage[] {
   if (!Array.isArray(payload)) return [INITIAL_ASSISTANT_MESSAGE]
@@ -190,9 +254,9 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
       if (!item || typeof item !== 'object') return null
       const value = item as Record<string, unknown>
       const role = value.role === 'assistant' ? 'assistant' : value.role === 'user' ? 'user' : null
-      const content = typeof value.content === 'string' ? fixMojibakeText(value.content).trim() : ''
+      const content = typeof value.content === 'string' ? normalizeIncomingText(value.content).trim() : ''
       const timestamp = typeof value.timestamp === 'string' && value.timestamp.trim() ? value.timestamp : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      if (!role || !content) return null
+      if (!role || !content || isStaleRawAiError(content)) return null
 
       return {
         role,
@@ -200,10 +264,12 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
         timestamp,
         degraded: Boolean(value.degraded),
         providerStatus: value.providerStatus === 'LIVE_PROVIDER_ACTIVE' || value.providerStatus === 'FALLBACK_PROVIDER_ACTIVE' || value.providerStatus === 'AI_PROVIDER_UNAVAILABLE' ? value.providerStatus : null,
-        actionCommand: typeof value.actionCommand === 'string' && KNOWN_ACTION_COMMANDS.has(value.actionCommand as AiActionCommand)
+        actionCommand: typeof value.actionCommand === 'string' && isKnownAiActionCommand(value.actionCommand)
           ? (value.actionCommand as AiActionCommand)
           : null,
         actionParams: value.actionParams && typeof value.actionParams === 'object' ? (value.actionParams as Record<string, unknown>) : null,
+        requiresConfirmation: typeof value.requiresConfirmation === 'boolean' ? value.requiresConfirmation : null,
+        riskLevel: typeof value.riskLevel === 'string' ? value.riskLevel : null,
       }
     })
     .filter((item): item is AiMessage => item !== null)
@@ -244,81 +310,10 @@ function resolveProviderPresentation(messages: AiMessage[]) {
     degraded: false,
     badgeClassName: 'ai-header-status',
     label: 'Sẵn sàng hỗ trợ',
-    helper: 'Trợ lý AI có thể trả lời và gợi ý thao tác an toàn trong VNALO.',
+    helper: 'Đang hoạt động',
     banner: '',
     bannerClassName: 'ai-runtime-banner',
   }
-}
-
-function normalizeLookupText(value: string) {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function tokenizeLookupText(value: string) {
-  const normalized = normalizeLookupText(value)
-  return normalized ? normalized.split(' ') : []
-}
-
-function computeConversationMatchScore(conversationName: string, target: string) {
-  const normalizedName = normalizeLookupText(conversationName)
-  const normalizedTarget = normalizeLookupText(target)
-  if (!normalizedName || !normalizedTarget) return -1
-  if (normalizedName === normalizedTarget) return 1000
-  if (normalizedName.startsWith(`${normalizedTarget} `)) return 930
-  if (normalizedName.endsWith(` ${normalizedTarget}`)) return 920
-  if (normalizedName.includes(normalizedTarget)) return 870 + normalizedTarget.length
-
-  const nameTokens = tokenizeLookupText(normalizedName)
-  const targetTokens = tokenizeLookupText(normalizedTarget)
-  if (!nameTokens.length || !targetTokens.length || targetTokens.length > nameTokens.length) return -1
-
-  let cursor = 0
-  let score = 700 + targetTokens.length * 25
-  for (const targetToken of targetTokens) {
-    let foundIndex = -1
-    for (let index = cursor; index < nameTokens.length; index += 1) {
-      const nameToken = nameTokens[index]
-      if (nameToken === targetToken || nameToken.startsWith(targetToken)) {
-        foundIndex = index
-        break
-      }
-    }
-    if (foundIndex < 0) return -1
-    score -= (foundIndex - cursor) * 8
-    cursor = foundIndex + 1
-  }
-
-  if (nameTokens[0] === targetTokens[0]) score += 30
-  if (nameTokens[nameTokens.length - 1] === targetTokens[targetTokens.length - 1]) score += 45
-  score -= Math.max(0, nameTokens.length - targetTokens.length) * 6
-  return score
-}
-
-function extractActionTarget(params?: Record<string, unknown> | null) {
-  if (!params) return ''
-  const raw =
-    params.target ??
-    params.recipient ??
-    params.contactName ??
-    params.displayName ??
-    params.conversationName ??
-    params.groupName ??
-    params.groupTitle ??
-    params.chatName ??
-    params.name ??
-    ''
-  return String(raw).trim()
-}
-
-function extractComposeContent(params?: Record<string, unknown> | null) {
-  if (!params) return ''
-  const raw = params.content ?? params.messageText ?? params.prefilledText ?? ''
-  return String(raw).trim()
 }
 
 function buildConversationSubtitle(conversation: ConversationSummary) {
@@ -336,12 +331,6 @@ function buildRiskLabel(risk: AiActionPreview['risk']) {
   return 'An toàn'
 }
 
-function buildActionRisk(command: AiActionCommand): AiActionPreview['risk'] {
-  if (HIGH_RISK_ACTION_COMMANDS.has(command)) return 'high'
-  if (command === 'CREATE_GROUP' || command === 'SEND_FRIEND_REQUEST' || command === 'START_CALL') return 'medium'
-  return 'low'
-}
-
 function resolveNavigatePath(command: AiActionCommand, params?: Record<string, unknown> | null) {
   if (command === 'NAVIGATE_TO_CHAT') return '/chat'
   if (command === 'NAVIGATE_TO_CONTACTS') return '/contacts'
@@ -353,6 +342,8 @@ function resolveNavigatePath(command: AiActionCommand, params?: Record<string, u
   if (page === 'chat') return '/chat'
   if (page === 'contacts') return '/contacts'
   if (page === 'profile' || page === 'settings') return '/profile'
+  if (page === 'scanner' || page === 'qr') return '/scanner'
+  if (page === 'timeline' || page === 'social') return '/timeline'
   return null
 }
 
@@ -361,107 +352,24 @@ const CONVERSATION_ACTION_COMMANDS = new Set<AiActionCommand>([
   'COMPOSE_MESSAGE',
   'START_CALL',
   'OPEN_GROUP_SETTINGS',
-  'MUTE_CONVERSATION',
-  'UNMUTE_CONVERSATION',
-  'CHANGE_GROUP_NAME',
-  'ADD_GROUP_MEMBER',
-  'REMOVE_GROUP_MEMBER',
-  'TRANSFER_GROUP_OWNER',
-  'LEAVE_GROUP',
-  'DISBAND_GROUP',
+  'RECALL_MESSAGE',
+  'PIN_MESSAGE',
+  'UNPIN_MESSAGE',
 ])
 
-const HIGH_RISK_ACTION_COMMANDS = new Set<AiActionCommand>([
-  'BLOCK_USER',
-  'UNBLOCK_USER',
-  'REMOVE_GROUP_MEMBER',
-  'TRANSFER_GROUP_OWNER',
-  'LEAVE_GROUP',
-  'DISBAND_GROUP',
-  'RECALL_MESSAGE',
-])
 
 function isConversationAction(command: AiActionCommand) {
   return CONVERSATION_ACTION_COMMANDS.has(command)
 }
 
-function buildActionLabel(command: AiActionCommand) {
-  switch (command) {
-    case 'OPEN_CHAT':
-      return 'Mở cuộc trò chuyện'
-    case 'COMPOSE_MESSAGE':
-      return 'Mở chat và điền nháp'
-    case 'OPEN_GROUP_SETTINGS':
-      return 'Mở cài đặt nhóm'
-    case 'START_CALL':
-      return 'Mở chat để gọi'
-    case 'RECALL_MESSAGE':
-      return 'Thu hồi tin nhắn'
-    case 'CREATE_GROUP':
-      return 'Tạo nhóm mới'
-    case 'MUTE_CONVERSATION':
-      return 'Tắt thông báo cuộc trò chuyện'
-    case 'UNMUTE_CONVERSATION':
-      return 'Bật lại thông báo cuộc trò chuyện'
-    case 'PIN_MESSAGE':
-      return 'Ghim tin nhắn'
-    case 'UNPIN_MESSAGE':
-      return 'Bỏ ghim tin nhắn'
-    case 'SEND_FRIEND_REQUEST':
-      return 'Gửi lời mời kết bạn'
-    case 'BLOCK_USER':
-      return 'Chặn người dùng'
-    case 'UNBLOCK_USER':
-      return 'Bỏ chặn người dùng'
-    case 'CHANGE_GROUP_NAME':
-      return 'Đổi tên nhóm'
-    case 'ADD_GROUP_MEMBER':
-      return 'Thêm thành viên'
-    case 'REMOVE_GROUP_MEMBER':
-      return 'Xóa thành viên'
-    case 'TRANSFER_GROUP_OWNER':
-      return 'Chuyển quyền trưởng nhóm'
-    case 'LEAVE_GROUP':
-      return 'Rời nhóm'
-    case 'DISBAND_GROUP':
-      return 'Giải tán nhóm'
-    case 'NAVIGATE_TO':
-      return 'Đi đến trang yêu cầu'
-    case 'NAVIGATE_TO_SETTINGS':
-      return 'Mở cài đặt'
-    case 'NAVIGATE_TO_CHAT':
-      return 'Đi đến Chat'
-    case 'NAVIGATE_TO_CONTACTS':
-      return 'Đi đến Danh bạ'
-    case 'NAVIGATE_TO_SCANNER':
-      return 'Mở trình quét'
-    case 'NAVIGATE_TO_TIMELINE':
-      return 'Mở nhật ký'
-    case 'OPEN_PROFILE':
-      return 'Mở hồ sơ'
-    default:
-      return 'Thực hiện thao tác'
-  }
+function isRecallCandidate(message: { senderId?: string; from?: string; status?: string | null; recalledAt?: string | null; recalled_at?: string | null }, userId?: string | null) {
+  const senderId = String(message.senderId ?? message.from ?? '').trim()
+  return Boolean(userId && senderId === userId && message.status !== 'RECALLED' && !message.recalledAt && !message.recalled_at)
 }
 
-function buildDeferredActionReply(command: AiActionCommand) {
-  return `Mình đã nhận diện yêu cầu: ${buildActionLabel(command)}. Hãy bấm nút bên dưới để mình kiểm tra đúng đối tượng và mở luồng an toàn.`
+function isPinCandidate(message: { id?: string; messageType?: string | null; status?: string | null; recalledAt?: string | null; recalled_at?: string | null }) {
+  return Boolean(message.id && message.messageType !== 'system' && message.messageType !== 'SYSTEM' && message.status !== 'RECALLED' && !message.recalledAt && !message.recalled_at)
 }
-
-function buildMissingConversationFeedback(command: AiActionCommand, target: string) {
-  const targetLabel = target ? `"${target}"` : 'người/cuộc trò chuyện đó'
-
-  if (command === 'START_CALL') {
-    return `Mình không tìm thấy ${targetLabel} trong danh bạ hoặc danh sách trò chuyện của bạn, nên chưa thể chuẩn bị cuộc gọi. Hãy kiểm tra lại tên hoặc kết bạn trước khi gọi.`
-  }
-
-  if (command === 'COMPOSE_MESSAGE') {
-    return `Mình không tìm thấy ${targetLabel} trong danh bạ hoặc danh sách trò chuyện của bạn, nên chưa thể mở chat và điền nháp. Hãy kiểm tra lại tên người nhận.`
-  }
-
-  return `Mình không tìm thấy ${targetLabel} trong danh bạ hoặc danh sách trò chuyện của bạn. Hãy kiểm tra lại tên hoặc chọn thủ công trong Chat.`
-}
-
 function buildActionSuccessFeedback(command: AiActionCommand) {
   if (command === 'START_CALL') {
     return 'Đã mở đúng cuộc trò chuyện. Hãy bấm nút gọi để xác nhận cuộc gọi trên web.'
@@ -471,20 +379,34 @@ function buildActionSuccessFeedback(command: AiActionCommand) {
     return 'Đã mở đúng cuộc trò chuyện và lưu nội dung nháp nếu AI có cung cấp. Hãy kiểm tra lại trước khi gửi.'
   }
 
-  if (HIGH_RISK_ACTION_COMMANDS.has(command)) {
+  if (getAiActionRisk(command) === 'high') {
     return 'Đã mở đúng cuộc trò chuyện. Hãy tự kiểm tra kỹ và xác nhận thủ công trước khi thực hiện thao tác nhạy cảm.'
   }
 
   return 'Đã mở đúng cuộc trò chuyện đích.'
 }
 
-export function AiChatPage() {
+type AiChatPageProps = {
+  embedded?: boolean
+  onActivity?: (activity: { preview: string; timestamp: string }) => void
+}
+
+function getAiMessagePreview(message: AiMessage): string {
+  const trimmed = message.content.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return 'Sẵn sàng hỗ trợ'
+  return trimmed.length > 96 ? trimmed.slice(0, 93) + '...' : trimmed
+}
+
+export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {}) {
   const { accessToken, user } = useAuth()
+  const { recordActivity: recordAiAssistantActivity, resetMeta: resetAiAssistantMeta } = useAiAssistant()
   const navigate = useNavigate()
   const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
+  const pendingStorageKey = useMemo(() => buildAiPendingKey(user?.id as string | number | undefined), [user?.id])
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isPersistentPending, setIsPersistentPending] = useState(() => readAiPending(pendingStorageKey))
   const [actionBusyIndex, setActionBusyIndex] = useState<number | null>(null)
   const [activeActionLabel, setActiveActionLabel] = useState<string>('')
   const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState | null>(null)
@@ -501,6 +423,17 @@ export function AiChatPage() {
     return () => {
       isUnmountedRef.current = true
     }
+  }, [])
+
+  useEffect(() => {
+    const pendingPrompt = localStorage.getItem(AI_PENDING_PROMPT_KEY)
+    if (!pendingPrompt?.trim()) return
+
+    localStorage.removeItem(AI_PENDING_PROMPT_KEY)
+    setInputValue(pendingPrompt.trim())
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 50)
   }, [])
 
   useEffect(() => {
@@ -530,14 +463,73 @@ export function AiChatPage() {
     }
   }, [historyStorageKey])
 
-  const saveMessages = (nextMessages: AiMessage[]) => {
+  useEffect(() => {
+    setIsPersistentPending(readAiPending(pendingStorageKey))
+  }, [pendingStorageKey])
+
+  useEffect(() => {
+    if (!pendingStorageKey) return
+
+    const handlePendingUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; pending?: boolean }>).detail
+      if (detail?.key !== pendingStorageKey) return
+      setIsPersistentPending(Boolean(detail.pending))
+    }
+
+    window.addEventListener(AI_PENDING_UPDATED_EVENT, handlePendingUpdated)
+    return () => window.removeEventListener(AI_PENDING_UPDATED_EVENT, handlePendingUpdated)
+  }, [pendingStorageKey])
+
+  const persistPending = (pending: boolean) => {
+    if (!pendingStorageKey) return
+    if (pending) {
+      localStorage.setItem(pendingStorageKey, 'true')
+    } else {
+      localStorage.removeItem(pendingStorageKey)
+    }
+    setIsPersistentPending(pending)
+    window.dispatchEvent(new CustomEvent(AI_PENDING_UPDATED_EVENT, {
+      detail: { key: pendingStorageKey, pending },
+    }))
+  }
+
+  useEffect(() => {
+    if (!historyStorageKey) return
+
+    const handleHistoryUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; messages?: AiMessage[] }>).detail
+      if (detail?.key !== historyStorageKey || !Array.isArray(detail.messages)) return
+      setMessages(normalizeStoredMessages(detail.messages))
+    }
+
+    window.addEventListener(AI_HISTORY_UPDATED_EVENT, handleHistoryUpdated)
+    return () => window.removeEventListener(AI_HISTORY_UPDATED_EVENT, handleHistoryUpdated)
+  }, [historyStorageKey])
+
+  const persistMessages = (nextMessages: AiMessage[]) => {
     const normalized = normalizeStoredMessages(nextMessages)
-    setMessages(normalized)
+    const latestActivity = [...normalized].reverse().find((message) => message.content.trim())
+    if (latestActivity && latestActivity !== INITIAL_ASSISTANT_MESSAGE) {
+      const activity = { preview: getAiMessagePreview(latestActivity), timestamp: new Date().toISOString() }
+      recordAiAssistantActivity(activity)
+      onActivity?.(activity)
+    }
     if (!historyStorageKey) {
-      return
+      return normalized
     }
     localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
     localStorage.removeItem(LEGACY_STORAGE_KEY)
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(AI_HISTORY_UPDATED_EVENT, {
+        detail: { key: historyStorageKey, messages: normalized },
+      }))
+    }, 0)
+    return normalized
+  }
+
+  const saveMessages = (nextMessages: AiMessage[]) => {
+    const normalized = persistMessages(nextMessages)
+    setMessages(normalized)
   }
 
   const appendAssistantFeedback = (
@@ -558,6 +550,9 @@ export function AiChatPage() {
         localStorage.setItem(historyStorageKey, JSON.stringify(nextMessages))
         localStorage.removeItem(LEGACY_STORAGE_KEY)
       }
+      const activity = { preview: getAiMessagePreview(feedbackMessage), timestamp: new Date().toISOString() }
+      recordAiAssistantActivity(activity)
+      onActivity?.(activity)
       return nextMessages
     })
   }
@@ -570,10 +565,11 @@ export function AiChatPage() {
     }
 
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
-  }, [messages, isLoading, actionFeedback])
+  }, [messages, isLoading, isPersistentPending, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
-  const isAssistantBusy = isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null
+  const showTypingIndicator = isLoading || isPersistentPending
+  const isAssistantBusy = showTypingIndicator || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null
 
   useEffect(() => {
     const input = inputRef.current
@@ -594,11 +590,44 @@ export function AiChatPage() {
         role: 'assistant',
         content: 'Bạn cần đăng nhập lại để dùng Trợ lý AI trên web.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        degraded: true,
-        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+        degraded: false,
+        providerStatus: null,
       }
       saveMessages([...messages, authError])
       return
+    }
+
+    const createGroupIntentTargets = extractCreateGroupIntentTargets(query)
+    if (createGroupIntentTargets.length > 0) {
+      const userMessage: AiMessage = {
+        role: 'user',
+        content: query,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+
+      if (!textToSend) {
+        setInputValue('')
+      }
+
+      const friends = await getFriends(accessToken)
+      const { missingTargets, ambiguousTargets } = validateCreateGroupTargets(friends, createGroupIntentTargets)
+
+      if (missingTargets.length > 0 || ambiguousTargets.length > 0) {
+        const assistantText = missingTargets.length > 0
+          ? `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không tạo nhóm hoặc mở luồng tạo nhóm để tránh chọn nhầm người.`
+          : `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy nói rõ hơn hoặc tự chọn thủ công trong modal tạo nhóm.`
+        const assistantMessage: AiMessage = {
+          role: 'assistant',
+          content: assistantText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          providerStatus: null,
+          degraded: false,
+        }
+        saveMessages([...messages, userMessage, assistantMessage])
+        setActionFeedback({ tone: 'warning', message: assistantText })
+        setRetryPrompt('')
+        return
+      }
     }
 
     if (!textToSend) {
@@ -617,6 +646,7 @@ export function AiChatPage() {
     setActionFeedback(null)
     inFlightRequestRef.current = true
     setIsLoading(true)
+    persistPending(true)
 
     try {
       const apiHistory = updatedMessages.slice(-MAX_API_HISTORY).map((message) => ({
@@ -624,43 +654,54 @@ export function AiChatPage() {
         content: message.content,
       }))
 
-      const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory)
+      const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory, {
+        analyzeIntent: true,
+        contextId: historyStorageKey ?? undefined,
+        clientUserEntryId: buildClientEntryId('web-user'),
+        clientAssistantEntryId: buildClientEntryId('web-assistant'),
+        clientPlatform: 'WEB',
+      })
       const responseActionCommand = (aiResponse.actionCommand as AiActionCommand | undefined) ?? null
-      const safeActionCommand = responseActionCommand && KNOWN_ACTION_COMMANDS.has(responseActionCommand) ? responseActionCommand : null
+      const safeActionCommand = responseActionCommand && isKnownAiActionCommand(responseActionCommand) ? responseActionCommand : null
       const assistantMessage: AiMessage = {
         role: 'assistant',
         content: safeActionCommand
-          ? buildDeferredActionReply(safeActionCommand)
+          ? buildAiDeferredActionReply(safeActionCommand)
           : aiResponse.textReply || 'Mình chưa thể xử lý yêu cầu này ngay lúc này.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
         actionCommand: safeActionCommand,
         actionParams: aiResponse.actionParams ?? null,
+        requiresConfirmation: aiResponse.requiresConfirmation ?? null,
+        riskLevel: aiResponse.riskLevel ?? null,
       }
 
-      if (!isUnmountedRef.current) {
-        saveMessages([...updatedMessages, assistantMessage])
-      }
+      const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
+        ? messages
+        : updatedMessages
+      const persisted = persistMessages([...baseMessages, assistantMessage])
+      setMessages(persisted)
+      setRetryPrompt('')
     } catch (error) {
       console.error('AI chat failed:', error)
-      const fallbackText =
-        extractMessage((error as { response?: { data?: unknown } })?.response?.data) ||
-        extractMessage(error) ||
-        'Đã xảy ra lỗi khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.'
+      const errorPresentation = resolveErrorPresentation(error)
 
       const errorMessage: AiMessage = {
         role: 'assistant',
-        content: fallbackText,
+        content: errorPresentation.message,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        degraded: true,
-        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+        degraded: errorPresentation.degraded,
+        providerStatus: errorPresentation.providerStatus,
       }
 
-      if (!isUnmountedRef.current) {
-        saveMessages([...updatedMessages, errorMessage])
-      }
+      const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
+        ? messages
+        : updatedMessages
+      const persisted = persistMessages([...baseMessages, errorMessage])
+      setMessages(persisted)
     } finally {
+      persistPending(false)
       if (!isUnmountedRef.current) {
         inFlightRequestRef.current = false
         setIsLoading(false)
@@ -676,7 +717,7 @@ export function AiChatPage() {
     }
 
     setActionBusyIndex(index)
-    setActiveActionLabel(buildActionLabel(message.actionCommand))
+    setActiveActionLabel(getAiActionLabel(message.actionCommand))
     setActionFeedback(null)
 
     try {
@@ -692,114 +733,201 @@ export function AiChatPage() {
       }
 
       if (command === 'CREATE_GROUP') {
+        const friends = await getFriends(accessToken)
+        const { resolution, issues } = resolveCreateGroupAction(params, friends)
+
+        if (!resolution) {
+          const messageText = issues.map((issue) => issue.message).join(' ')
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
         setPendingActionReview({
-          title: 'Mở luồng tạo nhóm',
-          description: 'AI sẽ mở màn hình tạo nhóm. Bạn vẫn cần kiểm tra thành viên và xác nhận tạo nhóm thủ công.',
-          confirmLabel: 'Mở tạo nhóm',
-          path: '/chat?createGroup=true',
-          feedback: 'Đã mở luồng tạo nhóm. Hãy kiểm tra tên nhóm và danh sách thành viên trước khi tạo.',
-          preview: { risk: 'medium', targetLabel: String(params.title ?? params.groupName ?? 'Nhóm mới') },
+          title: 'Xác nhận tạo nhóm',
+          description: `Trợ lý sẽ tạo nhóm "${resolution.groupName}" với ${resolution.memberLabels.join(', ')}. Bạn vẫn có thể hủy nếu danh sách chưa đúng.`,
+          confirmLabel: 'Tạo nhóm',
+          feedback: `Đã tạo nhóm "${resolution.groupName}".`,
+          preview: { risk: 'medium', targetLabel: resolution.groupName, draft: resolution.memberLabels.join(', ') },
+          execute: async () => {
+            const conversationId = await createGroupConversation(accessToken, {
+              title: resolution.groupName,
+              memberUserIds: resolution.memberIds,
+            })
+            navigate('/chat/' + conversationId)
+          },
         })
         return
       }
 
       if (command === 'SEND_FRIEND_REQUEST') {
-        setPendingActionReview({
-          title: 'Mở danh bạ để gửi kết bạn',
-          description: 'Trợ lý web sẽ không tự gửi lời mời kết bạn. Mình sẽ mở Danh bạ để bạn kiểm tra đúng người rồi tự gửi.',
-          confirmLabel: 'Mở Danh bạ',
-          path: '/contacts',
-          feedback: 'Đã mở Danh bạ. Hãy xác nhận đúng người trước khi gửi lời mời kết bạn.',
-          preview: { risk: 'medium', targetLabel: extractActionTarget(params) || 'Chưa rõ liên hệ' },
-        })
-        return
-      }
-
-      if (HIGH_RISK_ACTION_COMMANDS.has(command) && !isConversationAction(command)) {
-        setPendingActionReview({
-          title: 'Cần xác nhận thủ công',
-          description: 'Thao tác này có thể ảnh hưởng đến tài khoản, tin nhắn hoặc thành viên nhóm. Trợ lý web sẽ chỉ mở đúng luồng để bạn tự xác nhận.',
-          confirmLabel: 'Mở Chat',
-          path: '/chat',
-          feedback: 'Đã mở Chat. Hãy kiểm tra đúng đối tượng rồi tự thực hiện thao tác nhạy cảm này.',
-          preview: { risk: 'high', targetLabel: extractActionTarget(params) || command },
-        })
-        return
-      }
-
-      if (isConversationAction(command)) {
         const target = extractActionTarget(params)
         if (!target) {
-          navigate('/chat')
-          setActionFeedback({ tone: 'warning', message: 'AI chưa xác định được cuộc trò chuyện cụ thể. Mình đã mở Chat để bạn tự chọn.' })
-          appendAssistantFeedback('Mình chưa xác định được người nhận hoặc cuộc trò chuyện cụ thể, nên đã mở Chat để bạn tự chọn thủ công.')
+          const messageText = 'Mình chưa xác định được người cần kết bạn. Hãy nói rõ tên, email hoặc số điện thoại.'
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const lookupUsers = await searchUsers(accessToken, target)
+        const { resolution, issues } = resolveFriendRequestAction(params, lookupUsers)
+        if (!resolution) {
+          const messageText = issues.map((issue) => issue.message).join(' ')
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        setPendingActionReview({
+          title: 'Xác nhận gửi kết bạn',
+          description: `Trợ lý sẽ gửi lời mời kết bạn tới ${resolution.targetLabel}.`,
+          confirmLabel: 'Gửi kết bạn',
+          feedback: `Đã gửi lời mời kết bạn tới ${resolution.targetLabel}.`,
+          preview: { risk: 'medium', targetLabel: resolution.targetLabel, draft: resolution.message },
+          execute: async () => {
+            await sendFriendRequest(accessToken, {
+              toUserId: resolution.targetUser.id,
+              message: resolution.message,
+            })
+          },
+        })
+        return
+      }
+
+      if (command === 'RECALL_MESSAGE' || command === 'PIN_MESSAGE' || command === 'UNPIN_MESSAGE') {
+        const target = extractActionTarget(params)
+        if (!target) {
+          const messageText = 'Mình cần biết cuộc trò chuyện nào để thực hiện thao tác tin nhắn an toàn.'
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
           return
         }
 
         const inbox = await fetchInbox(accessToken, user?.id)
-        const matches = inbox
-          .map((conversation) => {
-            return {
-              conversation,
-              normalizedName: normalizeLookupText(conversation.name),
-              score: computeConversationMatchScore(conversation.name, target),
-            }
-          })
-          .filter((item) => item.score >= 0)
-          .sort((left, right) => right.score - left.score)
-
-        const normalizedTarget = normalizeLookupText(target)
-        const exactMatches = matches.filter((item) => item.normalizedName === normalizedTarget)
-        const candidateConversations = (exactMatches.length > 0 ? exactMatches : matches).map((item) => item.conversation)
-
-        if (candidateConversations.length > 1) {
-          setPendingResolution({
-            candidates: candidateConversations.slice(0, 8),
-            draft: command === 'COMPOSE_MESSAGE' ? extractComposeContent(params) : '',
-            command,
-            targetLabel: target,
-          })
-          setActionFeedback({ tone: 'info', message: `Mình tìm thấy ${candidateConversations.length} cuộc trò chuyện khớp với "${target}". Hãy chọn đúng đối tượng trước khi tiếp tục.` })
-          appendAssistantFeedback(`Mình tìm thấy ${candidateConversations.length} cuộc trò chuyện khớp với "${target}". Hãy chọn đúng đối tượng trong danh sách xác nhận để mình tiếp tục an toàn.`)
+        const { resolution, issues } = resolveConversationAction(command, params, inbox)
+        if (!resolution) {
+          const messageText = issues.map((issue) => issue.message).join(' ')
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
           return
         }
 
-        const matched = candidateConversations[0]
-
-        if (!matched) {
-          const missingFeedback = buildMissingConversationFeedback(command, target)
-          setActionFeedback({ tone: 'warning', message: missingFeedback })
-          appendAssistantFeedback(missingFeedback)
-          return
-        }
-
-        if (command === 'COMPOSE_MESSAGE') {
-          const draft = extractComposeContent(params)
-          if (draft) {
-            localStorage.setItem(`${DRAFT_KEY_PREFIX}${matched.id}`, draft)
+        const conversation = resolution.conversation
+        const rawMessages = await fetchMessages(accessToken, conversation.id, true)
+        if (command === 'RECALL_MESSAGE') {
+          const candidate = [...rawMessages].reverse().find((item) => isRecallCandidate(item, user?.id))
+          if (!candidate?.id) {
+            const messageText = 'Không tìm thấy tin nhắn gần nhất của bạn đủ điều kiện thu hồi trong cuộc trò chuyện này.'
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
           }
+
+          setPendingActionReview({
+            title: 'Xác nhận thu hồi tin nhắn',
+            description: 'Trợ lý sẽ thu hồi tin nhắn gần nhất của bạn trong ' + conversation.name + '. Thao tác này có thể ảnh hưởng đến tất cả người trong cuộc trò chuyện.',
+            confirmLabel: 'Thu hồi tin nhắn',
+            feedback: 'Đã thu hồi tin nhắn gần nhất của bạn trong ' + conversation.name + '.',
+            preview: { risk: 'high', targetLabel: conversation.name, draft: candidate.content ?? undefined },
+            execute: async () => {
+              await recallMessage(accessToken, candidate.id)
+              window.dispatchEvent(new CustomEvent('vnalo:ai-action-message-updated', { detail: { conversationId: conversation.id, messageId: candidate.id, action: 'RECALL_MESSAGE' } }))
+            },
+          })
+          return
         }
 
-        navigate(`/chat/${matched.id}`)
+        if (command === 'PIN_MESSAGE') {
+          const candidate = [...rawMessages].reverse().find(isPinCandidate)
+          if (!candidate?.id) {
+            const messageText = 'Không tìm thấy tin nhắn phù hợp để ghim trong cuộc trò chuyện này.'
+            setActionFeedback({ tone: 'warning', message: messageText })
+            appendAssistantFeedback(messageText)
+            return
+          }
+
+          setPendingActionReview({
+            title: 'Xác nhận ghim tin nhắn',
+            description: 'Trợ lý sẽ ghim tin nhắn gần nhất phù hợp trong ' + conversation.name + '.',
+            confirmLabel: 'Ghim tin nhắn',
+            feedback: 'Đã ghim tin nhắn trong ' + conversation.name + '.',
+            preview: { risk: 'medium', targetLabel: conversation.name, draft: candidate.content ?? undefined },
+            execute: async () => {
+              await pinMessage(accessToken, conversation.id, candidate.id)
+              window.dispatchEvent(new CustomEvent('vnalo:ai-action-message-updated', { detail: { conversationId: conversation.id, messageId: candidate.id, action: 'PIN_MESSAGE' } }))
+            },
+          })
+          return
+        }
+
+        const pinnedMessages = await fetchPinnedMessages(accessToken, conversation.id)
+        const candidatePin = [...pinnedMessages].reverse().find((item) => item.messageId)
+        if (!candidatePin?.messageId) {
+          const messageText = 'Cuộc trò chuyện này hiện chưa có tin nhắn ghim phù hợp để bỏ ghim.'
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        setPendingActionReview({
+          title: 'Xác nhận bỏ ghim tin nhắn',
+          description: 'Trợ lý sẽ bỏ ghim tin nhắn ghim gần nhất trong ' + conversation.name + '.',
+          confirmLabel: 'Bỏ ghim',
+          feedback: 'Đã bỏ ghim tin nhắn trong ' + conversation.name + '.',
+          preview: { risk: 'medium', targetLabel: conversation.name },
+          execute: async () => {
+            await unpinMessage(accessToken, conversation.id, candidatePin.messageId)
+            window.dispatchEvent(new CustomEvent('vnalo:ai-action-message-updated', { detail: { conversationId: conversation.id, messageId: candidatePin.messageId, action: 'UNPIN_MESSAGE' } }))
+          },
+        })
+        return
+      }
+      if (isConversationAction(command)) {
+        const target = extractActionTarget(params)
+        if (!target) {
+          navigate('/chat')
+          const messageText = 'Mình chưa xác định được người nhận hoặc cuộc trò chuyện cụ thể, nên đã mở Chat để bạn tự chọn thủ công.'
+          setActionFeedback({ tone: 'info', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const inbox = await fetchInbox(accessToken, user?.id)
+        const { resolution, issues } = resolveConversationAction(command, params, inbox)
+
+        if (!resolution) {
+          const messageText = issues.map((issue) => issue.message).join(' ')
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        if (command === 'COMPOSE_MESSAGE' && resolution.draft) {
+          localStorage.setItem(DRAFT_KEY_PREFIX + resolution.conversation.id, resolution.draft)
+        }
+
+        navigate('/chat/' + resolution.conversation.id)
         const successFeedback = buildActionSuccessFeedback(command)
-        setActionFeedback({ tone: HIGH_RISK_ACTION_COMMANDS.has(command) ? 'warning' : 'success', message: successFeedback })
+        setActionFeedback({ tone: getAiActionRisk(command) === 'high' ? 'warning' : 'success', message: successFeedback })
         appendAssistantFeedback(successFeedback)
         return
       }
 
+      const unsupportedIssue = buildUnsupportedActionIssue(command)
       setPendingActionReview({
-        title: 'Web chưa hỗ trợ tự động thao tác này',
-        description: 'Trợ lý đã nhận ra ý định của bạn, nhưng web hiện chưa có executor an toàn cho thao tác này.',
-        confirmLabel: 'Mở Chat',
+        title: 'Thao tac can xu ly thu cong',
+        description: unsupportedIssue.message,
+        confirmLabel: 'Mo Chat',
         path: '/chat',
-        feedback: 'Đã mở Chat. Bạn có thể tiếp tục thủ công hoặc dùng mobile để thực hiện thao tác này.',
-        preview: { risk: 'medium', targetLabel: command },
+        feedback: 'Da mo Chat de ban tiep tuc thao tac thu cong mot cach an toan.',
+        preview: { risk: getAiActionRisk(command), targetLabel: getAiActionLabel(command) },
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
-      const errorFeedback = 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.'
+      const errorPresentation = resolveErrorPresentation(error)
+      const errorFeedback = errorPresentation.message || 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.'
       setActionFeedback({ tone: 'error', message: errorFeedback })
-      appendAssistantFeedback(errorFeedback, { degraded: true, providerStatus: 'AI_PROVIDER_UNAVAILABLE' })
+      appendAssistantFeedback(errorFeedback, { degraded: false, providerStatus: null })
     } finally {
       setActionBusyIndex(null)
       setActiveActionLabel('')
@@ -829,17 +957,30 @@ export function AiChatPage() {
     )
   }
 
-  const confirmPendingActionReview = () => {
+  const confirmPendingActionReview = async () => {
     if (!pendingActionReview) {
       return
     }
 
-    if (pendingActionReview.path) {
-      navigate(pendingActionReview.path)
-    }
-    setActionFeedback({ tone: 'info', message: pendingActionReview.feedback })
-    appendAssistantFeedback(pendingActionReview.feedback)
+    const review = pendingActionReview
     setPendingActionReview(null)
+    setActionFeedback({ tone: 'info', message: 'Đang thực hiện thao tác AI...' })
+
+    try {
+      if (review.execute) {
+        await review.execute()
+      }
+      if (review.path) {
+        navigate(review.path)
+      }
+      setActionFeedback({ tone: 'success', message: review.feedback })
+      appendAssistantFeedback(review.feedback)
+    } catch (error) {
+      console.error('AI confirmed action failed:', error)
+      const message = extractMessage(error) || 'Không thể thực hiện thao tác AI trên web lúc này. Vui lòng thử lại.'
+      setActionFeedback({ tone: 'error', message })
+      appendAssistantFeedback(message)
+    }
   }
 
   const executeResolvedConversationAction = (conversation: ConversationSummary, resolution: PendingActionResolution) => {
@@ -866,8 +1007,8 @@ export function AiChatPage() {
         return
       }
 
-      setPendingActionReview(null)
-      setPendingResolution(null)
+      closePendingActionReview()
+      closePendingResolution()
     }
 
     window.addEventListener('keydown', handleEscape)
@@ -879,7 +1020,22 @@ export function AiChatPage() {
       return
     }
 
+    setActionFeedback(null)
     void handleSend(retryPrompt)
+  }
+
+  const closePendingActionReview = (reason: 'dismiss' | 'cancel' = 'dismiss') => {
+    setPendingActionReview(null)
+    if (reason === 'cancel') {
+      setActionFeedback({ tone: 'info', message: 'Đã hủy bước xác nhận thao tác AI trên web.' })
+    }
+  }
+
+  const closePendingResolution = (reason: 'dismiss' | 'cancel' = 'dismiss') => {
+    setPendingResolution(null)
+    if (reason === 'cancel') {
+      setActionFeedback({ tone: 'info', message: 'Đã hủy bước chọn cuộc trò chuyện. Bạn có thể thử lại với tên cụ thể hơn.' })
+    }
   }
 
   const handleClearHistory = () => {
@@ -891,6 +1047,7 @@ export function AiChatPage() {
       localStorage.removeItem(historyStorageKey)
     }
     localStorage.removeItem(LEGACY_STORAGE_KEY)
+    resetAiAssistantMeta()
     saveMessages([
       {
         role: 'assistant',
@@ -900,29 +1057,70 @@ export function AiChatPage() {
     ])
   }
 
+  const handleCopyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard?.writeText(content)
+      setActionFeedback({ tone: 'success', message: 'Đã sao chép tin nhắn.' })
+    } catch {
+      setActionFeedback({ tone: 'error', message: 'Không thể sao chép tin nhắn trên trình duyệt hiện tại.' })
+    }
+  }
+
+  const handleShareMessage = async (message: AiMessage) => {
+    const text = message.content.trim()
+    if (!text) return
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, title: 'VNALO AI Assistant' })
+        return
+      }
+
+      await navigator.clipboard?.writeText(text)
+      setActionFeedback({ tone: 'success', message: 'Trình duyệt chưa hỗ trợ chia sẻ trực tiếp, nội dung đã được sao chép.' })
+    } catch (error) {
+      if ((error as { name?: string })?.name === 'AbortError') return
+      setActionFeedback({ tone: 'error', message: 'Không thể chia sẻ tin nhắn. Vui lòng thử lại.' })
+    }
+  }
+
+  const handleReplyToMessage = (message: AiMessage) => {
+    const preview = getAiMessagePreview(message)
+    setInputValue((current) => {
+      const existing = current.trim()
+      const quoted = `Trả lời: "${preview}"\n`
+      return existing ? `${quoted}${existing}` : quoted
+    })
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
   return (
-    <div className='ai-chat-layout'>
-      <aside className='ai-chat-sidebar'>
+    <div className={embedded ? 'ai-chat-layout ai-chat-layout-embedded' : 'ai-chat-layout'}>
+      {!embedded ? <aside className='ai-chat-sidebar'>
         <div className='ai-chat-sidebar-scroll'>
-          <section className='ai-assistant-card' aria-label='Thông tin trợ lý AI'>
-            <div className='ai-avatar-glow'>
-              <Sparkles size={28} />
+          <section className='ai-assistant-card ai-context-card' aria-label='Ngữ cảnh trợ lý AI'>
+            <div>
+              <h3>VNALO AI Assistant</h3>
+              <p>Đoạn chat riêng 1:1 với trợ lý trong VNALO.</p>
             </div>
-            <h3>{fixMojibakeText('VNALO AI Assistant')}</h3>
-            <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
+            <div className='ai-context-status'>
+              <span className={runtimeState.badgeClassName} />
+              <strong>{runtimeState.label}</strong>
+            </div>
           </section>
 
           <section className='ai-presets-container' aria-label='Gợi ý câu hỏi AI'>
-            <span className='ai-presets-title'>Gợi ý câu hỏi</span>
+            <span className='ai-presets-title'>Gợi ý nhanh</span>
             {PRESET_PROMPTS.map((prompt) => (
               <button
-                key={fixMojibakeText(prompt)}
+                key={prompt}
                 type='button'
                 className='ai-preset-btn'
-                onClick={() => void handleSend(fixMojibakeText(prompt))}
+                onClick={() => void handleSend(prompt)}
                 disabled={isAssistantBusy}
               >
-                {fixMojibakeText(prompt)}
+                <Sparkles size={14} />
+                <span>{prompt}</span>
               </button>
             ))}
           </section>
@@ -940,24 +1138,41 @@ export function AiChatPage() {
             Xóa lịch sử
           </button>
         </div>
-      </aside>
+      </aside> : null}
 
       <main className='ai-chat-main'>
-        <header className='ai-chat-header'>
-          <div className='ai-header-stack'>
-            <div className='ai-header-info'>
-              <div className={runtimeState.badgeClassName} />
-              <strong className='text-[15px] font-semibold'>{fixMojibakeText(runtimeState.label)}</strong>
+        <header className={embedded ? 'chat-window-header ai-chat-header ai-chat-header-embedded' : 'ai-chat-header'}>
+          <div className={embedded ? 'chat-window-header-main' : 'ai-header-main'}>
+            <div className='relative'>
+              <UserAvatar name='VNALO AI Assistant' size='md' isAiAssistant />
+              <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full' />
             </div>
-            <span className='ai-header-helper'>{fixMojibakeText(runtimeState.helper)}</span>
+            <div className={embedded ? 'chat-window-header-copy' : 'ai-header-stack'}>
+              <h2>VNALO AI Assistant</h2>
+              <div className='chat-window-header-meta'>
+                <p>{runtimeState.degraded ? runtimeState.label : 'Đang hoạt động'}</p>
+              </div>
+            </div>
+          </div>
+          <div className='chat-window-header-actions ai-chat-header-actions'>
+            <button
+              type='button'
+              className='chat-window-icon-btn ai-header-clear-btn'
+              onClick={handleClearHistory}
+              disabled={isAssistantBusy}
+              title='Xóa lịch sử chat AI'
+              aria-label='Xóa lịch sử chat AI'
+            >
+              <Trash2 size={18} />
+            </button>
           </div>
         </header>
 
         <div className='ai-chat-messages' ref={messagesContainerRef} role='log' aria-live='polite' aria-relevant='additions text'>
-          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{fixMojibakeText(runtimeState.banner)}</div>}
+          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
           {actionFeedback ? (
             <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>
-              <span>{fixMojibakeText(actionFeedback.message)}</span>
+              <span>{actionFeedback.message}</span>
               {actionFeedback.tone === 'error' && retryPrompt ? (
                 <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isAssistantBusy}>
                   Thử lại
@@ -969,11 +1184,25 @@ export function AiChatPage() {
           {messages.map((message, index) => (
             <div
               key={`${message.role}-${message.timestamp}-${index}`}
-              className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'}
+              className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'} data-role={message.role}
             >
-              <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
-                {fixMojibakeText(message.content)}
-              </p>
+              <div className='ai-message-action-toolbar' aria-label='Thao tác tin nhắn'>
+                <button type='button' className='ai-message-action-btn' onClick={() => handleReplyToMessage(message)} title='Trả lời tin nhắn' aria-label='Trả lời tin nhắn'>
+                  <Reply size={14} />
+                </button>
+                <button type='button' className='ai-message-action-btn' onClick={() => void handleShareMessage(message)} title='Chia sẻ tin nhắn' aria-label='Chia sẻ tin nhắn'>
+                  <Share2 size={14} />
+                </button>
+                <button type='button' className='ai-message-action-btn' onClick={() => void handleCopyMessage(message.content)} title='Sao chép tin nhắn' aria-label='Sao chép tin nhắn'>
+                  <Copy size={14} />
+                </button>
+                {message.role === 'assistant' && message.degraded && retryPrompt ? (
+                  <button type='button' className='ai-message-action-btn' onClick={handleRetry} disabled={isAssistantBusy} title='Thử lại' aria-label='Thử lại'>
+                    <RotateCcw size={14} />
+                  </button>
+                ) : null}
+              </div>
+              <p className='ai-message-text'>{message.content}</p>
               {message.role === 'assistant' && message.actionCommand ? (
                 <div className='ai-action-row'>
                   <button
@@ -982,16 +1211,14 @@ export function AiChatPage() {
                     onClick={() => void handleAction(message, index)}
                     disabled={isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null}
                   >
-                    {actionBusyIndex === index ? 'Đang xử lý...' : buildActionLabel(message.actionCommand)}
+                    {actionBusyIndex === index ? 'Đang xử lý...' : getAiActionLabel(message.actionCommand)}
                   </button>
                 </div>
               ) : null}
-              <div className='text-[10px] opacity-60 text-right mt-1.5' style={{ marginTop: '6px' }}>
-                {message.timestamp}
-              </div>
+              <div className='ai-message-time'>{message.timestamp}</div>
             </div>
           ))}
-          {isLoading && (
+          {showTypingIndicator && (
             <div className='ai-typing-indicator'>
               <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} đang được chuẩn bị` : 'Trợ lý AI đang soạn phản hồi'}</span>
               <div className='ai-typing-dot' />
@@ -1010,48 +1237,58 @@ export function AiChatPage() {
               void handleSend()
             }}
           >
-            <textarea
-              ref={inputRef}
-              className='ai-input-field'
-              placeholder='Nhắn điều bạn cần cho Trợ lý AI...'
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              disabled={pendingActionReview !== null || pendingResolution !== null}
-              rows={1}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  void handleSend()
-                }
-              }}
-            />
-            <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho trợ lý AI'>
-              <Send size={18} />
+            <button type='button' className='ai-composer-tool-btn' aria-label='Đính kèm ngữ cảnh' disabled>
+              <Paperclip size={18} />
             </button>
-            <span className='ai-input-hint'>Enter để gửi, Shift + Enter để xuống dòng</span>
+            <div className='ai-composer-field'>
+              <textarea
+                ref={inputRef}
+                className='ai-input-field'
+                placeholder='Nhắn điều bạn cần cho VNALO AI Assistant...'
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
+                disabled={pendingActionReview !== null || pendingResolution !== null}
+                rows={1}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    void handleSend()
+                  }
+                }}
+              />
+              <span className='ai-input-hint'>Enter để gửi · Shift + Enter để xuống dòng</span>
+            </div>
+            <div className='ai-composer-actions'>
+              <button type='button' className='ai-composer-tool-btn' aria-label='Nhập bằng giọng nói' disabled>
+                <Mic size={18} />
+              </button>
+              <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho VNALO AI Assistant'>
+                <Send size={18} />
+              </button>
+            </div>
           </form>
         </footer>
       </main>
 
       {pendingActionReview ? (
-        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-action-review-title' onClick={() => setPendingActionReview(null)}>
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-action-review-title' onClick={() => closePendingActionReview('dismiss')}>
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h3 id='ai-action-review-title'>{fixMojibakeText(pendingActionReview.title)}</h3>
-                <p>{fixMojibakeText(pendingActionReview.description)}</p>
+                <h3 id='ai-action-review-title'>{pendingActionReview.title}</h3>
+                <p>{pendingActionReview.description}</p>
                 {renderActionPreview(pendingActionReview.preview)}
               </div>
-              <button className='modal-close-btn' type='button' onClick={() => setPendingActionReview(null)} aria-label='Close'>
+              <button className='modal-close-btn' type='button' onClick={() => closePendingActionReview('dismiss')} aria-label='Đóng'>
                 <X size={18} />
               </button>
             </div>
             <div className='modal-footer'>
-              <button className='btn btn-subtle' type='button' onClick={() => setPendingActionReview(null)}>
+              <button className='btn btn-subtle' type='button' onClick={() => closePendingActionReview('cancel')}>
                 Hủy
               </button>
-              <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
-                {fixMojibakeText(pendingActionReview.confirmLabel)}
+              <button className='btn btn-primary' type='button' onClick={() => void confirmPendingActionReview()}>
+                {pendingActionReview.confirmLabel}
               </button>
             </div>
           </div>
@@ -1059,15 +1296,15 @@ export function AiChatPage() {
       ) : null}
 
       {pendingResolution ? (
-        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-resolution-title' onClick={() => setPendingResolution(null)}>
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-resolution-title' onClick={() => closePendingResolution('dismiss')}>
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
                 <h3 id='ai-resolution-title'>Chọn đúng cuộc trò chuyện</h3>
                 <p>Hãy xác nhận đúng đối tượng để tránh mở nhầm cuộc trò chuyện hoặc điền nháp sai người.</p>
-                {renderActionPreview({ risk: buildActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
+                {renderActionPreview({ risk: getAiActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
               </div>
-              <button className='modal-close-btn' type='button' onClick={() => setPendingResolution(null)} aria-label='Close'>
+              <button className='modal-close-btn' type='button' onClick={() => closePendingResolution('dismiss')} aria-label='Đóng'>
                 <X size={18} />
               </button>
             </div>
@@ -1088,7 +1325,7 @@ export function AiChatPage() {
               ))}
             </div>
             <div className='modal-footer'>
-              <button className='btn btn-subtle' type='button' onClick={() => setPendingResolution(null)}>
+              <button className='btn btn-subtle' type='button' onClick={() => closePendingResolution('cancel')}>
                 Hủy
               </button>
             </div>

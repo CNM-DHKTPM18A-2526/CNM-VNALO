@@ -17,6 +17,7 @@ export type ConversationSummary = {
   lastSeenTime?: string | null
   isGroup?: boolean
   isCloud?: boolean
+  isAiAssistant?: boolean
   memberCount?: number
   isPinned?: boolean
   members?: Array<{ userId: string; role: string; displayName?: string; avatarUrl?: string; leftAt?: string | null }>
@@ -100,6 +101,7 @@ export type ChatComposePayload = {
   sticker?: ChatSticker | null
   replyTo?: ReplyMetadata | null
   poll?: PollMetadata | null
+  mentions?: Array<{ displayName: string; userId: string }>
 }
 
 export type ChatMessage = {

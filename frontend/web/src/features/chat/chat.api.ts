@@ -1,6 +1,6 @@
 export type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
-import { formatMessageContent } from './utils/messageUtils'
+import { formatMessageContent, formatReactionSyncPreview } from './utils/messageUtils'
 import { extractMessage, messageApi, mediaApi, aiApi } from '../../api.client'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
@@ -321,8 +321,9 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
     }
   }
 
-  if (preview.startsWith('{"action":"UPDATE_MESSAGE_REACTIONS"')) {
-    return ''; // Hide sync signals
+  const reactionSyncPreview = formatReactionSyncPreview(preview)
+  if (reactionSyncPreview) {
+    return reactionSyncPreview
   }
 
   return preview
@@ -1116,18 +1117,72 @@ export async function fetchSuggestedReplies(
 export async function sendAiChatMessage(
   token: string,
   prompt: string,
-  history: Array<{ role: 'user' | 'assistant'; content: string }>
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+  options?: {
+    analyzeIntent?: boolean
+    contextId?: string | null
+    enableDeepSummary?: boolean
+    clientUserEntryId?: string
+    clientAssistantEntryId?: string
+    clientPlatform?: 'WEB' | 'MOBILE' | 'DESKTOP'
+  },
 ): Promise<{
   textReply: string
   actionCommand?: string | null
   actionParams?: Record<string, unknown> | null
   degraded?: boolean
   providerStatus?: string
+  conversationId?: string
+  userEntryId?: string
+  assistantEntryId?: string
+  requiresConfirmation?: boolean | null
+  riskLevel?: string | null
 }> {
+  const ACCESS_TOKEN_KEY = 'vnalo_access_token'
+
+  const resolveLatestWebToken = (fallbackToken: string) => {
+    if (typeof window === 'undefined') {
+      return fallbackToken
+    }
+
+    const latestToken = window.localStorage.getItem(ACCESS_TOKEN_KEY)?.trim()
+    return latestToken || fallbackToken
+  }
+
+  const postChat = async (accessToken: string) => {
+    return aiApi.post('chat', {
+      prompt,
+      history,
+      analyzeIntent: Boolean(options?.analyzeIntent),
+      enableDeepSummary: Boolean(options?.enableDeepSummary),
+      clientPlatform: options?.clientPlatform ?? 'WEB',
+      ...(options?.contextId ? { contextId: options.contextId } : {}),
+      ...(options?.clientUserEntryId ? { clientUserEntryId: options.clientUserEntryId } : {}),
+      ...(options?.clientAssistantEntryId ? { clientAssistantEntryId: options.clientAssistantEntryId } : {}),
+    }, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+  }
+
   try {
-    const response = await aiApi.post('chat', { prompt, history }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const firstToken = resolveLatestWebToken(token)
+    let response
+
+    try {
+      response = await postChat(firstToken)
+    } catch (error) {
+      const status = (error as { response?: { status?: number } } | undefined)?.response?.status
+      const latestToken = resolveLatestWebToken(token)
+      const shouldRetryWithFreshToken = (status === 401 || status === 403) && latestToken && latestToken !== firstToken
+
+      if (!shouldRetryWithFreshToken) {
+        throw error
+      }
+
+      console.warn('[sendAiChatMessage] retrying with refreshed web token after auth failure')
+      response = await postChat(latestToken)
+    }
+
     const data = response.data?.data;
     return {
       textReply: data?.textReply ?? '',
@@ -1135,10 +1190,14 @@ export async function sendAiChatMessage(
       actionParams: data?.actionParams ?? null,
       degraded: Boolean(data?.degraded),
       providerStatus: data?.providerStatus,
+      conversationId: data?.conversationId,
+      userEntryId: data?.userEntryId,
+      assistantEntryId: data?.assistantEntryId,
+      requiresConfirmation: data?.requiresConfirmation ?? null,
+      riskLevel: data?.riskLevel ?? null,
     };
   } catch (error) {
     console.error('[sendAiChatMessage] failed:', error);
     throw error;
   }
 }
-

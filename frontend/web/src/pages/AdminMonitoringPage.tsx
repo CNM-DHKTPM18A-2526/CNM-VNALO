@@ -42,6 +42,15 @@ type EventPage = {
   items: SessionAudit[]
 }
 
+type AdminRoleAssignment = {
+  accountId?: string
+  email: string
+  roleCode: string
+  grantedAt?: string
+  grantedBy?: string
+  expiresAt?: string | null
+}
+
 type MonitoringSummary = {
   generatedAt?: string
   accessMode?: string
@@ -104,14 +113,18 @@ const rangeOptions = [
 ]
 const eventTypeOptions = ['ALL', 'LOGIN_SUCCESS', 'LOGIN_FAILED', 'QR_LOGIN_APPROVED', 'SESSION_REVOKED_LOGOUT', 'SESSION_REVOKED_LOGOUT_ALL']
 const platformOptions = ['ALL', 'WEB', 'ANDROID', 'IOS']
+const roleOptions = ['ADMIN_MONITORING_VIEWER', 'ADMIN_MONITORING_ANALYST', 'SUPER_ADMIN']
 
-async function fetchWithTimeout(url: string, token?: string | null) {
+async function fetchWithTimeout(url: string, token?: string | null, init: RequestInit = {}) {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  const headers = new Headers(init.headers)
+  if (token) headers.set('Authorization', `Bearer ${token}`)
   try {
     return await fetch(url, {
+      ...init,
       signal: controller.signal,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers,
     })
   } finally {
     window.clearTimeout(timer)
@@ -139,7 +152,7 @@ function extractData<T>(payload: unknown): T | null {
 
 function resolveApiError(response: Response, fallback: string) {
   if (response.status === 401) return 'Authentication required. Please sign in again.'
-  if (response.status === 403) return 'Access denied by backend allowlist. Check ADMIN_MONITORING_ALLOWED_EMAILS.'
+  if (response.status === 403) return 'Access denied by backend RBAC. Check admin role/permission assignments.'
   return `${fallback} (${response.status})`
 }
 
@@ -230,11 +243,7 @@ function TrendBars({ points, language }: { points: EventTrendPoint[]; language: 
 export function AdminMonitoringPage() {
   const { language } = useLanguage()
   const { user, accessToken } = useAuth()
-  const adminMonitoringEmails = (import.meta.env.VITE_ADMIN_MONITORING_ALLOWED_EMAILS ?? '')
-    .split(',')
-    .map((email: string) => email.trim().toLowerCase())
-    .filter(Boolean)
-  const hasUiHintAccess = Boolean(user?.email && adminMonitoringEmails.includes(user.email.toLowerCase()))
+  const hasUiHintAccess = Boolean(user?.email)
 
   const [services, setServices] = React.useState<ServiceProbe[]>([])
   const [summary, setSummary] = React.useState<MonitoringSummary | null>(null)
@@ -250,6 +259,13 @@ export function AdminMonitoringPage() {
   const [page, setPage] = React.useState(0)
   const [hasMore, setHasMore] = React.useState(false)
   const [pageLimit] = React.useState(20)
+  const [roleAssignments, setRoleAssignments] = React.useState<AdminRoleAssignment[]>([])
+  const [isRbacLoading, setIsRbacLoading] = React.useState(false)
+  const [rbacError, setRbacError] = React.useState<string | null>(null)
+  const [rbacMessage, setRbacMessage] = React.useState<string | null>(null)
+  const [rbacEmail, setRbacEmail] = React.useState('')
+  const [rbacRole, setRbacRole] = React.useState('ADMIN_MONITORING_VIEWER')
+  const [rbacExpiresAt, setRbacExpiresAt] = React.useState('')
 
   const labels = language === 'vi'
     ? {
@@ -292,6 +308,20 @@ export function AdminMonitoringPage() {
         previousPage: 'Trang trước',
         nextPage: 'Trang sau',
         page: 'Trang',
+        rbacTitle: 'Quản trị quyền admin',
+        rbacSubtitle: 'Cấp hoặc thu hồi vai trò vận hành bằng RBAC ở backend.',
+        rbacHelp: 'SUPER_ADMIN có quyền quản trị RBAC. ANALYST có thêm quyền xuất dữ liệu. VIEWER chỉ xem dashboard.',
+        rbacEmail: 'Email tài khoản',
+        rbacRole: 'Vai trò',
+        rbacExpiresAt: 'Hết hạn (tùy chọn)',
+        grantRole: 'Cấp quyền',
+        revokeRole: 'Thu hồi',
+        activeAssignments: 'Phân quyền hiện tại',
+        noAssignments: 'Chưa có phân quyền admin nào.',
+        expiresNever: 'Không hết hạn',
+        grantedAt: 'Cấp lúc',
+        assignmentCount: 'phân quyền',
+        confirmRevoke: 'Thu hồi quyền này?',
       }
     : {
         title: 'Operations Monitoring',
@@ -333,6 +363,20 @@ export function AdminMonitoringPage() {
         previousPage: 'Previous page',
         nextPage: 'Next page',
         page: 'Page',
+        rbacTitle: 'Admin access control',
+        rbacSubtitle: 'Grant or revoke operational roles through backend RBAC.',
+        rbacHelp: 'SUPER_ADMIN can manage RBAC. ANALYST can export monitoring data. VIEWER can only view the dashboard.',
+        rbacEmail: 'Account email',
+        rbacRole: 'Role',
+        rbacExpiresAt: 'Expires at (optional)',
+        grantRole: 'Grant role',
+        revokeRole: 'Revoke',
+        activeAssignments: 'Active assignments',
+        noAssignments: 'No admin assignments yet.',
+        expiresNever: 'Never expires',
+        grantedAt: 'Granted at',
+        assignmentCount: 'assignments',
+        confirmRevoke: 'Revoke this role assignment?',
       }
 
   const load = React.useCallback(async () => {
@@ -403,9 +447,77 @@ export function AdminMonitoringPage() {
     setIsLoading(false)
   }, [accessToken, page, pageLimit, selectedEventType, selectedPlatform, windowHours])
 
+  const loadRbacAssignments = React.useCallback(async () => {
+    setIsRbacLoading(true)
+    setRbacError(null)
+    try {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/admin/rbac/assignments`, accessToken)
+      const payload = (await response.json().catch(() => null)) as unknown
+      if (!response.ok) throw new Error(resolveApiError(response, 'RBAC assignments failed'))
+      setRoleAssignments(extractArray(payload) as AdminRoleAssignment[])
+    } catch (error) {
+      setRoleAssignments([])
+      setRbacError(error instanceof Error ? error.message : 'RBAC API unavailable')
+    } finally {
+      setIsRbacLoading(false)
+    }
+  }, [accessToken])
+
+  const handleGrantRole = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsRbacLoading(true)
+    setRbacError(null)
+    setRbacMessage(null)
+    try {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/admin/rbac/assignments`, accessToken, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: rbacEmail.trim(),
+          roleCode: rbacRole,
+          ...(rbacExpiresAt ? { expiresAt: new Date(rbacExpiresAt).toISOString() } : {}),
+        }),
+      })
+      if (!response.ok) throw new Error(resolveApiError(response, 'Grant role failed'))
+      setRbacMessage(language === 'vi' ? 'Đã cập nhật phân quyền.' : 'Role assignment updated.')
+      setRbacEmail('')
+      setRbacExpiresAt('')
+      await loadRbacAssignments()
+    } catch (error) {
+      setRbacError(error instanceof Error ? error.message : 'Grant role failed')
+    } finally {
+      setIsRbacLoading(false)
+    }
+  }
+
+  const handleRevokeRole = async (assignment: AdminRoleAssignment) => {
+    if (!window.confirm(`${labels.confirmRevoke} ${assignment.email} / ${assignment.roleCode}`)) return
+    setIsRbacLoading(true)
+    setRbacError(null)
+    setRbacMessage(null)
+    try {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/admin/rbac/assignments`, accessToken, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: assignment.email, roleCode: assignment.roleCode }),
+      })
+      if (!response.ok) throw new Error(resolveApiError(response, 'Revoke role failed'))
+      setRbacMessage(language === 'vi' ? 'Đã thu hồi phân quyền.' : 'Role assignment revoked.')
+      await loadRbacAssignments()
+    } catch (error) {
+      setRbacError(error instanceof Error ? error.message : 'Revoke role failed')
+    } finally {
+      setIsRbacLoading(false)
+    }
+  }
+
   React.useEffect(() => {
     void load()
   }, [load])
+
+  React.useEffect(() => {
+    void loadRbacAssignments()
+  }, [loadRbacAssignments])
 
   React.useEffect(() => {
     if (!autoRefresh) return undefined
@@ -488,6 +600,63 @@ export function AdminMonitoringPage() {
               {platformOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
+        </div>
+      </section>
+
+      <section className='admin-monitoring-panel admin-monitoring-rbac-panel'>
+        <div className='admin-monitoring-panel-title'>
+          <div>
+            <h2>{labels.rbacTitle}</h2>
+            <span>{labels.rbacSubtitle}</span>
+            <small className='admin-monitoring-panel-help'>{labels.rbacHelp}</small>
+          </div>
+          <button className='admin-monitoring-secondary-button' type='button' onClick={() => void loadRbacAssignments()} disabled={isRbacLoading}>
+            {isRbacLoading ? labels.refreshing : labels.refresh}
+          </button>
+        </div>
+        {rbacError ? <div className='admin-monitoring-note admin-monitoring-error'>{rbacError}</div> : null}
+        {rbacMessage ? <div className='admin-monitoring-note admin-monitoring-success'>{rbacMessage}</div> : null}
+        <form className='admin-monitoring-rbac-form' onSubmit={handleGrantRole}>
+          <label>
+            <span>{labels.rbacEmail}</span>
+            <input type='email' value={rbacEmail} onChange={(event) => setRbacEmail(event.target.value)} placeholder='admin@vnalo.fit' required />
+          </label>
+          <label>
+            <span>{labels.rbacRole}</span>
+            <select value={rbacRole} onChange={(event) => setRbacRole(event.target.value)}>
+              {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>{labels.rbacExpiresAt}</span>
+            <input type='datetime-local' value={rbacExpiresAt} onChange={(event) => setRbacExpiresAt(event.target.value)} />
+          </label>
+          <button type='submit' disabled={isRbacLoading || !rbacEmail.trim()}>{labels.grantRole}</button>
+        </form>
+        <div className='admin-monitoring-rbac-list-heading'>
+          <strong>{labels.activeAssignments}</strong>
+          <span>{roleAssignments.length} {labels.assignmentCount}</span>
+        </div>
+        <div className='admin-monitoring-rbac-list' aria-label={labels.activeAssignments} aria-busy={isRbacLoading}>
+          {roleAssignments.length === 0 ? (
+            <p className='admin-monitoring-empty'>{labels.noAssignments}</p>
+          ) : roleAssignments.map((assignment) => (
+            <article className='admin-monitoring-rbac-row' key={`${assignment.email}-${assignment.roleCode}`}>
+              <div>
+                <strong>{assignment.email}</strong>
+                <span>{assignment.roleCode}</span>
+              </div>
+              <div>
+                <small>{labels.grantedAt}</small>
+                <time>{assignment.grantedAt ? new Date(assignment.grantedAt).toLocaleString() : '-'}</time>
+              </div>
+              <div>
+                <small>{labels.rbacExpiresAt}</small>
+                <time>{assignment.expiresAt ? new Date(assignment.expiresAt).toLocaleString() : labels.expiresNever}</time>
+              </div>
+              <button type='button' onClick={() => void handleRevokeRole(assignment)} disabled={isRbacLoading}>{labels.revokeRole}</button>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -605,7 +774,7 @@ export function AdminMonitoringPage() {
                     <strong>{audit.eventType ?? 'SESSION_EVENT'}</strong>
                     <span className={`admin-monitoring-severity ${audit.severity ?? 'info'}`}>{audit.severity ?? 'info'}</span>
                   </div>
-                  <span>{audit.platform ?? 'WEB'} • {audit.deviceName ?? 'Unknown device'} • {audit.detail ?? 'session update'}</span>
+                  <span>{audit.platform ?? 'WEB'} · {audit.deviceName ?? 'Unknown device'} · {audit.detail ?? 'session update'}</span>
                 </div>
                 <div className='admin-monitoring-event-meta'>
                   <small>{audit.deviceIdMasked ?? 'N/A'}</small>

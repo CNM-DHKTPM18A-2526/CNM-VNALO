@@ -332,47 +332,55 @@ export function ChatWindow({
             <>
               {conversation.isGroup ? (
                 <button
-                  className='chat-header-action-btn'
+                  className='chat-header-action-btn chat-header-action-btn-flat'
                   type='button'
                   onClick={() => onOpenAddMembers?.()}
                   title='Thêm thành viên'
                 >
-                  <Icon name='userPlus' />
+                  <Icon name='userPlus' size={22} />
                 </button>
               ) : (
                 <button
-                  className='chat-header-action-btn'
+                  className='chat-header-action-btn chat-header-action-btn-flat'
                   type='button'
                   onClick={() => onInitiateCall?.('audio')}
                 >
-                  <Icon name='phone' />
+                  <Icon name='phone' size={22} />
                 </button>
               )}
               <button
-                className='chat-header-action-btn'
+                className='chat-header-action-btn chat-header-action-btn-flat'
                 type='button'
                 onClick={() => onInitiateCall?.('video')}
               >
-                <Icon name='video' />
+                <Icon name='video' size={22} />
               </button>
             </>
           ) : null}
           <button
-            className={rightSidebarContent === 'search' || rightSidebarContent === 'global-search' ? 'chat-header-action-btn chat-header-action-btn-active' : 'chat-header-action-btn'}
+            className={
+              rightSidebarContent === 'search' || rightSidebarContent === 'global-search'
+                ? 'chat-header-action-btn chat-header-action-btn-flat chat-header-action-btn-active'
+                : 'chat-header-action-btn chat-header-action-btn-flat'
+            }
             type='button'
             onClick={onToggleSearchSidebar}
             aria-pressed={rightSidebarContent === 'search' || rightSidebarContent === 'global-search'}
           >
-            <Icon name='search' />
+            <Icon name='search' size={22} />
           </button>
           <button
-            className={rightSidebarContent === 'info' ? 'chat-header-action-btn chat-header-action-btn-active' : 'chat-header-action-btn'}
+            className={
+              rightSidebarContent === 'info'
+                ? 'chat-header-action-btn chat-header-action-btn-flat chat-header-action-btn-active'
+                : 'chat-header-action-btn chat-header-action-btn-flat'
+            }
             type='button'
             onClick={onToggleInfoSidebar}
             aria-pressed={rightSidebarContent === 'info'}
             title='Bật/tắt thông tin hội thoại'
           >
-            <Icon name='layoutSidebar' />
+            <Icon name='layoutSidebar' size={22} />
           </button>
         </div>
       </header>

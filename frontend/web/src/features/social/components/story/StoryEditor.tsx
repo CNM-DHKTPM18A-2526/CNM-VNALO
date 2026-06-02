@@ -3,7 +3,7 @@ import { StoryCropper } from './StoryCropper';
 import { StoryPreview } from './StoryPreview';
 import { StoryTextOverlay } from './StoryTextOverlay';
 import { getCroppedImage } from '../../utils/storyCrop';
-import type { StoryDraft } from '../../store/story.store';
+import { storyStore, type StoryDraft } from '../../store/story.store';
 import { uploadStoryMedia, socialApi } from '../../api/social.api';
 
 const STORY_WIDTH = 1080;
@@ -163,11 +163,14 @@ export function StoryEditor({
         throw new Error('Media URL is missing.');
       }
 
-      await socialApi.createStory(token, {
+      const created = await socialApi.createStory(token, {
         mediaUrl,
         caption: draft.caption,
-        visibility: 'PUBLIC',
+        visibility: 'FRIENDS',
       });
+      if (created?.storyId) {
+        storyStore.upsertStory(created);
+      }
       onPublished();
     } finally {
       setIsSaving(false);

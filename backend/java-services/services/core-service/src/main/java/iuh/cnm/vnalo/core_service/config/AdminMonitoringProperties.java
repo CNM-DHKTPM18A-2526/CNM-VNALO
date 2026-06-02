@@ -6,9 +6,9 @@ import java.util.List;
 
 @ConfigurationProperties(prefix = "app.admin.monitoring")
 public record AdminMonitoringProperties(
-        List<String> allowedEmails
+        List<String> bootstrapEmails
 ) {
     public AdminMonitoringProperties {
-        allowedEmails = allowedEmails == null ? List.of() : allowedEmails;
+        bootstrapEmails = bootstrapEmails == null ? List.of() : bootstrapEmails;
     }
 }
