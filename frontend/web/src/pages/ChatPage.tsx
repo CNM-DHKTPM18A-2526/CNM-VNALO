@@ -912,7 +912,7 @@ export default function ChatPage() {
         }
 
         if (conversationMsgs.length > 0 && (message.type === 'image' || message.type === 'file')) {
-          const lastFew = [...conversationMsgs, message].slice(-5);
+          const lastFew = dedupeMessages([...conversationMsgs, message]).slice(-5);
           let count = 0;
           const groupType = message.type;
 
