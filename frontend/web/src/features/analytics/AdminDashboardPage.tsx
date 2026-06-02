@@ -17,8 +17,8 @@ import {
   Legend,
 } from 'recharts'
 
-import { useAuth } from '../features/auth/useAuth'
-import { useLanguage } from '../shared/i18n/LanguageContext'
+import { useAuth } from '../auth/useAuth'
+import { useLanguage } from '../../shared/i18n/LanguageContext'
 import type {
   AnalyticsOverviewResponse,
   AnalyticsDashboardResponse,
@@ -295,7 +295,10 @@ function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }
               <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(v: number | undefined, name: string) => [`${formatNumber(v ?? 0)} (${((v ?? 0) / total * 100).toFixed(1)}%)`, name]} />
+          <Tooltip formatter={(v: unknown) => {
+            const n = typeof v === 'number' ? v : 0
+            return [`${formatNumber(n)} (${((n / total) * 100).toFixed(1)}%)`, '']
+          }} />
         </PieChart>
       </ResponsiveContainer>
       <div className="donut-legend">
@@ -490,7 +493,7 @@ export function AdminDashboardPage() {
       analyticsFetchWithTimeout<DailyTrendPointResponse[]>('/actions/trend', params),
     ])
 
-    const extract = <T,>(r: PromiseSettledResult<T>): T | null => {
+    const extract = <T,>(r: PromiseSettledResult<unknown> & { status: 'fulfilled'; value: T }): T | null => {
       if (r.status === 'fulfilled') return extractAnalyticsData<T>(r.value)
       return null
     }
