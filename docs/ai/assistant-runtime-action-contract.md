@@ -21,7 +21,7 @@ Tài liệu này chuẩn hóa cách AI Assistant chuyển ý định người d�
 | `SEND_FRIEND_REQUEST` | Target resolve duy nhất qua search user | Medium | Confirm + gửi lời mời | Confirm + gửi lời mời |
 | `RECALL_MESSAGE` | Có tin nhắn mới nhất của chính user, đủ điều kiện thu hồi | High | Chưa execute trực tiếp | Confirm + recall |
 | `PIN_MESSAGE`/`UNPIN_MESSAGE` | Có message hợp lệ và đủ quyền | Medium | Chưa execute trực tiếp | Confirm + pin/unpin |
-| `MUTE_CONVERSATION`/`UNMUTE_CONVERSATION` | Có conversation hợp lệ | Low | Review/flow thủ công nếu thiếu API | Confirm + execute nếu có provider |
+| `MUTE_CONVERSATION`/`UNMUTE_CONVERSATION` | Có conversation hợp lệ | Low | Chưa execute trực tiếp | Confirm + execute nếu có provider |
 | Group admin actions | Có nhóm, role đủ quyền, target rõ ràng | High | Flow thủ công | Confirm + execute tùy handler |
 
 ## Quy tắc chống sai lệch
@@ -51,3 +51,4 @@ Tài liệu này chuẩn hóa cách AI Assistant chuyển ý định người d�
 
 - AI service phải reject CREATE_GROUP nếu memberNames sau normalize/dedupe còn dưới 2 tên distinct.
 
+- Web không được coi việc mở chat là thực thi thành công cho `MUTE/UNMUTE`, `PIN/UNPIN`, `RECALL` hoặc group-admin actions khi chưa có executor thật.
