@@ -35,7 +35,7 @@ import type {
   DateRangePreset,
 } from './analytics.types'
 import { dateRangeFromPreset } from './analytics.types'
-import { analyticsFetchWithTimeout, extractAnalyticsData } from './analytics.client'
+import { analyticsFetchWithTimeout } from './analytics.client'
 import { API_BASE_URL, AI_API_URL, MEDIA_API_URL, MESSAGE_API_URL } from '../../api.client'
 import './analytics.css'
 
@@ -493,24 +493,24 @@ export function AdminDashboardPage() {
       analyticsFetchWithTimeout<DailyTrendPointResponse[]>('/actions/trend', params),
     ])
 
-    const extract = <T,>(r: PromiseSettledResult<unknown> & { status: 'fulfilled'; value: T }): T | null => {
-      if (r.status === 'fulfilled') return extractAnalyticsData<T>(r.value)
+    const extract = <T,>(r: PromiseSettledResult<T>): T | null => {
+      if (r.status === 'fulfilled') return r.value as T
       return null
     }
 
-    setDashboard(extract<AnalyticsDashboardResponse>(dashResult))
-    setOverview(extract<AnalyticsOverviewResponse>(overviewResult))
-    setReportReasons(extract<ReasonCountResponse[]>(reasonsResult) ?? [])
-    setMessageTypes(extract<MessageTypeCountResponse[]>(typesResult) ?? [])
-    setUserTrend(extract<DailyTrendPointResponse[]>(userTResult) ?? [])
-    setConvTrend(extract<DailyTrendPointResponse[]>(convTResult) ?? [])
-    setMsgTrend(extract<DailyTrendPointResponse[]>(msgTResult) ?? [])
-    setMediaTrend(extract<DailyTrendPointResponse[]>(mediaTResult) ?? [])
-    setReportTrend(extract<DailyTrendPointResponse[]>(reportTResult) ?? [])
-    setActionTrend(extract<DailyTrendPointResponse[]>(actionTResult) ?? [])
+    setDashboard(extract(dashResult))
+    setOverview(extract(overviewResult))
+    setReportReasons(extract(reasonsResult) ?? [])
+    setMessageTypes(extract(typesResult) ?? [])
+    setUserTrend(extract(userTResult) ?? [])
+    setConvTrend(extract(convTResult) ?? [])
+    setMsgTrend(extract(msgTResult) ?? [])
+    setMediaTrend(extract(mediaTResult) ?? [])
+    setReportTrend(extract(reportTResult) ?? [])
+    setActionTrend(extract(actionTResult) ?? [])
 
     if (dashResult.status === 'fulfilled') {
-      const d = extract<AnalyticsDashboardResponse>(dashResult.value)
+      const d = dashResult.value
       if (d?.activeUsers) setActiveUsers(d.activeUsers)
     }
   }, [dateRange])
