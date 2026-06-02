@@ -651,6 +651,7 @@ export default function ChatPage() {
   const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
   const [isAddingMembers, setIsAddingMembers] = useState(false);
   const [preselectedMemberIds, setPreselectedMemberIds] = useState<string[]>([]);
+  const [initialCreateGroupName, setInitialCreateGroupName] = useState('');
 
   const [isEditConversationNameOpen, setIsEditConversationNameOpen] = useState(false);
   const [editConversationNameMode, setEditConversationNameMode] = useState<'group' | 'nickname'>('group');
@@ -3934,6 +3935,7 @@ export default function ChatPage() {
 
   const handleOpenCreateGroupModal = useCallback(() => {
     setPreselectedMemberIds([]);
+    setInitialCreateGroupName('');
     setIsCreateGroupOpen(true)
   }, [])
 
@@ -3941,13 +3943,34 @@ export default function ChatPage() {
     const searchParams = new URLSearchParams(location.search)
     if (searchParams.get('createGroup') !== 'true') return
 
-    handleOpenCreateGroupModal()
+    const requestedGroupName = searchParams.get('groupName')?.trim() ?? ''
+    const requestedMembers = (searchParams.get('members') ?? '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
+      .filter(Boolean)
+    const matchedMemberIds = requestedMembers.flatMap((target) => {
+      const match = friendsDirectory.find((friend) => {
+        const label = (friend.nickname?.trim() || friend.displayName?.trim() || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+        return label === target || label.includes(target)
+      })
+      return match ? [match.friendId] : []
+    })
+
+    setPreselectedMemberIds([...new Set(matchedMemberIds)])
+    setInitialCreateGroupName(requestedGroupName)
+    setIsCreateGroupOpen(true)
     searchParams.delete('createGroup')
+    searchParams.delete('groupName')
+    searchParams.delete('members')
     const nextSearch = searchParams.toString()
     navigate({ pathname: '/chat', search: nextSearch ? `?${nextSearch}` : '' }, { replace: true })
-  }, [handleOpenCreateGroupModal, location.search, navigate])
+  }, [friendsDirectory, location.search, navigate])
 
   const handleCreateGroupFromDirect = useCallback(() => {
+    setInitialCreateGroupName('');
     if (selectedConversation && !selectedConversation.isGroup) {
       const peerId = (selectedConversation.participantUserIds ?? [])[0];
       if (peerId) {
@@ -5582,6 +5605,7 @@ export default function ChatPage() {
         onClose={() => setIsCreateGroupOpen(false)}
         onCreate={handleCreateGroup}
         initialMemberIds={preselectedMemberIds}
+        initialGroupName={initialCreateGroupName}
       />
 
       <CreateGroupModal
@@ -5911,5 +5935,3 @@ function PinnedLogicHooks({
 
   return null;
 }
-
-

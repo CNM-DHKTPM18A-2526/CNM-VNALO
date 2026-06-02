@@ -7,8 +7,8 @@ import { useAuth } from '../features/auth/useAuth'
 import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
 import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
-import { getFriends } from '../features/friends/friends.api'
-import type { Friend } from '../features/friends/friends.types'
+import { getFriends, searchUsers, sendFriendRequest } from '../features/friends/friends.api'
+import type { Friend, UserLookupResult } from '../features/friends/friends.types'
 import { UserAvatar } from '../shared/components/UserAvatar'
 
 type ProviderStatus =
@@ -53,6 +53,8 @@ type AiMessage = {
   providerStatus?: ProviderStatus
   actionCommand?: AiActionCommand | null
   actionParams?: Record<string, unknown> | null
+  requiresConfirmation?: boolean | null
+  riskLevel?: string | null
 }
 
 
@@ -70,6 +72,7 @@ type PendingActionReview = {
   path?: string
   feedback: string
   preview?: AiActionPreview
+  execute?: () => Promise<void> | void
 }
 
 type AiActionPreview = {
@@ -303,6 +306,8 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
           ? (value.actionCommand as AiActionCommand)
           : null,
         actionParams: value.actionParams && typeof value.actionParams === 'object' ? (value.actionParams as Record<string, unknown>) : null,
+        requiresConfirmation: typeof value.requiresConfirmation === 'boolean' ? value.requiresConfirmation : null,
+        riskLevel: typeof value.riskLevel === 'string' ? value.riskLevel : null,
       }
     })
     .filter((item): item is AiMessage => item !== null)
@@ -472,6 +477,26 @@ function findFriendMatches(friends: Friend[], target: string) {
     .map((friend) => ({ friend, score: computeConversationMatchScore(getFriendDisplayName(friend), normalizedTarget) }))
     .filter((item) => item.score >= 0)
     .sort((left, right) => right.score - left.score)
+}
+
+function getLookupDisplayName(user: UserLookupResult) {
+  return user.displayName?.trim() || user.phone?.trim() || user.email?.trim() || ''
+}
+
+function findUserMatches(users: UserLookupResult[], target: string) {
+  const normalizedTarget = normalizeLookupText(target)
+  if (!normalizedTarget) return []
+  return users
+    .map((lookupUser) => ({ lookupUser, score: computeConversationMatchScore(getLookupDisplayName(lookupUser), normalizedTarget) }))
+    .filter((item) => item.score >= 0)
+    .sort((left, right) => right.score - left.score)
+}
+
+function buildClientEntryId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 function validateCreateGroupTargets(friends: Friend[], requestedTargets: string[]) {
@@ -926,7 +951,12 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         content: message.content,
       }))
 
-      const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory)
+      const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory, {
+        analyzeIntent: true,
+        contextId: historyStorageKey ?? undefined,
+        clientUserEntryId: buildClientEntryId('web-user'),
+        clientAssistantEntryId: buildClientEntryId('web-assistant'),
+      })
       const responseActionCommand = (aiResponse.actionCommand as AiActionCommand | undefined) ?? null
       const safeActionCommand = responseActionCommand && KNOWN_ACTION_COMMANDS.has(responseActionCommand) ? responseActionCommand : null
       const assistantMessage: AiMessage = {
@@ -939,6 +969,8 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
         actionCommand: safeActionCommand,
         actionParams: aiResponse.actionParams ?? null,
+        requiresConfirmation: aiResponse.requiresConfirmation ?? null,
+        riskLevel: aiResponse.riskLevel ?? null,
       }
 
       const baseMessages = messages.some((message) => message.role === 'user' && message.content === query)
@@ -1019,13 +1051,17 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
           }
         }
 
+        const createGroupQuery = new URLSearchParams({ createGroup: 'true' })
+        if (groupName) createGroupQuery.set('groupName', groupName)
+        if (requestedTargets.length > 0) createGroupQuery.set('members', requestedTargets.join(','))
+
         setPendingActionReview({
           title: 'Mở luồng tạo nhóm',
           description: requestedTargets.length > 0
             ? 'Mình đã kiểm tra tên trong danh bạ. Web vẫn sẽ mở modal tạo nhóm để bạn tự chọn và xác nhận lần cuối.'
             : 'AI chưa xác định rõ thành viên. Web chỉ mở modal tạo nhóm để bạn tự chọn thủ công.',
           confirmLabel: 'Mở tạo nhóm',
-          path: '/chat?createGroup=true',
+          path: `/chat?${createGroupQuery.toString()}`,
           feedback: 'Đã mở luồng tạo nhóm. Hãy kiểm tra tên nhóm và danh sách thành viên trước khi tạo.',
           preview: { risk: 'medium', targetLabel: groupName || requestedTargets.join(', ') || 'Nhóm mới' },
         })
@@ -1033,13 +1069,46 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       }
 
       if (command === 'SEND_FRIEND_REQUEST') {
+        const target = extractActionTarget(params)
+        if (!target) {
+          setActionFeedback({ tone: 'warning', message: 'AI chưa xác định được người cần kết bạn.' })
+          appendAssistantFeedback('Mình chưa xác định được người cần kết bạn. Hãy nói rõ tên, email hoặc số điện thoại.')
+          return
+        }
+
+        const lookupUsers = await searchUsers(accessToken, target)
+        const matches = findUserMatches(lookupUsers, target)
+        if (matches.length === 0) {
+          const messageText = `Không tìm thấy "${target}" trong hệ thống. Mình sẽ không gửi lời mời kết bạn để tránh nhầm người.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const bestScore = matches[0]?.score ?? -1
+        const candidates = matches.filter((item) => item.score === bestScore)
+        if (candidates.length > 1) {
+          const messageText = `Có nhiều người khớp với "${target}". Hãy mở Danh bạ và chọn đúng tài khoản trước khi gửi lời mời.`
+          setActionFeedback({ tone: 'warning', message: messageText })
+          appendAssistantFeedback(messageText)
+          return
+        }
+
+        const selectedUser = candidates[0].lookupUser
+        const friendMessage = String(params.message ?? params.note ?? '').trim()
         setPendingActionReview({
-          title: 'Mở danh bạ để gửi kết bạn',
-          description: 'Trợ lý web sẽ không tự gửi lời mời kết bạn. Mình sẽ mở Danh bạ để bạn kiểm tra đúng người rồi tự gửi.',
-          confirmLabel: 'Mở Danh bạ',
-          path: '/contacts',
-          feedback: 'Đã mở Danh bạ. Hãy xác nhận đúng người trước khi gửi lời mời kết bạn.',
-          preview: { risk: 'medium', targetLabel: extractActionTarget(params) || 'Chưa rõ liên hệ' },
+          title: 'Xác nhận gửi lời mời kết bạn',
+          description: 'Trợ lý sẽ gửi lời mời kết bạn tới đúng tài khoản đã tìm thấy trong hệ thống.',
+          confirmLabel: 'Gửi lời mời',
+          feedback: `Đã gửi lời mời kết bạn tới ${getLookupDisplayName(selectedUser)}.`,
+          preview: { risk: 'medium', targetLabel: getLookupDisplayName(selectedUser), draft: friendMessage },
+          execute: async () => {
+            await sendFriendRequest(accessToken, {
+              toUserId: selectedUser.id,
+              message: friendMessage || undefined,
+              source: 'SEARCH',
+            })
+          },
         })
         return
       }
@@ -1159,17 +1228,30 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     )
   }
 
-  const confirmPendingActionReview = () => {
+  const confirmPendingActionReview = async () => {
     if (!pendingActionReview) {
       return
     }
 
-    if (pendingActionReview.path) {
-      navigate(pendingActionReview.path)
-    }
-    setActionFeedback({ tone: 'info', message: pendingActionReview.feedback })
-    appendAssistantFeedback(pendingActionReview.feedback)
+    const review = pendingActionReview
     setPendingActionReview(null)
+    setActionFeedback({ tone: 'info', message: 'Đang thực hiện thao tác AI...' })
+
+    try {
+      if (review.execute) {
+        await review.execute()
+      }
+      if (review.path) {
+        navigate(review.path)
+      }
+      setActionFeedback({ tone: 'success', message: review.feedback })
+      appendAssistantFeedback(review.feedback)
+    } catch (error) {
+      console.error('AI confirmed action failed:', error)
+      const message = extractMessage(error) || 'Không thể thực hiện thao tác AI trên web lúc này. Vui lòng thử lại.'
+      setActionFeedback({ tone: 'error', message })
+      appendAssistantFeedback(message)
+    }
   }
 
   const executeResolvedConversationAction = (conversation: ConversationSummary, resolution: PendingActionResolution) => {
@@ -1476,7 +1558,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
               <button className='btn btn-subtle' type='button' onClick={() => closePendingActionReview('cancel')}>
                 Hủy
               </button>
-              <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
+              <button className='btn btn-primary' type='button' onClick={() => void confirmPendingActionReview()}>
                 {pendingActionReview.confirmLabel}
               </button>
             </div>
