@@ -1198,12 +1198,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     const TextSpan(text: ' được gửi tin nhắn vào cộng đồng. '),
                     TextSpan(
                       text: 'Tìm hiểu thêm',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: linkColor),
                       style: TextStyle(
                         color: Colors.blue,
                         fontWeight: FontWeight.w500,
                       ),
->>>>>>> 32c7f0d90fe377bff6c2546e501b15e748080b8f
                     ),
                   ],
                 ),

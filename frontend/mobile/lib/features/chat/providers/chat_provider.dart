@@ -84,9 +84,10 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   // Deduplication cache for system notifications (ID -> Timestamp)
   final Map<String, DateTime> _processedSystemEvents = {};
   Message? _lastCloudMessage;
-  Timer? _openConversationDebounce;
+  Timer? _inboxPollingTimer;
   Timer? _pollReactionsTimer;
   Timer? _pollMessagesTimer;
+  static const _inboxPollingInterval = Duration(seconds: 3);
   static const _pollReactionsInterval = Duration(seconds: 2);
   static const _pollMessagesInterval = Duration(seconds: 2);
   final Map<String, DateTime> _lastReactionFetchAt = {};
@@ -244,6 +245,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _cancelSubscriptions();
     _pollReactionsTimer?.cancel();
     _pollMessagesTimer?.cancel();
+    _inboxPollingTimer?.cancel();
     _highlightTimer?.cancel();
     for (final timer in _retryTimers.values) {
       timer.cancel();
@@ -315,6 +317,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       final sanitizedInbox = raw.map((c) => _sanitizeConversation(c)).whereType<Conversation>().toList();
       final filteredInbox = sanitizedInbox.where((c) => !_recentlyLeftConversations.contains(c.id)).toList();
       _conversations = [...localEmptyGroups, ...filteredInbox];
+      await _applyLocalReadStateOverrides();
       _sortConversations();
       _syncPresenceFromConversations();
 
@@ -328,8 +331,10 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         _socketService.joinConversation(conv.id);
       }
 
-      // Start inbox polling as fallback for realtime messaging (since socket.broadcast may not work)
+      // Start reactions polling as fallback for realtime messaging
       _startReactionsPolling(_activeConversationId ?? '');
+      // Start inbox polling as fallback for realtime messaging (since socket.broadcast may not work)
+      _startInboxPolling();
     } catch (e) {
       debugPrint('loadInbox error: $e');
     } finally {
@@ -337,6 +342,18 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
     }
   }
+
+  void _startInboxPolling() {
+    _inboxPollingTimer?.cancel();
+    _inboxPollingTimer = Timer.periodic(
+      _inboxPollingInterval,
+      (_) => _pollInbox(),
+    );
+    debugPrint(
+      '[ChatProvider] Started inbox polling every ${_inboxPollingInterval.inSeconds}s',
+    );
+  }
+
   void _startReactionsPolling(String conversationId) {
     _pollReactionsTimer?.cancel();
 
@@ -459,15 +476,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('[ChatProvider] pollReactions tick conv=$conversationId -> loadReactions mid=$mid');
       await loadReactions(mid);
     }
-  void _startInboxPolling() {
-    _inboxPollingTimer?.cancel();
-    _inboxPollingTimer = Timer.periodic(
-      _inboxPollingInterval,
-      (_) => _pollInbox(),
-    );
-    debugPrint(
-      '[ChatProvider] Started inbox polling every ${_inboxPollingInterval.inSeconds}s',
-    );
   }
 
   Future<void> _pollInbox() async {
@@ -522,7 +530,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
                     .map((m) => m.user?.displayName ?? 'Thành viên mới')
                     .join(', ');
                 _sendSystemNotification(
-                  conv.id,
+                  convId,
                   '$names đã được thêm vào nhóm',
                 );
               }
@@ -538,7 +546,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
                     .map((m) => m.user?.displayName ?? 'Thành viên')
                     .join(', ');
                 _sendSystemNotification(
-                  conv.id,
+                  convId,
                   '$names đã không còn trong nhóm',
                 );
               }
@@ -655,7 +663,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Combined helper to merge local optimistic members with remote server data
   /// and then apply standard sanitization (Dual Owner fix, membership check, etc.)
-  Conversation? _mergeAndSanitize(Conversation remote, {Conversation? local}) {
+  Conversation? _mergeAndSanitize(Conversation remote, {Conversation? local, bool isInboxSync = false}) {
     if (local == null) {
       return _sanitizeConversation(remote);
     }
@@ -778,46 +786,44 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         avatarUrl: avatarUrl,
       );
 
-      if (conversation != null) {
-        final sanitized = _sanitizeConversation(conversation);
-        if (sanitized != null) {
-          _conversations = [sanitized, ..._conversations];
-          notifyListeners();
+      final sanitized = _sanitizeConversation(conversation);
+      if (sanitized != null) {
+        _conversations = [sanitized, ..._conversations];
+        notifyListeners();
 
-          // Send system notification for group creation
-          final currentUser = _currentUserId;
-          String userName = 'Một thành viên';
-          if (currentUser != null) {
-            final memberIndex = sanitized.members.indexWhere(
-              (m) => m.userId == currentUser,
-            );
-            if (memberIndex >= 0) {
-              userName =
-                  sanitized.members[memberIndex].user?.displayName ?? userName;
-            }
+        // Send system notification for group creation
+        final currentUser = _currentUserId;
+        String userName = 'Một thành viên';
+        if (currentUser != null) {
+          final memberIndex = sanitized.members.indexWhere(
+            (m) => m.userId == currentUser,
+          );
+          if (memberIndex >= 0) {
+            userName =
+                sanitized.members[memberIndex].user?.displayName ?? userName;
           }
-          await _sendSystemNotification(
-            sanitized.id,
-            '$userName đã tạo nhóm "$title"',
-          );
-
-          // BROADCAST to other platforms/members via Socket
-          // 1. Join room first
-          _socketService.joinConversation(sanitized.id);
-
-          // 2. Emit identical SYSTEM message as Web does, so Web can 'discover' it
-          final syncPayload =
-              '{"action":"CREATE_GROUP","actorId":"$currentUser"}';
-          _socketService.sendMessage(
-            conversationId: sanitized.id,
-            content: syncPayload,
-            messageType: 'SYSTEM',
-          );
-
-          return sanitized;
         }
+        await _sendSystemNotification(
+          sanitized.id,
+          '$userName đã tạo nhóm "$title"',
+        );
+
+        // BROADCAST to other platforms/members via Socket
+        // 1. Join room first
+        _socketService.joinConversation(sanitized.id);
+
+        // 2. Emit identical SYSTEM message as Web does, so Web can 'discover' it
+        final syncPayload =
+            '{"action":"CREATE_GROUP","actorId":"$currentUser"}';
+        _socketService.sendMessage(
+          conversationId: sanitized.id,
+          content: syncPayload,
+          messageType: 'SYSTEM',
+        );
+
+        return sanitized;
       }
-      return conversation;
+      return null;
     } catch (e) {
       debugPrint('createGroupConversation error: $e');
       rethrow;
@@ -901,10 +907,13 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
         final filteredLocal =
             localOnly.where((m) {
-              if (serverIds.contains(m.id)) return false;
-              if (m.clientMessageId != null &&
-                  serverClientIds.contains(m.clientMessageId))
+              if (serverIds.contains(m.id)) {
                 return false;
+              }
+              if (m.clientMessageId != null &&
+                  serverClientIds.contains(m.clientMessageId)) {
+                return false;
+              }
               return true;
             }).toList();
 
@@ -1116,6 +1125,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   void closeConversation() {
     _stopReactionsPolling();
+    _stopMessagesPolling();
     final id = _activeConversationId;
     if (id != null) {
       _socketService.leaveConversation(id);
@@ -1281,11 +1291,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
                 : (optimistic.content ?? fileName)),
         mediaSizeBytes: fileSize,
       );
-      _replaceMessage(conversationId, optimistic.id, updated);
+      _replaceMessage2(conversationId, optimistic.id, updated);
       _sendWithRetryMedia(updated);
     } catch (e) {
       debugPrint('sendMediaMessage error: $e');
-      _replaceMessage(
+      _replaceMessage2(
         conversationId,
         optimistic.id,
         optimistic.copyWith(status: MessageStatus.FAILED),
@@ -1357,125 +1367,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  void sendFile({required String conversationId, required String filePath}) {
-    sendMediaMessage(
-      conversationId: conversationId,
-      file: File(filePath),
-      type: MessageType.FILE,
-    );
-  }
-
-  void deleteMessage(String messageId) {
-    if (_activeConversationId == null) return;
-    final cid = _activeConversationId!;
-    final list = _messages[cid] ?? [];
-    final updated = list.where((m) => m.id != messageId).toList();
-    _messages[cid] = updated;
-    notifyListeners();
-  }
-
-  // Forward one or more source messages to multiple target conversations.
-  Future<void> sendForwardBatch({
-    required List<String> conversationIds,
-    required List<Message> sourceMessages,
-    String? additionalText,
-  }) async {
-    if (conversationIds.isEmpty || sourceMessages.isEmpty) return;
-
-    debugPrint(
-      '[ChatProvider] sendForwardBatch: ${sourceMessages.length} msgs to ${conversationIds.length} convs',
-    );
-
-    final extra = additionalText?.trim();
-
-    for (final conversationId in conversationIds) {
-      // Send optional additional text first
-      if (extra != null && extra.isNotEmpty) {
-        try {
-          final msg = await _chatService.sendMessage(
-            conversationId: conversationId,
-            content: extra,
-            messageType: 'TEXT',
-          );
-          _addMessageToConversation(conversationId, msg);
-          debugPrint(
-            '[ChatProvider] sendForwardBatch: extra text sent to $conversationId',
-          );
-        } catch (e) {
-          debugPrint(
-            '[ChatProvider] sendForwardBatch: failed to send extra text to $conversationId: $e',
-          );
-        }
-      }
-
-      // Send each source message
-      for (final source in sourceMessages) {
-        try {
-          final hasRemoteMedia = (source.mediaUrl ?? '').trim().isNotEmpty;
-
-          if (source.messageType == MessageType.TEXT || !hasRemoteMedia) {
-            final content = (source.content ?? '').trim();
-            if (content.isEmpty) continue;
-
-            final msg = await _chatService.sendMessage(
-              conversationId: conversationId,
-              content: content,
-              messageType: source.messageType.name,
-              mediaUrl: hasRemoteMedia ? source.mediaUrl : null,
-              mediaThumbnailUrl: source.mediaThumbnailUrl,
-              forwardFromMessageId: source.id,
-              forwardFromConversationId: source.conversationId,
-            );
-            _addMessageToConversation(conversationId, msg);
-            debugPrint(
-              '[ChatProvider] sendForwardBatch: TEXT/FILE msg sent to $conversationId',
-            );
-          } else {
-            // Media message (IMAGE, VIDEO, AUDIO, STICKER) — forward as media
-            final msg = await _chatService.sendMessage(
-              conversationId: conversationId,
-              content: source.content ?? '',
-              messageType: source.messageType.name,
-              mediaUrl: source.mediaUrl,
-              mediaThumbnailUrl: source.mediaThumbnailUrl,
-              mediaMimeType: source.mediaMimeType,
-              mediaSizeBytes: source.mediaSizeBytes,
-              forwardFromMessageId: source.id,
-              forwardFromConversationId: source.conversationId,
-            );
-            _addMessageToConversation(conversationId, msg);
-            debugPrint(
-              '[ChatProvider] sendForwardBatch: MEDIA msg sent to $conversationId',
-            );
-          }
-        } catch (e) {
-          debugPrint(
-            '[ChatProvider] sendForwardBatch: failed to forward msg ${source.id} to $conversationId: $e',
-          );
-        }
-      }
-    }
-  }
-
-  void _addMessageToConversation(String conversationId, Message message) {
-    final list = _messages[conversationId] ?? [];
-    debugPrint(
-      '[ChatProvider] _addMessageToConversation: conv=$conversationId msgId=${message.id} existingCount=${list.length}',
-    );
-    if (!list.any((m) => m.id == message.id)) {
-      _messages[conversationId] = [message, ...list];
-      _db.saveMessage(_toLocal(message));
-      notifyListeners();
-      debugPrint(
-        '[ChatProvider] _addMessageToConversation: ADDED msgId=${message.id} newCount=${list.length + 1}',
-      );
-    } else {
-      debugPrint(
-        '[ChatProvider] _addMessageToConversation: SKIPPED (duplicate) msgId=${message.id}',
-      );
-    }
-  }
-
   // Recall a message for everyone and update UI immediately.
   void recallMessage(String messageId, String conversationId) {
     _socketService.recallMessage(messageId, conversationId);
@@ -1485,7 +1376,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     final index = list.indexWhere((m) => m.id == messageId);
     if (index < 0) return;
 
-    _replaceMessage(
+    _replaceMessage2(
       conversationId,
       messageId,
       list[index].copyWith(status: MessageStatus.RECALLED, content: ''),
@@ -1493,25 +1384,18 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> downloadFile(Message message) async {
-    // Basic implementation: for now, we just open the URL if possible,
-    // or provide a placeholder for actual background downloading in the future.
     if (message.mediaUrl == null || message.mediaUrl!.isEmpty) return;
-
-    // In a real app, this would involve a background download task.
-    // For now, satisfy the compiler and provide a hook.
     debugPrint('Download requested for: ${message.mediaUrl}');
   }
 
   // Delete a message only for current user.
   Future<void> deleteForMe(String messageId, String conversationId) async {
-    // Step 1: Surgical Local Update for immediate feedback
     final list = _messages[conversationId];
     if (list != null) {
       _messages[conversationId] = list.where((m) => m.id != messageId).toList();
       notifyListeners();
     }
 
-    // Step 2: Background tasks
     try {
       await _chatService.deleteForMe(messageId);
       if (_currentUserId != null) {
@@ -1519,8 +1403,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('deleteForMe error: $e');
-      // In a more robust implementation, we could revert if the API fails,
-      // but usually standard sync handles this.
     }
   }
 
@@ -1541,6 +1423,113 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void retryMessage(Message message) {
+    final clientMessageId = message.clientMessageId;
+    if (clientMessageId == null || message.status != MessageStatus.FAILED) return;
+    final current = _findMessageByClientId(clientMessageId);
+    if (current == null) return;
+    _sendWithRetry(current.copyWith(status: MessageStatus.SENDING));
+  }
+
+  // Forward one or more source messages to multiple target conversations.
+  Future<void> sendForwardBatch({
+    required List<String> conversationIds,
+    required List<Message> sourceMessages,
+    String? additionalText,
+  }) async {
+    if (conversationIds.isEmpty || sourceMessages.isEmpty) return;
+
+    final extra = additionalText?.trim();
+
+    for (final conversationId in conversationIds) {
+      if (extra != null && extra.isNotEmpty) {
+        try {
+          final msg = await _chatService.sendMessage(
+            conversationId: conversationId,
+            content: extra,
+            messageType: 'TEXT',
+          );
+          _addMessageToConversation(conversationId, msg);
+        } catch (e) {
+          debugPrint('[ChatProvider] sendForwardBatch: failed to send extra text: $e');
+        }
+      }
+
+      for (final source in sourceMessages) {
+        try {
+          final hasRemoteMedia = (source.mediaUrl ?? '').trim().isNotEmpty;
+
+          if (source.messageType == MessageType.TEXT || !hasRemoteMedia) {
+            final content = (source.content ?? '').trim();
+            if (content.isEmpty) continue;
+
+            final msg = await _chatService.sendMessage(
+              conversationId: conversationId,
+              content: content,
+              messageType: source.messageType.name,
+              mediaUrl: hasRemoteMedia ? source.mediaUrl : null,
+              mediaThumbnailUrl: source.mediaThumbnailUrl,
+              forwardFromMessageId: source.id,
+              forwardFromConversationId: source.conversationId,
+            );
+            _addMessageToConversation(conversationId, msg);
+          } else {
+            final msg = await _chatService.sendMessage(
+              conversationId: conversationId,
+              content: source.content ?? '',
+              messageType: source.messageType.name,
+              mediaUrl: source.mediaUrl,
+              mediaThumbnailUrl: source.mediaThumbnailUrl,
+              mediaMimeType: source.mediaMimeType,
+              mediaSizeBytes: source.mediaSizeBytes,
+              forwardFromMessageId: source.id,
+              forwardFromConversationId: source.conversationId,
+            );
+            _addMessageToConversation(conversationId, msg);
+          }
+        } catch (e) {
+          debugPrint('[ChatProvider] sendForwardBatch: failed: $e');
+        }
+      }
+    }
+  }
+
+  Message? _findMessageByClientId(String clientMessageId) {
+    for (final messages in _messages.values) {
+      for (final m in messages) {
+        if (m.clientMessageId == clientMessageId) return m;
+      }
+    }
+    return null;
+  }
+
+  void _replaceMessage(String conversationId, String messageId, Message replacement) {
+    final list = _messages[conversationId];
+    if (list == null) return;
+    final index = list.indexWhere((m) => m.id == messageId);
+    if (index < 0) return;
+    _messages[conversationId] = [
+      ...list.sublist(0, index),
+      replacement,
+      ...list.sublist(index + 1),
+    ];
+    notifyListeners();
+  }
+
+  void _addMessageToConversation(String conversationId, Message msg) {
+    final list = _messages[conversationId] ?? [];
+    _messages[conversationId] = [msg, ...list];
+    notifyListeners();
+  }
+
+  void sendFile({required String conversationId, required File file}) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: file,
+      type: MessageType.FILE,
+    );
+  }
+
   MediaCategory _mapMessageTypeToCategory(MessageType type) {
     switch (type) {
       case MessageType.IMAGE:
@@ -1551,43 +1540,12 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         return MediaCategory.CHAT_VOICE;
       case MessageType.FILE:
         return MediaCategory.CHAT_FILE;
-      case MessageType.STICKER:
-        return MediaCategory.STICKER;
       default:
-        return MediaCategory.CHAT_FILE;
+        return MediaCategory.CHAT_IMAGE;
     }
   }
 
-  void retryMessage(Message message) {
-    final clientMessageId = message.clientMessageId;
-    if (clientMessageId == null || message.status != MessageStatus.FAILED) {
-      return;
-    }
-
-    _retryCounts[clientMessageId] = 0;
-    _replaceMessage(
-      message.conversationId,
-      message.id,
-      message.copyWith(status: MessageStatus.SENDING),
-    );
-
-    // Use HTTP fallback for TEXT, socket retry for media
-    final isMedia = message.mediaUrl != null;
-    if (isMedia) {
-      _sendWithRetryMedia(message.copyWith(status: MessageStatus.SENDING));
-    } else {
-      _sendWithRetry(message.copyWith(status: MessageStatus.SENDING));
-    }
-  }
-
-  void _syncPresenceToMembers(
-    String userId,
-    bool isOnline, {
-    DateTime? lastSeen,
-  }) {
-    debugPrint(
-      '[ChatProvider] 🔄 _syncPresenceToMembers: $userId -> online=$isOnline',
-    );
+  void _syncPresenceToMembers(String userId, bool isOnline, {DateTime? lastSeen}) {
     int matchCount = 0;
     for (int i = 0; i < _conversations.length; i++) {
       final conv = _conversations[i];
@@ -1618,6 +1576,102 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     debugPrint(
       '[ChatProvider] 🔄 _syncPresenceToMembers finished. Matches: $matchCount',
     );
+  }
+
+  void _processSignalMessage(Message message) {
+    if (!message.isSystemMessage) return;
+    final content = message.content ?? '';
+    if (content.isEmpty) return;
+
+    try {
+      // Parse JSON content for signal actions
+      final jsonStart = content.indexOf('{');
+      if (jsonStart < 0) return;
+      final jsonStr = content.substring(jsonStart);
+      final data = jsonDecode(jsonStr) as Map<dynamic, dynamic>;
+
+      final action = data['action'] as String?;
+      if (action == null) return;
+
+      // FILTER: Prevent "Ghost Conversations" from friend requests
+      if (content.contains('lời mời kết bạn') ||
+          content.contains('[ACTION:FRIEND_REQUEST]')) {
+        final index = _conversations.indexWhere((c) => c.id == message.conversationId);
+        if (index < 0) {
+          debugPrint(
+            '[ChatProvider] 🚫 Filtering out ghost conversation from friend request: ${message.conversationId}',
+          );
+          _db.saveMessage(_toLocal(message));
+          return;
+        }
+      }
+
+      // Handle various signal actions
+      switch (action) {
+        case 'UPDATE_GROUP_INFO':
+          final newName = data['metadata']?['newName'] as String?;
+          final actorId = data['actorId'] as String?;
+          if (actorId != null) {
+            final actorName = getSenderName(message.conversationId, actorId);
+            final text = newName != null
+                ? '$actorName đã đổi tên nhóm thành "$newName".'
+                : '$actorName đã cập nhật thông tin nhóm.';
+            _sendSystemNotification(message.conversationId, text);
+          }
+          refreshConversation(message.conversationId);
+          break;
+
+        case 'PIN_MESSAGE':
+          final actorId = data['actorId'] as String?;
+          if (actorId != null) {
+            final actorName = getSenderName(message.conversationId, actorId);
+            _sendSystemNotification(message.conversationId, '$actorName đã ghim một tin nhắn.');
+          }
+          break;
+
+        case 'UNPIN_MESSAGE':
+          final actorId = data['actorId'] as String?;
+          if (actorId != null) {
+            final actorName = getSenderName(message.conversationId, actorId);
+            _sendSystemNotification(message.conversationId, '$actorName đã bỏ ghim một tin nhắn.');
+          }
+          break;
+
+        case 'UPDATE_MESSAGE_REACTIONS':
+          final msgId = data['messageId'] as String?;
+          final actionType = data['type'] as String?;
+          final emoji = data['emoji'] as String?;
+          final actorId = data['actorId'] as String?;
+
+          if (msgId != null && actionType != null && emoji != null && actorId != null) {
+            debugPrint('SIGNAL: Reaction update signal received for $msgId.');
+            final currentReactions = _reactions[msgId] ?? [];
+            if (actionType == 'ADD') {
+              final newReaction = MessageReaction(
+                id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
+                conversationId: message.conversationId,
+                messageId: msgId,
+                serverSeq: 0,
+                userId: actorId,
+                emoji: emoji,
+                createdAt: DateTime.now(),
+              );
+              final filtered =
+                  currentReactions.where((r) => r.userId != actorId).toList();
+              filtered.add(newReaction);
+              _reactions[msgId] = filtered;
+            } else if (actionType == 'REMOVE') {
+              _reactions[msgId] =
+                  currentReactions.where((r) => r.userId != actorId).toList();
+            }
+            notifyListeners();
+            loadReactions(msgId);
+          }
+          break;
+      }
+    } catch (e) {
+      debugPrint('Error parsing signal message: $e');
+    }
   }
 
   void _handleIncomingMessage(Message message) {
@@ -1665,62 +1719,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    // FILTER: Prevent "Ghost Conversations" from friend requests
-    if (message.isSystemMessage) {
-      final content = message.content ?? '';
-      if (content.contains('lời mời kết bạn') ||
-          content.contains('[ACTION:FRIEND_REQUEST]')) {
-        final index = _conversations.indexWhere((c) => c.id == conversationId);
-        if (index < 0) {
-          debugPrint(
-            '[ChatProvider] 🚫 Filtering out ghost conversation from friend request: $conversationId',
-          );
-          _db.saveMessage(_toLocal(message));
-          return;
-        }
-      }
-      }
-      }
-      try {
-        if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
-          final data = jsonDecode(content);
-          final msgId = data['messageId'];
-          final actionType = data['type'];
-          final emoji = data['emoji'];
-          final actorId = data['actorId'];
-
-          if (msgId != null) {
-            debugPrint('SIGNAL: Reaction update signal received for $msgId.');
-            if (actionType != null && emoji != null && actorId != null) {
-              final currentReactions = _reactions[msgId] ?? [];
-              if (actionType == 'ADD') {
-                final newReaction = MessageReaction(
-                  id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
-                  conversationId: conversationId,
-                  messageId: msgId,
-                  serverSeq: 0,
-                  userId: actorId,
-                  emoji: emoji,
-                  createdAt: DateTime.now(),
-                );
-                final filtered =
-                    currentReactions.where((r) => r.userId != actorId).toList();
-                filtered.add(newReaction);
-                _reactions[msgId] = filtered;
-              } else if (actionType == 'REMOVE') {
-                _reactions[msgId] =
-                    currentReactions.where((r) => r.userId != actorId).toList();
-              }
-              notifyListeners();
-            }
-            loadReactions(msgId);
-          }
-        }
-      } catch (e) {
-        debugPrint('Error parsing system signal: $e');
-          }
-    }
-
     // Resolve mediaId to URL if it's just an ID
     Message resolvedMessage = message;
     if (message.mediaUrl != null &&
@@ -1741,8 +1739,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         resolvedMessage = resolvedMessage.copyWith(mediaUrl: resolvedUrl);
       }
     }
-
-    // Removed the overly broad catch-all filter to allow users to send JSON messages.
 
     // Resolve reply sender name if missing but ID is present
     if (resolvedMessage.replyToSenderId != null &&
@@ -1996,7 +1992,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (conversationId == null) return;
     debugPrint('[ChatProvider] EVENT: Group settings changed: $conversationId');
 
-    // ── Inline optimistic apply from socket payload ─────────────────────────
     // The gateway sends the full updated conversation in `data['conversation']`.
     // We apply it immediately for instant UI (0 extra round-trip for members).
     final dynamic convData = data['conversation'];
@@ -2028,12 +2023,12 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         final idx = _conversations.indexWhere((c) => c.id == conversationId);
         if (idx >= 0) {
           final local = _conversations[idx];
-          
+
           // Handle member nickname changes (for sync across devices/clients)
           final dynamic nicknameChanges = changes['memberNicknames'];
           var updatedMembers = List<ConversationMember>.from(local.members);
           if (nicknameChanges != null && nicknameChanges is Map) {
-            for (final entry in (nicknameChanges as Map).entries) {
+            for (final entry in nicknameChanges.entries) {
               final userId = entry.key.toString();
               final newNickname = entry.value as String?;
               final memberIdx = updatedMembers.indexWhere((m) => m.userId == userId);
@@ -2042,7 +2037,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
               }
             }
           }
-          
+
           _conversations[idx] = local.copyWith(
             title: changes['title'] as String? ?? local.title,
             description: changes['description'] as String? ?? local.description,
@@ -2068,6 +2063,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     // Notify other members (only if actor is NOT the current user — they already updated optimistically)
     final String? actorId = data['actorId'] ?? data['updatedBy'];
+    if (actorId != null) {
       final actorName = getSenderName(conversationId, actorId);
       _sendSystemNotification(
         conversationId,
@@ -2457,14 +2453,12 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _syncPresenceFromConversations() {
-    // debugPrint('[PRESENCE] 🔄 _syncPresenceFromConversations starting (convs: ${_conversations.length})');
     for (final conv in _conversations) {
       if (conv.type == ConversationType.DIRECT) {
         for (final member in conv.members) {
           if (member.userId != _currentUserId && member.user != null) {
             final uid = member.userId.toLowerCase();
             _userPresence[uid] = member.user!.isOnline;
-            // debugPrint('[PRESENCE] 🔄 Synced $uid -> ${member.user!.isOnline} from conv ${conv.id}');
           }
         }
       }
@@ -2481,7 +2475,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    final userId = rawUserId.toLowerCase(); // Standardize ID
+    final userId = rawUserId.toLowerCase();
 
     // Super safe boolean parsing
     final isOnline =
@@ -2506,7 +2500,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _syncPresenceToMembers(userId, isOnline, lastSeen: lastSeen);
 
     if (presenceChanged || isOnline) {
-      // Always notify if someone goes online to ensure UI catches it
       notifyListeners();
     }
   }
@@ -2542,7 +2535,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         }
       }
       if (changed) {
-        // debugPrint('[PRESENCE] 📡 Cache updated from LIST: $_userPresence');
         notifyListeners();
       }
     }
@@ -2677,7 +2669,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     final retryCount = (_retryCounts[clientMessageId] ?? 0) + 1;
     _retryCounts[clientMessageId] = retryCount;
     if (retryCount > 3) {
-      _replaceMessage(
+      _replaceMessage2(
         message.conversationId,
         message.id,
         message.copyWith(status: MessageStatus.FAILED),
@@ -2700,7 +2692,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
           _clearRetry(clientMessageId);
           return;
         }
-        _replaceMessage(
+        _replaceMessage2(
           message.conversationId,
           current.id,
           current.copyWith(status: MessageStatus.SENDING),
@@ -2797,7 +2789,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     final retryCount = (_retryCounts[clientMessageId] ?? 0) + 1;
     _retryCounts[clientMessageId] = retryCount;
     if (retryCount > 3) {
-      _replaceMessage(
+      _replaceMessage2(
         message.conversationId,
         message.id,
         message.copyWith(status: MessageStatus.FAILED),
@@ -2820,7 +2812,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
           _clearRetry(clientMessageId);
           return;
         }
-        _replaceMessage(
+        _replaceMessage2(
           message.conversationId,
           current.id,
           current.copyWith(status: MessageStatus.SENDING),
@@ -2843,7 +2835,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     return null;
   }
 
-  void _replaceMessage(
+void _replaceMessage2(
     String conversationId,
     String messageId,
     Message updated,
@@ -2880,7 +2872,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         '-${toHex(bytes[10])}${toHex(bytes[11])}${toHex(bytes[12])}${toHex(bytes[13])}${toHex(bytes[14])}${toHex(bytes[15])}';
   }
 
-  @override
   // Settings and management
   Future<void> updateConversationSettings({
     required String conversationId,
@@ -3038,7 +3029,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     try {
       // Try to get all messages with media
       final messages = await _chatService.getMessages(conversationId, limit: limit);
-      // Filter to only messages with media (TEXT with URL will be filtered separately in MediaViewer)
+      // Filter to only messages with media
       return messages.where((m) => m.hasMedia || m.messageType == MessageType.VIDEO || m.messageType == MessageType.FILE || m.messageType == MessageType.AUDIO).toList();
     } catch (e) {
       debugPrint('getAllMediaForConversation error: $e');
@@ -3055,66 +3046,36 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       final memberIndex = conv.members.indexWhere((m) => m.userId == senderId);
       if (memberIndex >= 0) {
         final member = conv.members[memberIndex];
-        return member.nickname ??
-            member.user?.displayName ??
-            'Người dùng ($senderId)';
+        if (member.nickname != null && member.nickname!.isNotEmpty) {
+          return member.nickname!;
+        }
+        if (member.user?.displayName != null) {
+          return member.user!.displayName;
+        }
       }
     }
-    return 'Người dùng ($senderId)';
-  }
-
-  void updateUserProfileInConversations(User updatedUser) {
-    bool changed = false;
-    final updatedConversations =
-        _conversations.map((conv) {
-          if (conv.members.isEmpty) return conv;
-
-          final newMembers =
-              conv.members.map((member) {
-                if (member.userId != updatedUser.id) return member;
-                changed = true;
-                final mergedUser =
-                    member.user?.copyWith(
-                      displayName: updatedUser.displayName,
-                      avatarUrl: updatedUser.avatarUrl,
-                      coverUrl: updatedUser.coverUrl,
-                      isOnline: updatedUser.isOnline,
-                    ) ??
-                    updatedUser;
-                return member.copyWith(user: mergedUser);
-              }).toList();
-
-          return conv.copyWith(members: newMembers);
-        }).toList();
-
-    if (changed) {
-      _conversations = updatedConversations;
-      notifyListeners();
-    }
+    return senderId;
   }
 
   Future<void> refreshConversation(String conversationId) async {
     try {
       final updated = await _chatService.getConversationById(conversationId);
-      if (updated != null) {
-        final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (updated == null) return;
 
-        if (index >= 0) {
-          final localConv = _conversations[index];
-          final sanitized = _mergeAndSanitize(updated, local: localConv);
+      final sanitized = _sanitizeConversation(updated);
+      if (sanitized == null) return;
 
-          if (sanitized == null) {
-            _conversations.removeAt(index);
-          } else {
-            _conversations[index] = sanitized;
-          }
-        } else {
-          // If not in local list yet, use standard sanitization
-          final sanitized = _sanitizeConversation(updated);
-          if (sanitized != null) {
-            _conversations.insert(0, sanitized);
-          }
-        }
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        // Preserve local-only fields
+        final local = _conversations[index];
+        _conversations[index] = local.copyWith(
+          title: sanitized.title,
+          avatarUrl: sanitized.avatarUrl,
+          description: sanitized.description,
+          members: sanitized.members,
+          updatedAt: sanitized.updatedAt,
+        );
         notifyListeners();
       }
     } catch (e) {
@@ -3122,50 +3083,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  // --- Group Management ---
-
-  String _formatSystemActionAsNotification(String conversationId, Map<dynamic, dynamic> data) {
-    try {
-      final action = data['action'] as String?;
-      final actorId = data['actorId'] as String?;
-      if (action == null) return '';
-
-      final actorName = actorId != null ? getSenderName(conversationId, actorId) : 'Hệ thống';
-
-      switch (action) {
-        case 'UPDATE_GROUP_INFO':
-          final newName = data['metadata']?['newName'];
-          if (newName != null) return '$actorName đã đổi tên nhóm thành "$newName".';
-          return '$actorName đã cập nhật thông tin nhóm.';
-        case 'ADD_MEMBER':
-        case 'ADD_MEMBERS':
-          // Assuming target member names might not be in metadata easily, use generic
-          return '$actorName đã thêm thành viên mới vào nhóm.';
-        case 'REMOVE_MEMBER':
-        case 'KICK_MEMBER':
-          return '$actorName đã xóa một thành viên khỏi nhóm.';
-        case 'PIN_MESSAGE':
-          return '$actorName đã ghim một tin nhắn.';
-        case 'UNPIN_MESSAGE':
-          return '$actorName đã bỏ ghim một tin nhắn.';
-        case 'UPDATE_AVATAR':
-          return '$actorName đã thay đổi ảnh đại diện của nhóm.';
-        case 'LEAVE_GROUP':
-          return '$actorName đã rời khỏi nhóm.';
-        case 'PROMOTE_DEPUTY':
-          return '$actorName đã được thăng cấp làm phó nhóm.';
-        case 'DEMOTE_DEPUTY':
-          return '$actorName đã bị hủy quyền phó nhóm.';
-        default:
-          return ''; // Ignore unknown actions
-      }
-    } catch (e) {
-      debugPrint('[ChatProvider] _formatSystemActionAsNotification error: $e');
-      return '';
-    }
-  }
-
-  Future<void> _sendSystemNotification(String conversationId, String content, {Map<String, dynamic>? metadata}) async {
+  Future<void> _sendSystemNotification(String conversationId, String content) async {
     try {
       // Use a consistent ID format that can be easily identified as a local system message
       // but still unique enough to avoid collisions.
@@ -3175,13 +3093,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       final systemMessage = Message(
         id: localId,
         conversationId: conversationId,
-        senderId: 'SERVER', // Use 'SERVER' or 'SYSTEM' consistently
+        senderId: 'SERVER',
         messageType: MessageType.SYSTEM,
         content: content,
         status: MessageStatus.SENT,
         createdAt: DateTime.now(),
-        // metadata can store actorId, targetId, or action type for Web to parse
-        // content: jsonEncode({'text': content, ...metadata}), // Optional: if Web expects JSON
       );
 
       // 1. Memory update
@@ -3278,20 +3194,26 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       if (description != null) body['description'] = description;
       if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
       if (joinMode != null) body['joinMode'] = joinMode;
-      if (allowMemberInvite != null)
+      if (allowMemberInvite != null) {
         body['allowMemberInvite'] = allowMemberInvite;
+      }
       if (allowMemberPin != null) body['allowMemberPin'] = allowMemberPin;
-      if (allowMemberEditInfo != null)
+      if (allowMemberEditInfo != null) {
         body['allowMemberEditInfo'] = allowMemberEditInfo;
+      }
       if (onlyAdminCanPost != null) body['onlyAdminCanPost'] = onlyAdminCanPost;
-      if (highlightAdminMessages != null)
+      if (highlightAdminMessages != null) {
         body['highlightAdminMessages'] = highlightAdminMessages;
-      if (showHistoryToNewMembers != null)
+      }
+      if (showHistoryToNewMembers != null) {
         body['showHistoryToNewMembers'] = showHistoryToNewMembers;
-      if (allowMemberCreateNote != null)
+      }
+      if (allowMemberCreateNote != null) {
         body['allowMemberCreateNote'] = allowMemberCreateNote;
-      if (allowMemberCreatePoll != null)
+      }
+      if (allowMemberCreatePoll != null) {
         body['allowMemberCreatePoll'] = allowMemberCreatePoll;
+      }
 
       await _chatService.updateGroupInfo(conversationId, body);
 
@@ -3325,8 +3247,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         isGlobal: isGlobal,
       );
 
-      // Update local state immediately — refreshConversation only returns conversation-level data
-      // and does NOT include personalWallpaperUrl (inbox-level personal setting per user).
+      // Update local state immediately
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         if (isGlobal) {
@@ -3448,7 +3369,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     try {
       // Use updateMemberRole to transfer ownership (set target to ADMIN)
-      // The backend should handle demoting the current owner automatically or via separate call
       await _chatService.updateMemberRole(
         conversationId,
         targetUserId,
@@ -3596,7 +3516,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         await _chatService.removeMember(conversationId, userId);
       }
 
-      // Restore Optimistic UI Notification (Silent Leave - will only be visible locally for the actor)
+      // Restore Optimistic UI Notification
       final currentUser = _currentUserId;
       String userName = 'Admin';
       String targetName = 'Thành viên';
@@ -3687,7 +3607,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     try {
       final conv = _conversations.firstWhere((c) => c.id == conversationId);
       final memberIds = conv.members.map((m) => m.userId);
-      
+
       if (_socketService.isConnected()) {
         try {
           final ack = await _socketService.emitDisbandGroupWithAck(conversationId);
@@ -3709,7 +3629,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
           memberIds: memberIds,
         );
       }
-      
+
       // Local notification before removal
       final userName =
           _conversations
@@ -3745,7 +3665,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> approveJoinRequest(String conversationId, String userId) async {
     try {
       await _chatService.approveJoinRequest(conversationId, userId);
-      // We might need to refresh the conversation members list here
       final updated = await _chatService.getConversationById(conversationId);
       if (updated != null) {
         final index = _conversations.indexWhere((c) => c.id == conversationId);
@@ -3847,7 +3766,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       await refreshConversation(conversationId);
     } catch (e) {
       debugPrint('updateMemberRole error: $e');
-      // ROLLBACK: Sync back to server truth if API fails (e.g., 404 Member Not Found)
+      // ROLLBACK: Sync back to server truth if API fails
       await refreshConversation(conversationId);
       rethrow;
     }
@@ -3866,7 +3785,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
           '[ChatProvider] loadPinnedMessages pin item: $p (type: ${p.runtimeType})',
         );
         // Handle both Map and object with 'message' property
-        // The API returns PinnedMessage entity: { id, conversationId, messageId, serverSeq, pinnedBy, pinnedAt, message: {...} }
         Object? messageData;
         if (p is Map) {
           messageData = p['message'];
@@ -4030,11 +3948,29 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         });
   }
 
-  void pinMessageInConversation(String messageId, String conversationId) {
-    final previousActiveConversationId = _activeConversationId;
-    _activeConversationId = conversationId;
-    pinMessage(messageId);
-    _activeConversationId = previousActiveConversationId;
+  /// Pin a message in a specific conversation (used by note screens).
+  void pinMessageWithConv(String messageId, String conversationId) {
+    debugPrint('[ChatProvider] pinMessageWithConv: msgId=$messageId convId=$conversationId');
+    _chatService
+        .pinMessage(conversationId, messageId)
+        .then((pinData) async {
+          final messageData = pinData['message'];
+          if (messageData != null && messageData is Map) {
+            final msg = Message.fromJson(Map<String, dynamic>.from(messageData));
+            final resolvedName = getSenderName(conversationId, msg.senderId);
+            final resolvedMsg = msg.copyWith(senderName: resolvedName);
+            final currentPins = _pinnedMessages[conversationId] ?? [];
+            if (!currentPins.any((m) => m.id == resolvedMsg.id)) {
+              _pinnedMessages[conversationId] = [resolvedMsg, ...currentPins];
+            }
+          }
+          _socketService.pinMessage(messageId, conversationId);
+          notifyListeners();
+        })
+        .catchError((e) {
+          debugPrint('[ChatProvider] pinMessageWithConv REST FAILED: $e');
+          _socketService.pinMessage(messageId, conversationId);
+        });
   }
 
   void unpinMessage(String messageId) {
@@ -4127,17 +4063,18 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     final currentPins = _pinnedMessages[conversationId] ?? [];
 
     // Avoid duplicates - update existing or add new
-    final existingIndex = currentPins.indexWhere((m) => m.id == message!.id);
+    final pinnedMsg = message;
+    final existingIndex = currentPins.indexWhere((m) => m.id == pinnedMsg.id);
     if (existingIndex >= 0) {
       // Update existing pin
       final updated = List<Message>.from(currentPins);
-      updated[existingIndex] = message!;
+      updated[existingIndex] = pinnedMsg;
       _pinnedMessages[conversationId] = updated;
-      debugPrint('[ChatProvider] Updated existing pin: ${message!.id}');
+      debugPrint('[ChatProvider] Updated existing pin: ${pinnedMsg.id}');
     } else {
       // Add new pin at the beginning
-      _pinnedMessages[conversationId] = [message!, ...currentPins];
-      debugPrint('[ChatProvider] Added new pin: ${message!.id}');
+      _pinnedMessages[conversationId] = [pinnedMsg, ...currentPins];
+      debugPrint('[ChatProvider] Added new pin: ${pinnedMsg.id}');
     }
     notifyListeners();
   }
@@ -4217,7 +4154,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       // Only use REST API for now (WebSocket events not implemented on backend)
       await _chatService.addReaction(messageId, emoji);
-      // _socketService.addReaction(messageId, emoji); // Disabled until backend implements WebSocket events
 
       // Broadcast signal for real-time sync with other clients (Web/Mobile)
       if (_activeConversationId != null) {
@@ -4229,8 +4165,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
           'type': 'ADD',
           'emoji': emoji,
         };
-        // Avoid using socket message.send here since ACK timeouts can crash the app.
-        // REST already updated the reaction; we only need other clients to refresh.
+        _socketService.sendMessage(
+          conversationId: _activeConversationId!,
+          content: jsonEncode(signal),
+          messageType: 'SYSTEM',
+        );
       }
     } catch (e) {
       debugPrint('Error adding reaction: $e');
@@ -4265,11 +4204,10 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       _reactions[messageId] = updatedReactions;
       notifyListeners();
 
-      // Only use REST API for now (WebSocket events not implemented on backend)
+      // Only use REST API for now
       await _chatService.removeReaction(messageId);
-      // _socketService.removeReaction(messageId); // Disabled until backend implements WebSocket events
 
-      // Broadcast signal for real-time sync with other clients (Web/Mobile)
+      // Broadcast signal for real-time sync with other clients
       if (_activeConversationId != null && removedEmoji.isNotEmpty) {
         final signal = {
           'action': 'UPDATE_MESSAGE_REACTIONS',
@@ -4279,8 +4217,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
           'type': 'REMOVE',
           'emoji': removedEmoji,
         };
-        // Avoid using socket message.send here since ACK timeouts can crash the app.
-        // REST already removed the reaction; we only need other clients to refresh.
+        _socketService.sendMessage(
+          conversationId: _activeConversationId!,
+          content: jsonEncode(signal),
+          messageType: 'SYSTEM',
+        );
       }
     } catch (e) {
       debugPrint('Error removing reaction: $e');
@@ -4291,15 +4232,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> loadReactions(String messageId) async {
     try {
-      debugPrint('[ChatProvider] loadReactions -> mid=$messageId');
       final reactions = await _chatService.getReactions(messageId);
-      debugPrint(
-        '[ChatProvider] loadReactions <- mid=$messageId count=${reactions.length} emojis=${reactions.take(6).map((r) => r.emoji).toList()}',
-      );
       _reactions[messageId] = reactions;
       notifyListeners();
     } catch (e) {
-      debugPrint('[ChatProvider] loadReactions error mid=$messageId err=$e');
+      debugPrint('Error loading reactions: $e');
     }
   }
 
@@ -4308,148 +4245,5 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       'toggleReaction called: messageId=$messageId, emoji=$emoji, userId=$_currentUserId',
     );
     await addReaction(messageId, emoji);
-  }
-
-  void _processSignalMessage(Message message) {
-    final String conversationId = message.conversationId;
-    
-    try {
-      final content = message.content ?? '';
-      if (content.isNotEmpty && content.trimLeft().startsWith('{')) {
-        final data = jsonDecode(content);
-        if (data is Map && data['action'] == 'UPDATE_MESSAGE_REACTIONS') {
-          final msgId = data['messageId']?.toString();
-          final actionType = data['type'];
-          final emoji = data['emoji'];
-          final actorId = data['actorId'];
-
-          if (msgId != null) {
-            debugPrint('SIGNAL: Reaction update signal received for $msgId.');
-            if (actionType != null && emoji != null && actorId != null) {
-              final currentReactions = _reactions[msgId] ?? [];
-              if (actionType == 'ADD') {
-                final newReaction = MessageReaction(
-                  id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
-                  conversationId: conversationId,
-                  messageId: msgId,
-                  serverSeq: 0,
-                  userId: actorId,
-                  emoji: emoji,
-                  createdAt: DateTime.now(),
-                );
-                final filtered = currentReactions.where((r) => r.userId != actorId).toList();
-                filtered.add(newReaction);
-                _reactions[msgId] = filtered;
-              } else if (actionType == 'REMOVE') {
-                _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
-              }
-              notifyListeners();
-            }
-            // Ensure consistency against backend lag
-            Future.delayed(const Duration(seconds: 1), () => loadReactions(msgId));
-            Future.delayed(const Duration(seconds: 3), () => loadReactions(msgId));
-          }
-          return;
-        } else if (data is Map && data.containsKey('action')) {
-            final action = data['action'];
-            // Process other group actions for ALL signal-like messages (both true SYSTEM and TEXT signals)
-            bool skipRefresh = false;
-
-            // Manually handle specific actions for immediate optimistic UI update
-            if ((action == 'UPDATE_GROUP_INFO' || action == 'RENAME_GROUP') && data['metadata'] != null) {
-              // DO NOT skip refresh! Let it reload from backend to ensure all metadata is perfect.
-              final newName = data['metadata']['title']?.toString() ?? data['metadata']['name']?.toString() ?? data['metadata']['newName']?.toString();
-              final onlyAdminCanPost = data['metadata']['onlyAdminCanPost'];
-              
-              final idx = _conversations.indexWhere((c) => c.id == conversationId);
-              if (idx >= 0) {
-                var updated = _conversations[idx];
-                if (newName != null) updated = updated.copyWith(title: newName);
-                
-                if (onlyAdminCanPost != null) {
-                  bool parsedVal = false;
-                  if (onlyAdminCanPost is bool) parsedVal = onlyAdminCanPost;
-                  else if (onlyAdminCanPost is String) parsedVal = onlyAdminCanPost.toLowerCase() == 'true';
-                  updated = updated.copyWith(onlyAdminCanPost: parsedVal);
-                }
-                
-                _conversations[idx] = updated;
-                notifyListeners();
-              }
-            } else if (action == 'CHANGE_GROUP_AVATAR' && data['metadata'] != null) {
-              skipRefresh = true;
-              final newAvatarUrl = data['metadata']['newAvatarUrl'];
-              if (newAvatarUrl != null) {
-                final idx = _conversations.indexWhere((c) => c.id == conversationId);
-                if (idx >= 0) {
-                  _conversations[idx] = _conversations[idx].copyWith(avatarUrl: newAvatarUrl);
-                  notifyListeners();
-                }
-              }
-            } else if (action == 'PIN_MESSAGE') {
-              skipRefresh = true;
-              // Try to immediately add message to pinned list from signal data
-              final pinnedMsgId = data['messageId']?.toString();
-              if (pinnedMsgId != null) {
-                // Find the message in the current messages list to pin it immediately
-                final msgs = _messages[conversationId] ?? [];
-                final msgToPinIdx = msgs.indexWhere((m) => m.id == pinnedMsgId);
-                if (msgToPinIdx >= 0) {
-                  final msgToPin = msgs[msgToPinIdx];
-                  final currentPins = _pinnedMessages[conversationId] ?? [];
-                  if (!currentPins.any((m) => m.id == msgToPin.id)) {
-                    _pinnedMessages[conversationId] = [msgToPin, ...currentPins];
-                    notifyListeners();
-                  }
-                }
-              }
-              // Also reload from server to get the full pin data (multiple times to beat cache/lag)
-              Future.delayed(const Duration(seconds: 1), () => loadPinnedMessages(conversationId));
-              Future.delayed(const Duration(seconds: 3), () => loadPinnedMessages(conversationId));
-            } else if (action == 'UNPIN_MESSAGE') {
-              skipRefresh = true;
-              // Extract messageId from top-level OR metadata
-              final unpinMsgId = data['messageId']?.toString() 
-                ?? data['metadata']?['messageId']?.toString();
-              if (unpinMsgId != null) {
-                final currentPins = _pinnedMessages[conversationId] ?? [];
-                final updatedPins = currentPins.where((m) => m.id != unpinMsgId).toList();
-                if (updatedPins.length != currentPins.length) {
-                  _pinnedMessages[conversationId] = updatedPins;
-                  notifyListeners();
-                }
-              }
-              Future.delayed(const Duration(seconds: 1), () => loadPinnedMessages(conversationId));
-              Future.delayed(const Duration(seconds: 3), () => loadPinnedMessages(conversationId));
-            }
-
-            // Ensure group name/avatar/members refresh realtime from backend
-            // Delayed to prevent fetching stale data due to backend cache/replication lag
-            if (_activeConversationId == conversationId && !skipRefresh) {
-              refreshConversation(conversationId);
-              
-              Future.delayed(const Duration(seconds: 1), () {
-                if (_activeConversationId == conversationId) {
-                  refreshConversation(conversationId);
-                }
-              });
-              
-              Future.delayed(const Duration(seconds: 2), () {
-                if (_activeConversationId == conversationId) {
-                  refreshConversation(conversationId);
-                }
-              });
-              
-              Future.delayed(const Duration(seconds: 5), () {
-                if (_activeConversationId == conversationId) {
-                  refreshConversation(conversationId);
-                }
-              });
-            }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error parsing system signal: $e');
-    }
   }
 }

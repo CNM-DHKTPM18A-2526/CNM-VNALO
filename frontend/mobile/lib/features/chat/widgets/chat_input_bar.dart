@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -299,7 +300,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
         }
         provider.sendFile(
           conversationId: widget.conversationId,
-          filePath: file.path!,
+          file: File(file.path!),
         );
       }
     }

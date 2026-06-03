@@ -189,6 +189,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
         const SizedBox(height: 8),
 
         // 24h Status Row
+        if (postProvider.stories.isNotEmpty || true) // Keep row layout even when empty
         Container(
           height: 120,
           color: containerColor,
@@ -201,70 +202,11 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
               if (index == 0) {
                 return _buildStoryItem(isDarkMode, auth.user?.avatarUrl, common.createNewStory, isMe: true);
               }
-              groupedStories[story.authorId]!.add(story);
-            }
-            final uniqueAuthors = groupedStories.keys.toList();
-
-            return Container(
-              color: containerColor,
-              height: 200,
-              padding: const EdgeInsets.only(top: 12, bottom: 12),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: uniqueAuthors.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return GestureDetector(
-                      onTap: () => _openCreateStory(context),
-                      child: _buildStoryCard(
-                        isDarkMode,
-                        bgImageUrl: auth.user?.avatarUrl,
-                        avatarUrl: auth.user?.avatarUrl,
-                        name: 'Tạo mới',
-                        isMe: true,
-                      ),
-                    );
-                  }
-
-                  final authorId = uniqueAuthors[index - 1];
-                  final userStories = groupedStories[authorId]!;
-                  final story = userStories.first;
-                  final contactProvider = context.read<ContactProvider>();
-
-                  String authorName = authorId;
-                  String? authorAvatar;
-
-                  if (authorId == auth.user?.id) {
-                    authorName = auth.user?.displayName ?? authorId;
-                    authorAvatar = auth.user?.avatarUrl;
-                  } else {
-                    final user = contactProvider.getUserById(authorId);
-                    if (user != null) {
-                      authorName = user.displayName;
-                      authorAvatar = user.avatarUrl;
-                    }
-                  }
-
-                  final flatIndex = postProvider.stories.indexOf(story);
-
-                  return GestureDetector(
-                    onTap: () => _openStoryViewer(context, flatIndex),
-                    child: _buildStoryCard(
-                      isDarkMode,
-                      bgImageUrl: story.mediaUrl,
-                      avatarUrl: authorAvatar,
-                      name: authorName,
-                      isMe: false,
-                    ),
-                  );
-                },
-              ),
-            );
-          }
-
+              final story = postProvider.stories[index - 1];
+              return _buildStoryItem(isDarkMode, story.mediaUrl, story.authorId, isMe: false);
+            },
+          ),
         ),
-        const SizedBox(height: 8),
 
         // Feed Items
         if (postProvider.isLoading && postProvider.posts.isEmpty)

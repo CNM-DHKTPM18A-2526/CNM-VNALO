@@ -1,0 +1,8 @@
+merge(nguyenvu): resolve conflicts — RBAC layer + enterprise dashboard merged
+
+- AdminMonitoringService: keep RBAC constants/methods, remove email-allowlist path
+- AdminMonitoringServiceTest: update tests to use RBAC permission mocks
+- docker/.env.example: keep separate analytics/moderation DB names
+- App.tsx: keep both /admin/monitoring routes (dashboard + legacy page)
+- AdminMonitoringPage.tsx: modern UI + RBAC panel + merged EN/VI labels
+- admin-monitoring.css: deduplicate rules, merge media queries + RBAC styles

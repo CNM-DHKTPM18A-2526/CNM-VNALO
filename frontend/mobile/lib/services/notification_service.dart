@@ -16,6 +16,33 @@ import 'package:vnalo_mobile/core/utils/device_info_util.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/services/notification_formatter.dart';
 
+Future<void> registerTokenToBackend({
+  required String accessToken,
+  required String deviceId,
+  required String platform,
+  required String coreServiceUrl,
+}) async {
+  final token = await FirebaseMessaging.instance.getToken();
+  if (token == null) return;
+
+  try {
+    await http.post(
+      Uri.parse('$coreServiceUrl/notifications/register-token'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({
+        'fcmToken': token,
+        'deviceId': deviceId,
+        'platform': platform,
+      }),
+    );
+  } catch (e) {
+    developer.log('Failed to register FCM token: $e');
+  }
+}
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;

@@ -85,14 +85,14 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
           return;
         } else {
           // Pin directly using explicit conversationId
-          chatProvider.pinMessageInConversation(confirmedId, convId);
+          chatProvider.pinMessageWithConv(confirmedId, convId);
         }
       } else {
         // Server didn't confirm in time — try pinning with local ID as fallback
         final list = chatProvider.getMessages(convId);
         final found = list.where((m) => m.content == contentStr).firstOrNull;
         if (found != null) {
-          chatProvider.pinMessageInConversation(found.id, convId);
+          chatProvider.pinMessageWithConv(found.id, convId);
         }
       }
     }

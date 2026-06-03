@@ -232,7 +232,7 @@ class NoteDetailScreen extends StatelessWidget {
                 if (pins.length >= 3) {
                   PinnedMessageBar.showPinLimitDialog(context, message);
                 } else {
-                  chatProvider.pinMessageInConversation(message.id, conversation.id);
+                  chatProvider.pinMessageWithConv(message.id, conversation.id);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Đã ghim ghi chú lên đầu trò chuyện'),

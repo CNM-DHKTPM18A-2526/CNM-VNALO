@@ -539,7 +539,7 @@ class _GroupBoardScreenState extends State<GroupBoardScreen> with SingleTickerPr
       // Show pin limit dialog
       PinnedMessageBar.showPinLimitDialog(context, msg);
     } else {
-      chatProvider.pinMessageInConversation(msg.id, widget.conversation.id);
+      chatProvider.pinMessageWithConv(msg.id, widget.conversation.id);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đã ghim ghi chú lên đầu trò chuyện'),
