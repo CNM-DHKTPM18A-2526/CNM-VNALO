@@ -186,21 +186,18 @@ class _SystemMessageState extends State<SystemMessage>
     }
 
     _SystemEvent? parsedEvent;
-    if (widget.content.startsWith('{')) {
+    final trimmedContent = widget.content.trim();
+    
+    if (trimmedContent.startsWith('{')) {
       try {
         final data = Map<String, dynamic>.from(
-          json.decode(widget.content) as Map<String, dynamic>,
+          json.decode(trimmedContent) as Map<String, dynamic>,
         );
         final action = data['action'] as String?;
         parsedEvent = _parseEvent(data, action);
-      } catch (_) {
-        parsedEvent = _SystemEvent(
-          icon: Icons.info_outline,
-          iconColor: Colors.grey,
-          text: widget.content,
-          actorId: null,
-          targetIds: null,
-        );
+      } catch (e) {
+        debugPrint('SystemMessage JSON parse error: $e for content: $trimmedContent');
+        parsedEvent = null;
       }
     }
 
@@ -224,6 +221,26 @@ class _SystemMessageState extends State<SystemMessage>
       iconColor = parsedEvent.iconColor;
     } else {
       displayText = widget.content;
+      
+      // Ẩn các tin nhắn hệ thống cũ (chữ trơn) bị lặp lại do đã có tin nhắn JSON mới
+      // Đồng thời ẩn luôn các tin nhắn bị lỗi font chữ (chứa ký tự Ä')
+      final lowerText = displayText.toLowerCase();
+      if (lowerText.contains('ä\'') ||
+          lowerText.contains('đã đổi tên nhóm') ||
+          lowerText.contains('đã cập nhật thông tin nhóm') ||
+          lowerText.contains('đã thêm thành viên') ||
+          lowerText.contains('đã rời khỏi nhóm') ||
+          lowerText.contains('đã xóa một thành viên') ||
+          lowerText.contains('đã ghim một tin nhắn') ||
+          lowerText.contains('đã bỏ ghim một tin nhắn') ||
+          lowerText.contains('đã thay đổi ảnh đại diện') ||
+          lowerText.contains('đã được thăng cấp') ||
+          lowerText.contains('đã chuyển quyền') ||
+          lowerText.contains('đã giải tán') ||
+          lowerText.contains('đã bị hủy quyền')) {
+        return const SizedBox.shrink();
+      }
+
       icon = Icons.info_outline;
       iconColor = Colors.grey;
     }

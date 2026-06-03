@@ -61,6 +61,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final auth = context.watch<AuthProvider>();
     final postProvider = context.watch<PostProvider>();
+    final contactProvider = context.watch<ContactProvider>(); // watch ContactProvider
     final common = CommonTexts.of(context);
     final displayName = auth.user?.displayName ?? common.unknownUser;
     final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7);
@@ -348,12 +349,10 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                     authorName = auth.user?.displayName ?? authorId;
                     authorAvatar = auth.user?.avatarUrl;
                   } else {
-                    try {
-                      final friend = contactProvider.friends.firstWhere((u) => u.id == authorId);
-                      authorName = friend.displayName;
-                      authorAvatar = friend.avatarUrl;
-                    } catch (e) {
-                      // Fallback
+                    final user = contactProvider.getUserById(authorId);
+                    if (user != null) {
+                      authorName = user.displayName;
+                      authorAvatar = user.avatarUrl;
                     }
                   }
 
@@ -550,11 +549,11 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
       authorName = auth.user?.displayName ?? post.authorId;
       authorAvatar = auth.user?.avatarUrl;
     } else {
-      try {
-        final friend = contactProvider.friends.firstWhere((u) => u.id == post.authorId);
-        authorName = friend.displayName;
-        authorAvatar = friend.avatarUrl;
-      } catch (_) {}
+      final user = contactProvider.getUserById(post.authorId);
+      if (user != null) {
+        authorName = user.displayName;
+        authorAvatar = user.avatarUrl;
+      }
     }
 
     // Determine if post has video

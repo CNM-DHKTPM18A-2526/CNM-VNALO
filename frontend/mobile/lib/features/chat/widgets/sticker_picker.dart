@@ -164,7 +164,7 @@ class _StickerPickerState extends State<StickerPicker> {
                 children: [
                   _GifTabContent(conversationId: widget.conversationId, onSelected: widget.onSelected),
                   _buildEmojiTab(isDarkMode),
-                  _TrendingTabContent(onShowStore: () => _showStickerStore(context), buildSmartImage: _buildSmartImage),
+                  _AllStickersTabContent(myPacks: _myPacks, stickersCache: _stickersCache, conversationId: widget.conversationId, onSelected: widget.onSelected),
                   _buildRecentTab(),
                   ..._myPacks.map((pack) {
                     final id = pack['stickerPackId'] ?? pack['id'];
@@ -482,21 +482,38 @@ class _GifTabContent extends StatefulWidget {
 class _GifTabContentState extends State<_GifTabContent> {
   List<Map<String, dynamic>> _gifs = [];
   bool _isLoading = false;
+  bool _hasError = false;
   final TextEditingController _gifController = TextEditingController();
 
   @override
   void initState() { super.initState(); _loadTrending(); }
 
   Future<void> _loadTrending() async {
-    setState(() => _isLoading = true);
-    final gifs = await GifService(context.read<MediaService>()).getTrendingGifs();
-    if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    setState(() { _isLoading = true; _hasError = false; });
+    try {
+      final gifs = await GifService(context.read<MediaService>()).getTrendingGifs();
+      debugPrint('[_GifTabContent] _loadTrending: got ${gifs.length} GIFs');
+      if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    } catch (e) {
+      debugPrint('[_GifTabContent] _loadTrending error: $e');
+      if (mounted) setState(() { _isLoading = false; _hasError = true; });
+    }
   }
 
   Future<void> _search(String query) async {
-    setState(() => _isLoading = true);
-    final gifs = await GifService(context.read<MediaService>()).searchGifs(query);
-    if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    if (query.isEmpty) {
+      _loadTrending();
+      return;
+    }
+    setState(() { _isLoading = true; _hasError = false; });
+    try {
+      final gifs = await GifService(context.read<MediaService>()).searchGifs(query);
+      debugPrint('[_GifTabContent] _search: query=$query, got ${gifs.length} GIFs');
+      if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    } catch (e) {
+      debugPrint('[_GifTabContent] _search error: $e');
+      if (mounted) setState(() { _isLoading = false; _hasError = true; });
+    }
   }
 
   @override
@@ -520,53 +537,440 @@ class _GifTabContentState extends State<_GifTabContent> {
           ),
         ),
         Expanded(
-          child: _isLoading ? const Center(child: CircularProgressIndicator()) : GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1.5),
-            itemCount: _gifs.length,
-            itemBuilder: (context, index) {
-              final gif = _gifs[index];
-              final rawUrl = gif['url']?.toString() ?? '';
-              final resolvedUrl = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
-
-              if (resolvedUrl.isEmpty) return const SizedBox.shrink();
-
-              return GestureDetector(
-                onTap: () {
-                  // Gửi với marker [GIF] để khi hiển thị biết đây là GIF
-                  context.read<ChatProvider>().sendGif(conversationId: widget.conversationId, gifUrl: resolvedUrl);
-                  widget.onSelected();
-                },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Builder(
-                    builder: (context) {
-                      final token = context.watch<AuthProvider>().accessToken;
-                      final headers = (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
-                          ? {'Authorization': 'Bearer $token'}
-                          : <String, String>{};
-                      // Sử dụng Image.network cho GIF để đảm bảo animation hoạt động
-                      return Image.network(
-                        resolvedUrl,
-                        fit: BoxFit.cover,
-                        headers: headers,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(color: Colors.grey.withValues(alpha: 0.1));
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          debugPrint('[_GifTabContent] GIF Error: $error for URL: $resolvedUrl');
-                          return const Center(child: Icon(Icons.error_outline, color: Colors.grey));
-                        },
-                      );
-                    }
-                  ),
-                ),
-              );
-            },
-          ),
+          child: _isLoading 
+              ? const Center(child: CircularProgressIndicator())
+              : _gifs.isEmpty
+                  ? _buildEmptyState(isDarkMode, common)
+                  : GridView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1.5),
+                      itemCount: _gifs.length,
+                      itemBuilder: (context, index) => _buildGifItem(context, index, isDarkMode),
+                    ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEmptyState(bool isDarkMode, CommonTexts common) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _hasError ? Icons.error_outline : Icons.gif_box_outlined,
+            size: 64,
+            color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _hasError ? 'Không thể tải GIF' : 'Chưa có GIF nào',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: isDarkMode ? Colors.white54 : Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _hasError 
+                ? 'Vui lòng thử lại sau'
+                : 'GIF đang được cập nhật',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+            ),
+          ),
+          if (_hasError) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadTrending,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Thử lại'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDarkMode ? Colors.white12 : Colors.grey.shade200,
+                foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGifItem(BuildContext context, int index, bool isDarkMode) {
+    final gif = _gifs[index];
+    final rawUrl = gif['url']?.toString() ?? '';
+    debugPrint('[_GifTabContent] index=$index, rawUrl=$rawUrl');
+    
+    // Try multiple URL field names
+    String resolvedUrl = rawUrl;
+    if (resolvedUrl.isEmpty) {
+      // Try nested media_formats
+      final formats = gif['media_formats'] as Map<String, dynamic>?;
+      if (formats != null) {
+        final tinygif = formats['tinygif'] as Map<String, dynamic>?;
+        if (tinygif != null) {
+          resolvedUrl = tinygif['url']?.toString() ?? '';
+        }
+        if (resolvedUrl.isEmpty) {
+          final gifFormat = formats['gif'] as Map<String, dynamic>?;
+          if (gifFormat != null) {
+            resolvedUrl = gifFormat['url']?.toString() ?? '';
+          }
+        }
+      }
+    }
+    
+    // Try other common fields
+    if (resolvedUrl.isEmpty) {
+      resolvedUrl = gif['mediaUrl']?.toString() ?? 
+                   gif['fileUrl']?.toString() ?? 
+                   gif['publicUrl']?.toString() ?? 
+                   gif['cdnUrl']?.toString() ?? 
+                   gif['downloadUrl']?.toString() ?? '';
+    }
+    
+    // If URL is an ID (no slashes, no dots, not http), try to construct URL
+    if (resolvedUrl.isNotEmpty && 
+        !resolvedUrl.contains('/') && 
+        !resolvedUrl.contains('.') && 
+        !resolvedUrl.startsWith('http')) {
+      resolvedUrl = '/media/public/$resolvedUrl';
+    }
+    
+    resolvedUrl = AvatarResolver.resolveUrl(resolvedUrl) ?? resolvedUrl;
+    debugPrint('[_GifTabContent] resolvedUrl=$resolvedUrl');
+
+    if (resolvedUrl.isEmpty) {
+      debugPrint('[_GifTabContent] index=$index: URL is empty, showing placeholder');
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(
+          child: Icon(Icons.image_not_supported, color: Colors.grey),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () {
+        debugPrint('[_GifTabContent] Sending GIF: $resolvedUrl');
+        context.read<ChatProvider>().sendGif(conversationId: widget.conversationId, gifUrl: resolvedUrl);
+        widget.onSelected();
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Builder(
+          builder: (context) {
+            final token = context.watch<AuthProvider>().accessToken;
+            final headers = (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
+                ? {'Authorization': 'Bearer $token'}
+                : <String, String>{};
+            return Image.network(
+              resolvedUrl,
+              fit: BoxFit.cover,
+              headers: headers,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('[_GifTabContent] GIF Error: $error for URL: $resolvedUrl');
+                return Container(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 32),
+                  ),
+                );
+              },
+            );
+          }
+        ),
+      ),
+    );
+  }
+}
+
+class _AllStickersTabContent extends StatelessWidget {
+  final List<Map<String, dynamic>> myPacks;
+  final Map<String, List<Map<String, dynamic>>> stickersCache;
+  final String conversationId;
+  final VoidCallback onSelected;
+
+  const _AllStickersTabContent({
+    required this.myPacks,
+    required this.stickersCache,
+    required this.conversationId,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // If user has no packs, show store button
+    if (myPacks.isEmpty) {
+      return _buildEmptyState(context, isDarkMode);
+    }
+    
+    // Collect all stickers from all packs
+    final List<Map<String, dynamic>> allStickers = [];
+    for (var pack in myPacks) {
+      final id = pack['stickerPackId'] ?? pack['id'];
+      final stickers = stickersCache[id.toString()];
+      if (stickers != null && stickers.isNotEmpty) {
+        allStickers.addAll(stickers);
+      }
+    }
+    
+    if (allStickers.isEmpty) {
+      return _buildLoadingState();
+    }
+    
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4, mainAxisSpacing: 12, crossAxisSpacing: 12),
+      itemCount: allStickers.length,
+      itemBuilder: (context, index) => _buildStickerItem(context, allStickers[index], isDarkMode),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, bool isDarkMode) {
+    final common = CommonTexts.of(context);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.style_outlined, size: 64, color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text('Chưa có Sticker nào', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: isDarkMode ? Colors.white54 : Colors.grey.shade600)),
+          const SizedBox(height: 8),
+          Text('Mua sticker từ cửa hàng', style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white38 : Colors.grey.shade500)),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _showStickerStore(context),
+            icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+            label: Text(common.stickerStoreTitle),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDarkMode ? Colors.white12 : Colors.grey.shade200,
+              foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  Widget _buildStickerItem(BuildContext context, Map<String, dynamic> sticker, bool isDarkMode) {
+    final id = sticker['stickerId'] ?? sticker['id'] ?? '';
+    final mediaService = context.read<MediaService>();
+    final url = _resolveStickerUrl(sticker, mediaService);
+    debugPrint('[_AllStickersTabContent] sticker id=$id, url=$url');
+    
+    if (url.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () {
+        debugPrint('[_AllStickersTabContent] Sending sticker: $url');
+        mediaService.recordStickerUsage(id.toString());
+        context.read<ChatProvider>().sendSticker(conversationId: conversationId, stickerId: id.toString(), stickerUrl: url);
+        onSelected();
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: _buildStickerImage(context, url, isDarkMode),
+      ),
+    );
+  }
+
+  String _resolveStickerUrl(Map<String, dynamic> sticker, MediaService mediaService) {
+    // Try multiple URL field names
+    String? url = sticker['url']?.toString();
+    if (url != null && url.isNotEmpty) return url;
+    
+    url = sticker['mediaUrl']?.toString();
+    if (url != null && url.isNotEmpty) return url;
+    
+    url = sticker['imageUrl']?.toString();
+    if (url != null && url.isNotEmpty) return url;
+    
+    url = sticker['thumbnailUrl']?.toString();
+    if (url != null && url.isNotEmpty) return url;
+    
+    url = sticker['publicUrl']?.toString();
+    if (url != null && url.isNotEmpty) return url;
+    
+    // If it's just an ID, construct URL
+    final id = sticker['stickerId'] ?? sticker['id'];
+    if (id != null && id.toString().isNotEmpty) {
+      return mediaService.getPublicUrl(id.toString());
+    }
+    
+    return '';
+  }
+
+  Widget _buildStickerImage(BuildContext context, String url, bool isDarkMode) {
+    final resolvedUrl = AvatarResolver.resolveUrl(url) ?? url;
+    final token = context.watch<AuthProvider>().accessToken;
+    final headers = (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
+        ? {'Authorization': 'Bearer $token'}
+        : <String, String>{};
+
+    return CachedNetworkImage(
+      imageUrl: resolvedUrl,
+      fit: BoxFit.cover,
+      httpHeaders: headers,
+      placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
+      errorWidget: (context, error, stackTrace) {
+        debugPrint('[_AllStickersTabContent] Failed to load sticker: $resolvedUrl, error: $error');
+        return Container(
+          color: Colors.grey.withValues(alpha: 0.2),
+          child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+        );
+      },
+    );
+  }
+
+  void _showStickerStore(BuildContext context) async {
+    final mediaService = context.read<MediaService>();
+    final common = CommonTexts.of(context, listen: false);
+    
+    final allPacks = await mediaService.getStickerPacks();
+    if (!context.mounted) return;
+    
+    showModalBottomSheet(
+      context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: BoxDecoration(
+          color: isDarkMode ? DarkColors.surface : LightColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20))
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: isDarkMode ? DarkColors.divider : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2)
+              )
+            ),
+            Text(common.stickerStoreTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: allPacks.isEmpty
+                  ? Center(child: Text(common.stickerPackEmptyNote, style: const TextStyle(color: Colors.grey)))
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, childAspectRatio: 0.85, crossAxisSpacing: 12, mainAxisSpacing: 12),
+                      itemCount: allPacks.length,
+                      itemBuilder: (context, index) {
+                        final pack = allPacks[index];
+                        final packId = pack['id'] ?? pack['stickerPackId'] ?? '';
+                        final name = pack['name'] ?? 'Sticker Pack';
+                        final coverUrl = pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '';
+                        final price = pack['price'] ?? 0;
+                        
+        return _StickerPackCard(
+          name: name,
+          coverUrl: coverUrl,
+          price: price,
+          onTap: () async {
+            Navigator.pop(context);
+            await mediaService.installPack(packId.toString());
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Đã thêm $name vào bộ sưu tập'), backgroundColor: Colors.green),
+              );
+            }
+          },
+        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+class _StickerPackCard extends StatelessWidget {
+  final String name;
+  final String coverUrl;
+  final int price;
+  final VoidCallback onTap;
+
+  const _StickerPackCard({required this.name, required this.coverUrl, required this.price, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final resolvedUrl = AvatarResolver.resolveUrl(coverUrl) ?? coverUrl;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDarkMode ? DarkColors.surfaceLight : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: resolvedUrl.isNotEmpty
+                    ? CachedNetworkImage(imageUrl: resolvedUrl, fit: BoxFit.cover)
+                    : Container(color: Colors.grey.shade200, child: const Icon(Icons.style, size: 40, color: Colors.grey)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(price == 0 ? 'Miễn phí' : '$price xu', style: TextStyle(fontSize: 12, color: price == 0 ? Colors.green : Colors.orange)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

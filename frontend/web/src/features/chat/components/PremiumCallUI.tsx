@@ -41,10 +41,10 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   const [isPortraitStream, setIsPortraitStream] = React.useState(false)
 
   React.useEffect(() => {
-    if (videoRef.current && stream && isCameraOn) {
+    if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
     }
-  }, [stream, isCameraOn])
+  }) // Run on every render to ensure srcObject is always set on the current ref
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
@@ -95,6 +95,17 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
               ? 'object-contain bg-black'
               : 'object-cover'
           }`}
+        />
+      )}
+
+      {/* ── AUDIO CONTENT (Fallback for Audio-Only Calls) ── */}
+      {!showVideo && stream && (
+        <audio
+          ref={videoRef as unknown as React.RefObject<HTMLAudioElement>}
+          autoPlay
+          playsInline
+          muted={isLocal}
+          className="hidden"
         />
       )}
 
@@ -578,10 +589,10 @@ export const MiniCallWindow: React.FC<MiniCallWindowProps> = ({
   const resolvedAvatar = peerAvatar ? resolveMediaUrl(peerAvatar) : null
 
   React.useEffect(() => {
-    if (videoRef.current && stream && isCameraOn) {
+    if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
     }
-  }, [stream, isCameraOn])
+  }) // Run on every render
 
   return (
     <div className="fixed bottom-6 right-6 z-[600] w-48 h-72 rounded-3xl overflow-hidden bg-[#000000] border border-[#007BFF]/20 shadow-[0_20px_50px_rgba(0,0,0,0.6)] group transition-transform hover:scale-105">

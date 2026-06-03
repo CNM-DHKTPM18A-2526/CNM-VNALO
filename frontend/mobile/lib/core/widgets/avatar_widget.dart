@@ -51,9 +51,12 @@ class _AvatarWidgetState extends State<AvatarWidget> {
   }
 
   void _resolve() {
+    debugPrint('[AvatarWidget] _resolve: imageUrl=${widget.imageUrl}');
     final resolved = AvatarResolver.resolveUrl(widget.imageUrl);
+    debugPrint('[AvatarWidget] _resolve: resolvedUrl=$resolved');
     setState(() {
       _resolvedUrl = _appendCacheVersion(resolved, widget.cacheVersion);
+      debugPrint('[AvatarWidget] _resolve: finalUrl=$_resolvedUrl');
     });
   }
 

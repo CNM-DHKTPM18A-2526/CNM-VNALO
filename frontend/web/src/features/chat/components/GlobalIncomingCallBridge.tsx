@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 
 import { useAuth } from '../../auth/useAuth'
 import { getOrCreateSocket } from '../chat.socket'
@@ -72,6 +72,27 @@ export function GlobalIncomingCallBridge() {
       }
     }
 
+    const handleIceCandidate = (data: unknown) => {
+      const payload = unwrapSignalPayload(data)
+      if (!payload) return
+
+      const callId = payload.callId?.toString()
+      if (!callId) return
+      
+      const candidateObj = payload.candidate
+      if (!candidateObj) return
+
+      try {
+        const key = `pending_ice_${callId}`
+        const existing = sessionStorage.getItem(key)
+        const candidates = existing ? JSON.parse(existing) : []
+        candidates.push(candidateObj)
+        sessionStorage.setItem(key, JSON.stringify(candidates))
+      } catch (error) {
+        console.warn('[GlobalIncomingCall] Failed to store ICE candidate', error)
+      }
+    }
+
     const handleOffer = async (data: unknown) => {
       const payload = unwrapSignalPayload(data)
       if (!payload) return
@@ -108,6 +129,8 @@ export function GlobalIncomingCallBridge() {
 
     socket.on('call:offer', handleOffer)
     socket.on('call.offer', handleOffer)
+    socket.on('call:ice-candidate', handleIceCandidate)
+    socket.on('call.ice-candidate', handleIceCandidate)
     socket.on('call:answer', clearCall)
     socket.on('call.answer', clearCall)
     socket.on('call:end', clearCall)
@@ -116,6 +139,8 @@ export function GlobalIncomingCallBridge() {
     return () => {
       socket.off('call:offer', handleOffer)
       socket.off('call.offer', handleOffer)
+      socket.off('call:ice-candidate', handleIceCandidate)
+      socket.off('call.ice-candidate', handleIceCandidate)
       socket.off('call:answer', clearCall)
       socket.off('call.answer', clearCall)
       socket.off('call:end', clearCall)

@@ -29,6 +29,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
   bool _allowAddOption = true;
   bool _isAnonymous = false;
   bool _isOptionLimitReached = false;
+  bool _isCreating = false;
   bool _isValid = false;
 
   @override
@@ -85,7 +86,11 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
   }
 
   Future<void> _createPoll() async {
-    if (!_isValid) return;
+    if (!_isValid || _isCreating) return;
+
+    setState(() {
+      _isCreating = true;
+    });
 
     final question = _questionController.text.trim();
     final filledOptions = _optionControllers
@@ -140,10 +145,13 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
       });
     }
 
-    // Dismiss screens to return to chat thread
-    // Double pop: from CreatePoll -> GroupBoard -> Chat
-    Navigator.of(context).pop();
-    Navigator.of(context).pop();
+    if (mounted) {
+      setState(() {
+        _isCreating = false;
+      });
+      Navigator.of(context).pop();
+      Navigator.of(context).pop();
+    }
   }
 
   @override

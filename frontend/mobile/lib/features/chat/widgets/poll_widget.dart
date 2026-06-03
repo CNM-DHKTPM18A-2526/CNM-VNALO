@@ -6,6 +6,8 @@ import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/poll_details_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
+import 'package:vnalo_mobile/models/user_model.dart';
 
 class PollWidget extends StatelessWidget {
   final Message message;
@@ -50,10 +52,35 @@ class PollWidget extends StatelessWidget {
 
     final question = pollData['question']?.toString() ?? 'Bình chọn';
     final rawOptions = pollData['options'] as List<dynamic>? ?? [];
+
+    // Map index -> option id to support both formats:
+    // - vote:0 / vote:1 (index-based, used by web)
+    // - vote:<optionId> (id-based)
+    final Map<String, String> indexToOptionId = {
+      for (int i = 0; i < rawOptions.length; i++)
+        i.toString(): (rawOptions[i] is Map
+            ? ((rawOptions[i] as Map)['id']?.toString() ?? i.toString())
+            : i.toString()),
+    };
+
+    // Debug: help verify mapping between poll option ids and reaction vote ids
+    debugPrint(
+      '[PollWidget] poll msg=${message.id} options=${rawOptions.map((e) => (e is Map ? (e['id']?.toString() ?? '') : '')).toList()} indexMap=$indexToOptionId',
+    );
     
     // Parse live votes from reactions
     final reactions = chatProvider.getReactionsForMessage(message.id);
-    final Map<String, List<String>> optionVotes = {}; // optionId -> List of userIds
+
+    // optionId -> userIds
+    final Map<String, List<String>> optionVotes = {};
+
+    void addVote(String optionKey, String userId) {
+      // If the optionKey directly matches an actual option ID, use it.
+      // Otherwise, assume it's an index (sent by Web for "o0", "o1" format) and map it.
+      final isDirectId = rawOptions.any((opt) => opt is Map && opt['id']?.toString() == optionKey);
+      final resolvedId = isDirectId ? optionKey : (indexToOptionId[optionKey] ?? optionKey);
+      optionVotes.putIfAbsent(resolvedId, () => []).add(userId);
+    }
 
     for (final reaction in reactions) {
       final emoji = reaction.emoji;
@@ -63,7 +90,7 @@ class PollWidget extends StatelessWidget {
         for (final optId in optionIds) {
           final trimmed = optId.trim();
           if (trimmed.isNotEmpty) {
-            optionVotes.putIfAbsent(trimmed, () => []).add(reaction.userId);
+            addVote(trimmed, reaction.userId);
           }
         }
       }
@@ -299,6 +326,10 @@ class PollWidget extends StatelessWidget {
     const double avatarSize = 18.0;
     const double overlap = 12.0;
 
+    final members = (conv.members is List)
+        ? (conv.members as List).whereType<ConversationMember>().toList()
+        : <ConversationMember>[];
+
     return SizedBox(
       height: avatarSize,
       width: ((displayedIds.length - 1) * overlap + avatarSize).clamp(avatarSize, 80.0),
@@ -306,21 +337,19 @@ class PollWidget extends StatelessWidget {
         clipBehavior: Clip.hardEdge,
         children: List.generate(displayedIds.length, (i) {
           final userId = displayedIds[i];
-          dynamic member;
-          try {
-            member = (conv.members as List<dynamic>).firstWhere(
-              (m) => (m as dynamic).userId == userId,
-              orElse: () => null,
-            );
-          } catch (_) {
-            member = null;
-          }
 
-          final String? avatarUrl = member?.user?.avatarUrl as String?;
+          final member = members.where((m) => m.userId == userId).isNotEmpty
+              ? members.firstWhere((m) => m.userId == userId)
+              : null;
+
+          final User? user = member?.user;
+          final String? avatarUrl = user?.avatarUrl;
           final String displayName =
-              (member?.nickname as String?) ??
-              (member?.user?.displayName as String?) ??
-              'U';
+              (member?.nickname?.trim().isNotEmpty == true)
+                  ? member!.nickname!
+                  : (user?.displayName?.trim().isNotEmpty == true)
+                      ? user!.displayName!
+                      : 'U';
 
           return Positioned(
             left: i * overlap,

@@ -33,6 +33,8 @@ class ChatListItem extends StatelessWidget {
     final avatarVersion = context.watch<AvatarCacheProvider>().versionForUser(avatarOwnerId);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
+    
+    debugPrint('[ChatListItem] displayAvatar=$displayAvatar displayName=$displayName');
 
     final chat = context.watch<ChatProvider>();
     final otherMember = _getOtherMember(conversation, currentUserId);
@@ -96,7 +98,7 @@ class ChatListItem extends StatelessWidget {
         child: ListTile(
           onTap: onTap,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.isEmpty))
+          leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.trim().isEmpty))
               ? GroupAvatar(
                   members: conversation.members
                       .where((m) => m.userId != currentUserId)

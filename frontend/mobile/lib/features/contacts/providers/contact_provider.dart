@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
+import 'package:vnalo_mobile/services/user_service.dart';
 
 class ContactProvider with ChangeNotifier {
   final FriendService _friendService;
+  final UserService _userService;
   SocketService _socketService;
   Timer? _pollingTimer;
   
@@ -16,16 +18,21 @@ class ContactProvider with ChangeNotifier {
   String? _currentUserId;
   int _lastSocketReinitCount = -1;
 
+  final Map<String, User> _userCache = {};
+  final Set<String> _fetchingUsers = {};
+
   final List<StreamSubscription> _subscriptions = [];
 
-  ContactProvider(this._friendService, this._socketService) {
+  ContactProvider(this._friendService, this._socketService, this._userService) {
     _initSocketListeners();
     _startPolling();
   }
 
   void _startPolling() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    // Avoid unnecessary polling. Prefer socket events; use polling as fallback.
+    final intervalSeconds = _currentUserId == null ? 10 : 30;
+    _pollingTimer = Timer.periodic(Duration(seconds: intervalSeconds), (timer) {
        fetchIncomingRequests();
     });
   }
@@ -78,7 +85,8 @@ class ContactProvider with ChangeNotifier {
       needsReinit = true;
     }
 
-    if (_currentUserId != userId) {
+    final userChanged = _currentUserId != userId;
+    if (userChanged) {
       debugPrint('🟢 [ContactProvider] User ID changed: $_currentUserId -> $userId');
       _currentUserId = userId;
       needsReinit = true;
@@ -97,7 +105,9 @@ class ContactProvider with ChangeNotifier {
     if (needsReinit && userId != null) {
       _initSocketListeners();
       _startPolling();
+      // Ensure both lists are up-to-date after login/reinit.
       fetchIncomingRequests();
+      fetchFriends();
     }
   }
 
@@ -107,8 +117,35 @@ class ContactProvider with ChangeNotifier {
     _pendingRequestCount = 0;
     _isLoading = false;
     _currentUserId = null;
+    _userCache.clear();
+    _fetchingUsers.clear();
     _cancelSubscriptions();
     notifyListeners();
+  }
+
+  User? getUserById(String id) {
+    if (id == _currentUserId) return null;
+    try {
+      return _friends.firstWhere((u) => u.id == id);
+    } catch (_) {
+      if (_userCache.containsKey(id)) return _userCache[id];
+      _fetchAndCacheUser(id);
+      return null;
+    }
+  }
+
+  Future<void> _fetchAndCacheUser(String id) async {
+    if (_fetchingUsers.contains(id)) return;
+    _fetchingUsers.add(id);
+    try {
+      final user = await _userService.getUserById(id);
+      if (user != null) {
+        _userCache[id] = user;
+        notifyListeners();
+      }
+    } finally {
+      _fetchingUsers.remove(id);
+    }
   }
 
   List<User> get friends => _friends;

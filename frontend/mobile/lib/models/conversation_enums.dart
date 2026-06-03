@@ -24,8 +24,9 @@ enum MessageType {
 enum MessageStatus { SENDING, SENT, DELIVERED, READ, FAILED, RECALLED }
 
 T enumFromString<T>(List<T> values, String value) {
+  final upperValue = value.toUpperCase();
   for (final v in values) {
-    if (v.toString().split('.').last == value) {
+    if (v.toString().split('.').last.toUpperCase() == upperValue) {
       return v;
     }
   }

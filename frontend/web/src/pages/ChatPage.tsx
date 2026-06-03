@@ -912,7 +912,7 @@ export default function ChatPage() {
         }
 
         if (conversationMsgs.length > 0 && (message.type === 'image' || message.type === 'file')) {
-          const lastFew = [...conversationMsgs, message].slice(-5);
+          const lastFew = dedupeMessages([...conversationMsgs, message]).slice(-5);
           let count = 0;
           const groupType = message.type;
 
@@ -2705,7 +2705,7 @@ export default function ChatPage() {
               const attClientId = crypto.randomUUID();
               const payload = {
                 conversationId,
-                content: att.name || '',
+                content: shareModalMessage.type === 'file' ? (att.name || '') : '',
                 messageType: toSocketMessageType(shareModalMessage.type),
                 mediaUrl: att.url,
                 mediaThumbnailUrl: att.thumbnailUrl,
@@ -4631,8 +4631,9 @@ export default function ChatPage() {
         const isVideo = res.mimeType?.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v', '3gp', 'mkv'].includes(actualExt);
         const resTypeStr = isDoc ? 'file' : (res.mimeType?.startsWith('image/') ? 'image' : (isVideo ? 'video' : (res.mimeType === 'application/x-chat-sticker' ? 'sticker' : 'file')));
 
-        // Use original filename as content for 'file' or 'image' type messages if no other text is provided.
-        const resContent = (i === 0 && content.trim().length > 0) ? content : (file ? file.name : "");
+        // Use original filename as content for 'file' type messages if no other text is provided.
+        // For 'image', 'video' or 'sticker' messages, the content should be empty if no text was typed.
+        const resContent = (i === 0 && content.trim().length > 0) ? content : (resTypeStr === 'file' && file ? file.name : "");
 
         const payload: any = {
           conversationId: targetConversationId,

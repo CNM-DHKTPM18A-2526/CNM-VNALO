@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/core/widgets/group_avatar.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/services/block_service.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 import 'package:vnalo_mobile/features/chat/widgets/system_message.dart';
@@ -261,7 +262,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.call_outlined, color: Colors.white),
-                onPressed: () {
+                onPressed: () async {
                   if (!isDirect) {
                     Navigator.push(
                       context,
@@ -278,6 +279,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       SnackBar(content: Text(common.cannotOpenChat)),
                     );
                     return;
+                  }
+
+                  try {
+                    final res = await context.read<BlockService>().checkBlockStatus(peerUserId);
+                    final data = res['data'];
+                    final blockedYou = data is Map ? (data['blockedYou'] == true) : false;
+                    if (blockedYou) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Bạn đã bị chặn cuộc gọi (thoại/video) bởi người này')),
+                        );
+                      }
+                      return;
+                    }
+                  } catch (_) {
+                    // If status check fails, fall back to starting the call.
                   }
 
                   Navigator.push(
@@ -302,7 +319,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.videocam_outlined, color: Colors.white),
-                onPressed: () {
+                onPressed: () async {
                   if (!isDirect) {
                     Navigator.push(
                       context,
@@ -319,6 +336,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       SnackBar(content: Text(common.cannotOpenChat)),
                     );
                     return;
+                  }
+
+                  try {
+                    final res = await context.read<BlockService>().checkBlockStatus(peerUserId);
+                    final data = res['data'];
+                    final blockedYou = data is Map ? (data['blockedYou'] == true) : false;
+                    if (blockedYou) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Bạn đã bị chặn cuộc gọi (thoại/video) bởi người này')),
+                        );
+                      }
+                      return;
+                    }
+                  } catch (_) {
+                    // If status check fails, fall back to starting the call.
                   }
 
                   Navigator.push(
@@ -547,6 +580,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           }
 
                           return MessageBubble(
+                            key: ValueKey('${message.id}_${chat.getReactionsForMessage(message.id).length}_${message.status}'),
                             message: message,
                             isMine: isMine,
                             showTime: showTime,
@@ -586,19 +620,74 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
                 if (canSend)
                   ChatInputBar(
+                    key: ValueKey('input_bar_${conv.id}_${conv.onlyAdminCanPost}'),
                     conversationId: conv.id,
-                    onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
-                    onSendWithType: (content, messageType) => chat.sendMessage(
-                      conversationId: conv.id,
-                      content: content,
-                      messageType: messageType,
-                    ),
+                    onSend: (text) async {
+                      if (conv.type == ConversationType.DIRECT) {
+                        final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+                        final otherMember = conv.members.firstWhere(
+                          (m) => m.userId != currentUserId,
+                          orElse: () => conv.members.first,
+                        );
+                        final otherUserId = otherMember.userId;
+
+                        try {
+                          final res = await context.read<BlockService>().checkBlockStatus(otherUserId);
+                          final data = res['data'];
+                          final blockedYou = data is Map ? (data['blockedYou'] == true) : false;
+                          if (blockedYou) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Bạn đã bị chặn gửi tin nhắn bởi người này')),
+                              );
+                            }
+                            return;
+                          }
+                        } catch (_) {
+                          // If status check fails, fall back to sending.
+                        }
+                      }
+
+                      chat.sendMessage(conversationId: conv.id, content: text);
+                    },
+                    onSendWithType: (content, messageType) async {
+                      if (conv.type == ConversationType.DIRECT) {
+                        final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+                        final otherMember = conv.members.firstWhere(
+                          (m) => m.userId != currentUserId,
+                          orElse: () => conv.members.first,
+                        );
+                        final otherUserId = otherMember.userId;
+
+                        try {
+                          final res = await context.read<BlockService>().checkBlockStatus(otherUserId);
+                          final data = res['data'];
+                          final blockedYou = data is Map ? (data['blockedYou'] == true) : false;
+                          if (blockedYou) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Bạn đã bị chặn gửi tin nhắn bởi người này')),
+                              );
+                            }
+                            return;
+                          }
+                        } catch (_) {
+                          // If status check fails, fall back to sending.
+                        }
+                      }
+
+                      chat.sendMessage(
+                        conversationId: conv.id,
+                        content: content,
+                        messageType: messageType,
+                      );
+                    },
                     initialText: widget.prefilledText,
                     members: conv.members,
                     isGroup: conv.type == ConversationType.GROUP,
                   )
                 else
-                  _buildReadOnlyBanner(),
+                  _buildReadOnlyBanner(key: ValueKey('banner_${conv.id}_${conv.onlyAdminCanPost}')),
               ],
             ),
           ),
@@ -917,9 +1006,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Widget _buildReadOnlyBanner() {
+  Widget _buildReadOnlyBanner({Key? key}) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final linkColor = isDarkMode ? Colors.blue.shade400 : Colors.blue.shade600;
+    
     return Container(
+      key: key,
       width: double.infinity,
       color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -934,9 +1026,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               child: RichText(
                 text: TextSpan(
                   style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700, height: 1.4),
-                  children: const [
-                    TextSpan(text: 'Bạn không có quyền ', style: TextStyle(fontWeight: FontWeight.bold)),
-                    TextSpan(text: 'gửi tin nhắn vào nhóm này.'),
+                  children: [
+                    const TextSpan(text: 'Chỉ '),
+                    TextSpan(
+                      text: 'trưởng và phó cộng đồng', 
+                      style: TextStyle(fontWeight: FontWeight.bold, color: linkColor),
+                    ),
+                    const TextSpan(text: ' được gửi tin nhắn vào cộng đồng. '),
+                    TextSpan(
+                      text: 'Tìm hiểu thêm', 
+                      style: TextStyle(fontWeight: FontWeight.bold, color: linkColor),
+                    ),
                   ],
                 ),
               ),

@@ -63,10 +63,13 @@
 }
 
 .chat-list-search-input {
-  min-height: 38px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
+  min-height: 25px;
+  height: 35px;
+  width: 245px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  /* xám đậm hơn nhẹ */
+  background: color-mix(in srgb, var(--surface-2) 55%, #0b1220 5%);
   border: 1px solid transparent;
   box-shadow: none;
 }
@@ -78,8 +81,8 @@
 }
 
 .chat-list-search-input .search-input-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .chat-list-search-input input {
@@ -89,13 +92,13 @@
 .chat-toolbar-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0px;
 }
 
 .chat-toolbar-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 0px;
   border: none !important;
   outline: none !important;
   background: transparent;
