@@ -122,49 +122,56 @@ class _AiRobotAvatarState extends State<AiRobotAvatar>
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            final wave = math.sin(_controller.value * math.pi * 2);
-            final lift = wave * 2.0;
-            final auraScale = 0.92 + ((_controller.value + 0.12) * 0.12);
+        child: ClipOval(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              final wave = math.sin(_controller.value * math.pi * 2);
+              final lift =
+                  widget.state == AiState.listening ? wave * 1.0 : wave * 2.0;
+              final auraScale =
+                  widget.state == AiState.listening
+                      ? 0.9 + ((_controller.value + 0.08) * 0.08)
+                      : 0.92 + ((_controller.value + 0.12) * 0.12);
 
-            return Transform.translate(
-              offset: Offset(0, lift),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Transform.scale(
-                    scale: auraScale,
-                    child: Container(
-                      width: widget.size,
-                      height: widget.size,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            auraColor.withValues(alpha: 0.35),
-                            auraColor.withValues(alpha: 0.12),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.42, 0.72, 1],
+              return Transform.translate(
+                offset: Offset(0, lift),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Transform.scale(
+                      scale: auraScale,
+                      child: Container(
+                        width: widget.size,
+                        height: widget.size,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              auraColor.withValues(alpha: 0.35),
+                              auraColor.withValues(alpha: 0.12),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.42, 0.72, 1],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  _RobotHead(
-                    size: widget.size,
-                    faceColor: faceColor,
-                    eyeColor: auraColor,
-                    blinkClosed: _blinkClosed,
-                    state: widget.state,
-                    emotion: widget.emotion,
-                    pulse: _controller.value,
-                  ),
-                ],
-              ),
-            );
-          },
+                    _RobotHead(
+                      size: widget.size,
+                      faceColor: faceColor,
+                      eyeColor: auraColor,
+                      blinkClosed: _blinkClosed,
+                      state: widget.state,
+                      emotion: widget.emotion,
+                      pulse: _controller.value,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

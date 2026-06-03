@@ -96,6 +96,7 @@ class DiscoverScreen extends StatelessWidget {
             startListening: true,
             persist: false,
             source: 'discover_entry',
+            startListeningSurface: AiResponseSurface.voice,
           );
         },
       ),
@@ -181,75 +182,80 @@ class _DiscoverItem extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isPremium = itemKey == 'vnaloAi';
 
-    return ListTile(
-      key: ValueKey('discover_item_$itemKey'),
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color:
-              isPremium
-                  ? null
-                  : (isDarkMode ? DarkColors.primary : AppColors.primary)
-                      .withValues(alpha: 0.1),
-          gradient:
-              isPremium
-                  ? const LinearGradient(
-                    colors: [
-                      Color(0xFF8A2387),
-                      Color(0xFFE94057),
-                      Color(0xFFF27121),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                  : null,
-          borderRadius: BorderRadius.circular(12),
+    return Material(
+      color: isDarkMode ? DarkColors.surface : Colors.white,
+      child: ListTile(
+        key: ValueKey('discover_item_$itemKey'),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color:
+                isPremium
+                    ? null
+                    : (isDarkMode ? DarkColors.primary : AppColors.primary)
+                        .withValues(alpha: 0.1),
+            gradient:
+                isPremium
+                    ? const LinearGradient(
+                      colors: [
+                        Color(0xFF8A2387),
+                        Color(0xFFE94057),
+                        Color(0xFFF27121),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                    : null,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            size: 28,
+            color:
+                isPremium
+                    ? Colors.white
+                    : (isDarkMode ? DarkColors.primary : AppColors.primary),
+          ),
         ),
-        child: Icon(
-          icon,
-          size: 28,
-          color:
-              isPremium
-                  ? Colors.white
-                  : (isDarkMode ? DarkColors.primary : AppColors.primary),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 16,
+            color:
+                isPremium && isDarkMode
+                    ? Colors.orange.shade300
+                    : (isDarkMode
+                        ? DarkColors.textPrimary
+                        : LightColors.textPrimary),
+          ),
         ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 16,
-          color:
+        subtitle: Text(
+          subtitle,
+          style:
               isPremium && isDarkMode
-                  ? Colors.orange.shade300
-                  : (isDarkMode
-                      ? DarkColors.textPrimary
-                      : LightColors.textPrimary),
+                  ? TextStyle(
+                    color: Colors.orange.shade100.withValues(alpha: 0.7),
+                  )
+                  : TextStyle(
+                    color:
+                        isDarkMode
+                            ? DarkColors.textSecondary
+                            : LightColors.textSecondary,
+                    fontSize: 13,
+                  ),
         ),
+        trailing: Icon(
+          Icons.chevron_right,
+          size: 20,
+          color:
+              isDarkMode
+                  ? DarkColors.textHint
+                  : AppColors.iconSubtle.withValues(alpha: 0.5),
+        ),
+        onTap: onTap,
       ),
-      subtitle: Text(
-        subtitle,
-        style:
-            isPremium && isDarkMode
-                ? TextStyle(color: Colors.orange.shade100.withOpacity(0.7))
-                : TextStyle(
-                  color:
-                      isDarkMode
-                          ? DarkColors.textSecondary
-                          : LightColors.textSecondary,
-                  fontSize: 13,
-                ),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        size: 20,
-        color:
-            isDarkMode
-                ? DarkColors.textHint
-                : AppColors.iconSubtle.withValues(alpha: 0.5),
-      ),
-      onTap: onTap,
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/forgot_password_screen.dart';
+import 'package:vnalo_mobile/features/auth/screens/face_login_screen.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 
 class LoginPasswordScreen extends StatefulWidget {
@@ -165,6 +166,79 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                                 )
                                 : Text(t.login, style: const TextStyle(color: Colors.white)),
                       ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: isDarkMode ? DarkColors.divider : LightColors.divider)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('hoặc', style: TextStyle(fontSize: 13, color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)),
+                    ),
+                    Expanded(child: Divider(color: isDarkMode ? DarkColors.divider : LightColors.divider)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                          side: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const FaceLoginScreen(),
+                            ),
+                          );
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.face_rounded,
+                              size: 20,
+                              color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Đăng nhập khuôn mặt',
+                              style: TextStyle(
+                                color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF111827),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.amber.shade900 : Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.science_outlined, size: 12, color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade800),
+                          const SizedBox(width: 3),
+                          Text(
+                            'thử nghiệm',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade900),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
