@@ -89,11 +89,23 @@ class FriendService {
     final sent = await getSentRequests();
     // find request where toUserId == userId
     final req = sent.firstWhere(
-      (r) => r['toUserId'] == userId || (r['toUser'] != null && r['toUser']['id'] == userId),
-      orElse: () => throw ApiException(message: 'Không tìm thấy lời mời để hủy.', statusCode: 404),
+      (r) =>
+          r['toUserId'] == userId ||
+          (r['toUser'] != null && r['toUser']['id'] == userId),
+      orElse:
+          () =>
+              throw ApiException(
+                message: 'Không tìm thấy lời mời để hủy.',
+                statusCode: 404,
+              ),
     );
     final id = req['id'];
-    if (id == null) throw ApiException(message: 'Dữ liệu lời mời không hợp lệ.', statusCode: 500);
+    if (id == null) {
+      throw ApiException(
+        message: 'Dữ liệu lời mời không hợp lệ.',
+        statusCode: 500,
+      );
+    }
     await cancelRequest(id.toString());
   }
 
@@ -101,12 +113,36 @@ class FriendService {
     await _apiService.delete(_base, '/friends/$friendId');
   }
 
+  Future<void> blockUser(
+    String userId, {
+    bool blockMessages = true,
+    bool blockCalls = true,
+    bool blockAndHideLogs = false,
+  }) async {
+    await _apiService.post(
+      _base,
+      '/blocks/$userId',
+      queryParams: {
+        'blockMessages': blockMessages.toString(),
+        'blockCalls': blockCalls.toString(),
+        'blockAndHideLogs': blockAndHideLogs.toString(),
+      },
+    );
+  }
+
+  Future<void> unblockUser(String userId) async {
+    await _apiService.delete(_base, '/blocks/$userId');
+  }
+
   Future<String?> getFriendshipStatus(String userId) async {
     try {
       final response = await _apiService.get(_base, '/friends/$userId/status');
       final data = response['data'];
       if (data is Map<String, dynamic>) {
-        final status = data['status'] ?? data['friendshipStatus'] ?? data['friendship_status'];
+        final status =
+            data['status'] ??
+            data['friendshipStatus'] ??
+            data['friendship_status'];
         return status?.toString();
       }
       if (data is String) {
@@ -121,9 +157,10 @@ class FriendService {
   Future<bool> checkSentRequest(String userId) async {
     try {
       final sent = await getSentRequests();
-      return sent.any((r) => 
-        r['toUserId'] == userId || 
-        (r['toUser'] != null && r['toUser']['id'] == userId)
+      return sent.any(
+        (r) =>
+            r['toUserId'] == userId ||
+            (r['toUser'] != null && r['toUser']['id'] == userId),
       );
     } catch (_) {
       return false;
@@ -138,14 +175,14 @@ class FriendService {
       if (data is Map<String, dynamic>) {
         count = (data['pendingRequestCount'] as num?)?.toInt() ?? 0;
       }
-      
+
       // Fallback: if count is 0, verify with incoming requests list
       // sometimes stats might be out of sync or structured differently
       if (count == 0) {
         final incoming = await getIncomingRequests();
         return incoming.length;
       }
-      
+
       return count;
     } catch (_) {
       // Final fallback on error
@@ -165,29 +202,27 @@ class FriendService {
       queryParams: {'keyword': keyword},
     );
     final data = response['data'];
-    final list = data is Map<String, dynamic>
-        ? (data['content'] as List? ?? <dynamic>[])
-        : (data as List? ?? <dynamic>[]);
+    final list =
+        data is Map<String, dynamic>
+            ? (data['content'] as List? ?? <dynamic>[])
+            : (data as List? ?? <dynamic>[]);
     return list.map((e) => User.fromJson(e)).toList();
   }
 
   Future<User> searchUserByPhone(String phoneNumber) async {
     final normalized = _normalizePhone(phoneNumber);
     final encodedPhone = Uri.encodeComponent(normalized);
-    final response = await _apiService.get(
-      _base,
-      '/users/phone/$encodedPhone',
-    );
+    final response = await _apiService.get(_base, '/users/phone/$encodedPhone');
 
     final dynamic data = response['data'] ?? response;
-    if (data is! Map<String, dynamic> || 
-        data.isEmpty || 
+    if (data is! Map<String, dynamic> ||
+        data.isEmpty ||
         (data['id'] == null && data['_id'] == null)) {
-       throw ApiException(
-         message: 'Không tìm thấy người dùng với số điện thoại này.',
-         statusCode: 404,
-         code: 'USER_001',
-       );
+      throw ApiException(
+        message: 'Không tìm thấy người dùng với số điện thoại này.',
+        statusCode: 404,
+        code: 'USER_001',
+      );
     }
     return User.fromJson(data);
   }

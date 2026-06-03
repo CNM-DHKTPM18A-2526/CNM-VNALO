@@ -548,12 +548,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   onPressed: () => setState(() => _showPassword = !_showPassword),
                 ),
-                border: const UnderlineInputBorder(),
-                enabledBorder: UnderlineInputBorder(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                 ),
-                focusedBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary, width: 1.5),
                 ),
               ),
             ),
@@ -584,6 +589,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 filled: true,
                 fillColor: isDarkMode ? DarkColors.surface : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary, width: 1.5),
+                ),
                 errorText: confirm.isNotEmpty && !isMatch
                     ? t.passwordMismatch
                     : null,
@@ -593,13 +610,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     color: isDarkMode ? Colors.white54 : Colors.grey,
                   ),
                   onPressed: () => setState(() => _showConfirm = !_showConfirm),
-                ),
-                border: const UnderlineInputBorder(),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
-                ),
-                focusedBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.primary, width: 1.5),
                 ),
               ),
             ),
@@ -646,7 +656,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       child: Row(
         children: [
           Icon(
-            passed ? Icons.check_circle : Icons.radio_button_unchecked,
+            passed ? Icons.check_circle : Icons.circle_outlined,
             size: 16,
             color: passed ? AppColors.success : (Theme.of(context).brightness == Brightness.dark ? DarkColors.textHint : const Color(0xFF9CA3AF)),
           ),

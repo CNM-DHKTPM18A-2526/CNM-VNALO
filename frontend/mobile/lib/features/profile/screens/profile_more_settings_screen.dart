@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/features/profile/localization/profile_texts.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 
 class ProfileMoreSettingsScreen extends StatelessWidget {
@@ -15,6 +16,7 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
     final textColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
     final sectionLabel = isDarkMode ? DarkColors.textHint : const Color(0xFF5E7A93);
+    final t = ProfileTexts.of(context);
 
     Widget item(String title, {VoidCallback? onTap}) {
       return ListTile(
@@ -23,7 +25,7 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
         onTap: onTap ??
             () {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$title is currently using a temporary fallback.')),
+                SnackBar(content: Text(t.comingSoon)),
               );
             },
       );
@@ -49,15 +51,15 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                item('Information'),
+                item(t.profileInfo),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Change profile photo'),
+                item(t.changeProfilePhoto),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Change cover photo'),
+                item(t.changeCoverPhoto),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Update bio'),
+                item(t.updateBio),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('My wallet'),
+                item(t.myWallet),
               ],
             ),
           ),
@@ -69,14 +71,14 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                  child: Text('Settings', style: TextStyle(color: sectionLabel, fontWeight: FontWeight.w600)),
+                  child: Text(t.settings, style: TextStyle(color: sectionLabel, fontWeight: FontWeight.w600)),
                 ),
-                item('My QR code'),
+                item(t.myQrCode),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Privacy'),
+                item(t.privacy),
                 Divider(height: 1, indent: 16, color: dividerColor),
                 item(
-                  'Account management',
+                  t.accountManagement,
                   onTap: () {
                     Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
@@ -84,7 +86,7 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
                   },
                 ),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('General settings'),
+                item(t.generalSettings),
               ],
             ),
           ),

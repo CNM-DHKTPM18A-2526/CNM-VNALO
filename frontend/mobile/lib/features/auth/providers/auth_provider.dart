@@ -2,15 +2,16 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
-import 'package:vnalo_mobile/services/api_service.dart';
+import 'package:vnalo_mobile/services/api_service.dart' show ApiException, UnauthorizedException;
 import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
-import 'package:vnalo_mobile/services/notification_service.dart';
+import 'package:vnalo_mobile/services/face_auth_service.dart'
+    show FaceAuthService;
+
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/utils/device_info_util.dart';
-import 'package:vnalo_mobile/config/app_config.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
@@ -29,6 +30,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Cached access token for synchronous access (e.g. image loading headers).
   String? _accessToken;
+  String? _scopedUserId;
 
   /// Set when the user is kicked out by another device.
   String? _kickoutReason;
@@ -44,6 +46,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Current access token (cached in memory for synchronous access).
   String? get accessToken => _accessToken;
+  String? get scopedUserId => _user?.id ?? _scopedUserId;
 
   String? get kickoutReason => _kickoutReason;
 
@@ -60,8 +63,20 @@ class AuthProvider extends ChangeNotifier {
     };
   }
 
+  bool _isFatalAuthFailure(Object error) {
+    if (error is UnauthorizedException) {
+      return true;
+    }
+
+    if (error is ApiException) {
+      return error.statusCode == 401 || error.statusCode == 403;
+    }
+
+    return false;
+  }
   // Initialize the provider by checking if there's a valid token and fetching user info
   Future<void> initialize() async {
+    _scopedUserId = await _storageService.getUserId();
     final token = await _storageService.getAccessToken();
     if (token != null) {
       _accessToken = token;
@@ -70,41 +85,19 @@ class AuthProvider extends ChangeNotifier {
 
       try {
         _user = await _authService.getMe();
+        _scopedUserId = _user?.id ?? _scopedUserId;
         debugPrint('[Auth] Success: Profile hydrated.');
         // Trigger sync after successful hydration
         _localSyncService.syncRecently();
       } catch (e) {
         debugPrint('[Auth] Error: Fetching profile failed: $e');
-        // If profile fetch fails, we might still be able to function if local cache exists,
-        // but if it's an auth error, we should clear.
-        // For now, keep the session but log the error.
+        if (_isFatalAuthFailure(e)) {
+          await logout();
+        }
       }
-
-      // Register FCM token so the backend can push notifications to this device.
-      final deviceInfo = await DeviceInfoUtil.getDeviceInfo();
-      await _registerFcmToken(token, deviceInfo);
     }
     _isInitialized = true;
     notifyListeners();
-  }
-
-  Future<void> _registerFcmToken(String accessToken, DeviceInfo info) async {
-    final coreBase = AppConfig.instance.coreServiceUrl;
-    try {
-      final registered = await NotificationService().registerTokenToBackend(
-        accessToken: accessToken,
-        deviceId: info.deviceId,
-        platform: info.platform,
-        coreServiceUrl: coreBase,
-      );
-      if (!registered) {
-        debugPrint('[Auth] Warning: FCM token not registered (non-fatal).');
-      }
-    } catch (e) {
-      debugPrint(
-        '[Auth] Warning: FCM registration failed but login/session continues: $e',
-      );
-    }
   }
 
   // Login with phone and password
@@ -135,16 +128,15 @@ class AuthProvider extends ChangeNotifier {
 
       if (data['user'] != null) {
         await _storageService.saveUserId(data['user']['id']);
+        _scopedUserId = data['user']['id']?.toString();
         _user = User.fromJson(data['user']);
       } else {
         _user = await _authService.getMe();
+        _scopedUserId = _user?.id;
         await _storageService.saveUserId(_user!.id);
       }
 
       _socketService.connect(tokens.accessToken);
-
-      // Register FCM token so the backend can push notifications to this device.
-      await _registerFcmToken(tokens.accessToken, info);
 
       _isLoading = false;
       notifyListeners();
@@ -266,7 +258,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final info = await DeviceInfoUtil.getDeviceInfo();
       final response = await _authService.register(
         phone: phone,
         email: email,
@@ -276,8 +267,6 @@ class AuthProvider extends ChangeNotifier {
         acceptedTerms: acceptedTerms,
         acceptedPrivacy: acceptedPrivacy,
         legalVersion: legalVersion,
-        deviceName: info.deviceName,
-        platform: info.platform,
         gender: gender,
         dob: dob,
       );
@@ -298,14 +287,12 @@ class AuthProvider extends ChangeNotifier {
       _accessToken = tokens.accessToken;
       _socketService.connect(tokens.accessToken);
 
-      // Register FCM token so the backend can push notifications to this device.
-      await _registerFcmToken(tokens.accessToken, info);
-
       final hydrated = await _hydrateUserAfterRegister(
         data,
         displayName: displayName,
       );
       _user = hydrated.user;
+      _scopedUserId = _user?.id;
       await _storageService.saveUserId(_user!.id);
       if (hydrated.warning != null) {
         _warning = hydrated.warning;
@@ -587,6 +574,7 @@ class AuthProvider extends ChangeNotifier {
     await _storageService.clearAll();
     _user = null;
     _accessToken = null;
+    _scopedUserId = null;
     notifyListeners();
   }
 
@@ -637,6 +625,51 @@ class AuthProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  Future<bool> loginWithFace({
+    required String userId,
+    required String deviceId,
+    required String deviceName,
+    required String platform,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Import lazily to avoid circular deps
+      final faceService = FaceAuthService();
+      final result = await faceService.faceLogin(
+        userId: userId,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        platform: platform,
+      );
+
+      await _storageService.saveTokens(
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+      _accessToken = result.accessToken;
+
+      _user = await _authService.getMe();
+      _scopedUserId = _user?.id;
+      await _storageService.saveUserId(_user!.id);
+
+      _socketService.connect(result.accessToken);
+
+      _isLoading = false;
+      notifyListeners();
+      debugPrint('[Auth] Success: Face login.');
+      _localSyncService.syncRecently();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _error = _friendlyAuthError(e);
+      notifyListeners();
+      return false;
+    }
   }
 }
 

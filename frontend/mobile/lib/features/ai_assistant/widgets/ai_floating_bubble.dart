@@ -24,11 +24,11 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     with TickerProviderStateMixin {
   static const double _bubbleSize = 78;
   static const double _bubbleRadius = _bubbleSize / 2;
-  static const double _bubbleRootHeight = 96;
+  static const double _bubbleRootHeight = 106;
   static const String _positionXPrefKey = 'vnalo_ai_bubble_x';
   static const String _positionYPrefKey = 'vnalo_ai_bubble_y';
-  static const double _trashHoverDistance = 72;
-  static const double _trashAttractionDistance = 126;
+  static const double _trashHoverDistance = 64;
+  static const double _trashAttractionDistance = 108;
   static const double _trashActivationBandFromBottom = 260;
 
   Offset _position = const Offset(20, 100);
@@ -36,6 +36,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   bool _isDragging = false;
   bool _isHoveringTrash = false;
   bool _isBoardExpanded = false;
+  bool _suppressNextAutoBoard = false;
   String? _dismissedAssistantEntryId;
 
   DateTime? _ignoreTapUntil;
@@ -259,8 +260,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     const horizontalInset = 8.0;
     const verticalInset = 8.0;
     final minX = padding.left + horizontalInset;
-    final maxX =
+    final rawMaxX =
         screenSize.width - padding.right - _bubbleSize - horizontalInset;
+    final maxX = max(minX, rawMaxX);
     final minY = padding.top + verticalInset;
     final maxY = max(
       minY,
@@ -393,9 +395,6 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         state: provider.state,
         emotion: provider.currentEmotion,
         size: _bubbleSize,
-        onTap: () {
-          _toggleBoard();
-        },
       ),
     );
   }
@@ -416,20 +415,32 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               DateTime.now().isBefore(_ignoreTapUntil!)) {
             return;
           }
-          _toggleBoard();
+          _toggleBoard(provider);
         },
-        onLongPress:
-            () => provider.onPrimaryAction(source: 'bubble_long_press'),
       ),
     );
   }
 
-  void _toggleBoard() {
+  void _toggleBoard(AiAssistantProvider provider) {
+    final latestAssistantEntryId = _latestAssistantEntryId(provider);
+    final isAutoBoardVisible =
+        !_isBoardExpanded &&
+        provider.aiResponse.isNotEmpty &&
+        provider.shouldBubbleAutoShowResponse &&
+        latestAssistantEntryId != null &&
+        !_suppressNextAutoBoard &&
+        latestAssistantEntryId != _dismissedAssistantEntryId;
+
     setState(() {
-      if (!_isBoardExpanded) {
+      if (_isBoardExpanded || isAutoBoardVisible) {
+        _isBoardExpanded = false;
+        _suppressNextAutoBoard = provider.isAssistantGenerating;
+        _dismissedAssistantEntryId = latestAssistantEntryId;
+      } else {
+        _isBoardExpanded = true;
+        _suppressNextAutoBoard = false;
         _dismissedAssistantEntryId = null;
       }
-      _isBoardExpanded = !_isBoardExpanded;
     });
   }
 
@@ -450,10 +461,23 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   }
 
   Future<void> _openAiConversation() async {
+    if (mounted) {
+      context.read<AiAssistantProvider>().enterConversationSurface(
+        reason: 'bubble_open_conversation',
+      );
+      setState(() {
+        _isBoardExpanded = false;
+      });
+    }
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AiConversationScreen()),
     );
+    if (mounted) {
+      context.read<AiAssistantProvider>().leaveConversationSurface(
+        reason: 'bubble_close_conversation',
+      );
+    }
   }
 
   Widget _buildMascotContainer(AiAssistantProvider provider) {
@@ -474,38 +498,40 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: _bubbleSize,
-                  height: _bubbleSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        provider.state == AiState.speaking
-                            ? Colors.greenAccent.withValues(alpha: 0.24)
-                            : Colors.blueAccent.withValues(alpha: 0.14),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.52, 1.0],
+                Positioned.fill(
+                  child: Container(
+                    width: _bubbleSize,
+                    height: _bubbleSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          provider.state == AiState.speaking
+                              ? Colors.greenAccent.withValues(alpha: 0.24)
+                              : Colors.blueAccent.withValues(alpha: 0.14),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.52, 1.0],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.45),
+                      ),
                     ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.45),
-                    ),
+                    child: _buildMascotSurface(provider),
                   ),
-                  child: _buildMascotSurface(provider),
                 ),
                 Positioned.fill(child: _buildLayeredGestureMask(provider)),
                 Positioned(
-                  top: -10,
-                  left: -8,
+                  top: 2,
+                  left: 2,
                   child: GestureDetector(
                     key: const ValueKey('ai_bubble_toggle_board'),
                     behavior: HitTestBehavior.opaque,
-                    onTap: _toggleBoard,
+                    onTap: () => _toggleBoard(provider),
                     onLongPress: _openAiConversation,
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 26,
+                      height: 26,
                       decoration: BoxDecoration(
                         color:
                             _isBoardExpanded
@@ -513,37 +539,38 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                                 : Colors.black.withValues(alpha: 0.62),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: Colors.white.withValues(alpha: 0.42),
                         ),
                       ),
                       child: const Icon(
                         Icons.chat_bubble_outline_rounded,
                         color: Colors.white,
-                        size: 15,
+                        size: 14,
                       ),
                     ),
                   ),
                 ),
                 Positioned(
-                  top: -10,
-                  right: -8,
+                  top: 2,
+                  right: 2,
                   child: GestureDetector(
+                    key: const ValueKey('ai_bubble_open_gallery'),
                     behavior: HitTestBehavior.opaque,
                     onTap: _openMascotGallery,
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 26,
+                      height: 26,
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.62),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: Colors.white.withValues(alpha: 0.42),
                         ),
                       ),
                       child: const Icon(
                         Icons.tune,
                         color: Colors.white,
-                        size: 15,
+                        size: 14,
                       ),
                     ),
                   ),
@@ -566,12 +593,18 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     final availableHeight = max(240.0, screenSize.height - viewInsets.bottom);
 
     const boardPadding = 12.0;
-    final boardWidth = min(340.0, screenSize.width - (boardPadding * 2));
+    final boardWidth = min(320.0, screenSize.width - (boardPadding * 2));
     final compactHeightLimit = max(
-      240.0,
+      220.0,
       availableHeight - padding.top - padding.bottom - 24.0,
     );
-    final boardHeight = min(420.0, compactHeightLimit);
+    final prefersTallBoard =
+        aiProvider.clarificationState != null ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.25;
+    final boardHeight = min(
+      prefersTallBoard ? 456.0 : 392.0,
+      compactHeightLimit,
+    );
 
     final prefersRightDock = _position.dx < screenSize.width / 2;
     final desiredLeft =
@@ -589,13 +622,24 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       minBoardTop,
       availableHeight - boardHeight - padding.bottom - 16.0,
     );
-    final boardTop = desiredTop.clamp(minBoardTop, maxBoardTop).toDouble();
+    const boardGap = 10.0;
+    final topCandidate = _position.dy - boardHeight - boardGap;
+    final bottomCandidate = _position.dy + _bubbleRootHeight + boardGap;
+    final canPlaceAbove = topCandidate >= minBoardTop;
+    final canPlaceBelow = bottomCandidate <= maxBoardTop;
+    final boardTop =
+        canPlaceAbove
+            ? topCandidate
+            : canPlaceBelow
+            ? bottomCandidate
+            : desiredTop.clamp(minBoardTop, maxBoardTop).toDouble();
 
     final latestAssistantEntryId = _latestAssistantEntryId(aiProvider);
     final hasNewBubbleResponse =
         aiProvider.aiResponse.isNotEmpty &&
         aiProvider.shouldBubbleAutoShowResponse &&
         latestAssistantEntryId != null &&
+        !_suppressNextAutoBoard &&
         latestAssistantEntryId != _dismissedAssistantEntryId;
     final showBoard =
         !_isDragging && (_isBoardExpanded || hasNewBubbleResponse);
@@ -616,6 +660,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                 onClose: () {
                   setState(() {
                     _isBoardExpanded = false;
+                    _suppressNextAutoBoard = aiProvider.isAssistantGenerating;
                     _dismissedAssistantEntryId = latestAssistantEntryId;
                   });
                 },
@@ -626,10 +671,12 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                 onSubmitPrompt: (text) async {
                   setState(() {
                     _isBoardExpanded = true;
+                    _suppressNextAutoBoard = false;
                   });
                   await aiProvider.submitTextPrompt(
                     text,
                     source: 'bubble_chat_board',
+                    surface: AiResponseSurface.bubble,
                   );
                 },
               ),
@@ -642,7 +689,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildBubbleIndicator(aiProvider),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 _buildMascotContainer(aiProvider),
               ],
             ),

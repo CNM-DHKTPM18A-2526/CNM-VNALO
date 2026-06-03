@@ -6,12 +6,14 @@ import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/chat/widgets/sticker_picker.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/chat/screens/create_poll_screen.dart';
 import 'package:vnalo_mobile/features/chat/widgets/attachment_action_sheets.dart';
 import 'package:vnalo_mobile/features/chat/widgets/mention_autocomplete.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
+import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/features/chat/widgets/voice_recording_overlay.dart';
-import 'package:vnalo_mobile/features/chat/screens/group_board_screen.dart';
+import 'package:vnalo_mobile/features/chat/widgets/poll_widget.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
@@ -124,7 +126,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
     }
   }
 
-  // ─── @Mention Detection ───────────────────────────────────────────────────
+  // â”€â”€â”€ @Mention Detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _onTextChanged() {
     final text = _controller.text;
     final sel = _controller.selection;
@@ -190,9 +192,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final text = _controller.text;
     final cursorPos = _controller.selection.baseOffset;
 
-    final newText = text.substring(0, _mentionStart) +
-        '@$name ' +
-        text.substring(cursorPos);
+    final newText =
+        '${text.substring(0, _mentionStart)}@$name ${text.substring(cursorPos)}';
 
     _controller.value = TextEditingValue(
       text: newText,
@@ -226,7 +227,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
         if (length > 5 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Không hỗ trợ gửi file/ảnh lớn hơn 5MB')),
+              const SnackBar(
+                content: Text('Không hỗ trợ gửi file/ảnh lớn hơn 5MB'),
+              ),
             );
           }
           continue;
@@ -245,7 +248,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
       allowMultiple: true,
     );
     if (result != null && mounted) {
-      final paths = result.files.map((f) => f.path).whereType<String>().toList();
+      final paths =
+          result.files.map((f) => f.path).whereType<String>().toList();
       if (widget.onSendVideos != null) {
         await widget.onSendVideos!(paths);
         return;
@@ -256,7 +260,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
         if (file.size > 5 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Không hỗ trợ gửi video lớn hơn 5MB')),
+              const SnackBar(
+                content: Text('Không hỗ trợ gửi video lớn hơn 5MB'),
+              ),
             );
           }
           continue;
@@ -272,7 +278,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.pickFiles(allowMultiple: true);
     if (result != null && mounted) {
-      final paths = result.files.map((f) => f.path).whereType<String>().toList();
+      final paths =
+          result.files.map((f) => f.path).whereType<String>().toList();
       if (widget.onSendFiles != null) {
         await widget.onSendFiles!(paths);
         return;
@@ -283,7 +290,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
         if (file.size > 5 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Không hỗ trợ gửi file lớn hơn 5MB')),
+              const SnackBar(
+                content: Text('Không hỗ trợ gửi file lớn hơn 5MB'),
+              ),
             );
           }
           continue;
@@ -299,7 +308,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final common = CommonTexts.of(context);
     final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
 
     return Column(
@@ -345,7 +353,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
             decoration: BoxDecoration(
               color: bgColor,
               border: Border(
-                top: BorderSide(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider, width: 0.5),
+                top: BorderSide(
+                  color:
+                      isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+                  width: 0.5,
+                ),
               ),
             ),
             child: SafeArea(
@@ -356,8 +368,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 children: [
                   IconButton(
                     icon: Icon(
-                      _showStickers ? Icons.keyboard : Icons.emoji_emotions_outlined,
-                      color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle,
+                      _showStickers
+                          ? Icons.keyboard
+                          : Icons.emoji_emotions_outlined,
+                      color:
+                          isDarkMode
+                              ? DarkColors.textSecondary
+                              : AppColors.iconSubtle,
                     ),
                     onPressed: () {
                       setState(() => _showStickers = !_showStickers);
@@ -372,7 +389,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       ),
                       child: TextField(
                         controller: _controller,
-                        onChanged: (v) => setState(() => _hasText = v.trim().isNotEmpty),
+                        onChanged:
+                            (v) =>
+                                setState(() => _hasText = v.trim().isNotEmpty),
                         onTap: () => setState(() => _showStickers = false),
                         minLines: 1,
                         maxLines: 5,
@@ -383,12 +402,18 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         decoration: InputDecoration(
                           hintText: 'Tin nhắn',
                           hintStyle: TextStyle(
-                            color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
+                            color:
+                                isDarkMode
+                                    ? DarkColors.textHint
+                                    : const Color(0xFFA1A3A7),
                             fontSize: 16,
                           ),
                           isDense: true,
                           filled: false,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 4,
+                          ),
                           border: InputBorder.none,
                         ),
                       ),
@@ -396,7 +421,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   ),
                   if (_hasText)
                     IconButton(
-                      icon: Icon(Icons.send, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                      icon: Icon(
+                        Icons.send,
+                        color:
+                            isDarkMode ? DarkColors.primary : AppColors.primary,
+                      ),
                       onPressed: _onSend,
                     )
                   else
@@ -404,11 +433,23 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle),
+                          icon: Icon(
+                            Icons.more_horiz,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.textSecondary
+                                    : AppColors.iconSubtle,
+                          ),
                           onPressed: () => _showAttachmentMenu(context),
                         ),
                         IconButton(
-                          icon: Icon(Icons.mic_none_outlined, color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle),
+                          icon: Icon(
+                            Icons.mic_none_outlined,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.textSecondary
+                                    : AppColors.iconSubtle,
+                          ),
                           onPressed: () {
                             setState(() {
                               _showVoiceRecording = true;
@@ -418,7 +459,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           },
                         ),
                         IconButton(
-                          icon: Icon(Icons.image_outlined, color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle),
+                          icon: Icon(
+                            Icons.image_outlined,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.textSecondary
+                                    : AppColors.iconSubtle,
+                          ),
                           onPressed: _pickImage,
                         ),
                       ],
@@ -432,32 +479,46 @@ class _ChatInputBarState extends State<ChatInputBar> {
             conversationId: widget.conversationId,
             onSelected: () => setState(() => _showStickers = false),
             onEmojiSelected: (emoji) {
-               if (emoji == '\b') {
-                 final text = _controller.text;
-                 final selection = _controller.selection;
-                 if (selection.start > 0) {
-                   final newText = text.replaceRange(selection.start - 1, selection.start, '');
-                   _controller.value = TextEditingValue(
-                     text: newText,
-                     selection: TextSelection.collapsed(offset: selection.start - 1),
-                   );
-                 }
-                 setState(() => _hasText = _controller.text.trim().isNotEmpty);
-                 return;
-               }
-               final text = _controller.text;
-               final selection = _controller.selection;
-               if (selection.start >= 0 && selection.end >= 0) {
-                 final newText = text.replaceRange(selection.start, selection.end, emoji);
+              if (emoji == '\b') {
+                final text = _controller.text;
+                final selection = _controller.selection;
+                if (selection.start > 0) {
+                  final newText = text.replaceRange(
+                    selection.start - 1,
+                    selection.start,
+                    '',
+                  );
                   _controller.value = TextEditingValue(
                     text: newText,
-                    selection: TextSelection.collapsed(offset: (selection.start + emoji.length).toInt()),
+                    selection: TextSelection.collapsed(
+                      offset: selection.start - 1,
+                    ),
                   );
-               } else {
-                 _controller.text = text + emoji;
-                 _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
-               }
-               setState(() => _hasText = _controller.text.trim().isNotEmpty);
+                }
+                setState(() => _hasText = _controller.text.trim().isNotEmpty);
+                return;
+              }
+              final text = _controller.text;
+              final selection = _controller.selection;
+              if (selection.start >= 0 && selection.end >= 0) {
+                final newText = text.replaceRange(
+                  selection.start,
+                  selection.end,
+                  emoji,
+                );
+                _controller.value = TextEditingValue(
+                  text: newText,
+                  selection: TextSelection.collapsed(
+                    offset: (selection.start + emoji.length).toInt(),
+                  ),
+                );
+              } else {
+                _controller.text = text + emoji;
+                _controller.selection = TextSelection.fromPosition(
+                  TextPosition(offset: _controller.text.length),
+                );
+              }
+              setState(() => _hasText = _controller.text.trim().isNotEmpty);
             },
           ),
       ],
@@ -478,7 +539,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
       decoration: BoxDecoration(
         color: isDarkMode ? DarkColors.surface : Colors.white,
         border: Border(
-          top: BorderSide(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider, width: 0.5),
+          top: BorderSide(
+            color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+            width: 0.5,
+          ),
         ),
       ),
       child: Row(
@@ -500,7 +564,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 Text(
                   replyMsg.senderName ?? common.unknownUser,
                   style: TextStyle(
-                    color: isDarkMode ? DarkColors.primary : const Color(0xFF0068FF),
+                    color:
+                        isDarkMode
+                            ? DarkColors.primary
+                            : const Color(0xFF0068FF),
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
@@ -513,7 +580,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
+                    color:
+                        isDarkMode
+                            ? DarkColors.textSecondary
+                            : LightColors.textSecondary,
                   ),
                 ),
               ],
@@ -524,7 +594,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
             child: Icon(
               Icons.close,
               size: 20,
-              color: isDarkMode ? Colors.white54 : Colors.grey[600]
+              color: isDarkMode ? Colors.white54 : Colors.grey[600],
             ),
           ),
         ],
@@ -538,40 +608,44 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
     if (typingUsers.isEmpty) return const SizedBox.shrink();
 
-    final conv = chatProvider.conversations
-        .where((c) => c.id == widget.conversationId)
-        .firstOrNull;
+    final conv =
+        chatProvider.conversations
+            .where((c) => c.id == widget.conversationId)
+            .firstOrNull;
     if (conv == null) return const SizedBox.shrink();
 
-    String text;
-    final userIds = typingUsers.keys.toList();
-    if (userIds.length == 1) {
-      final member = conv.members
-          .where((m) => m.userId == userIds[0])
-          .firstOrNull;
-      text = '${member?.nickname ?? member?.user?.displayName ?? 'Ai đó'} đang nhập...';
-    } else {
-      text = '${userIds.length} người đang nhập...';
-    }
+    final orderedTypers =
+        typingUsers.entries.toList()
+          ..sort((a, b) {
+            final startedCompare = a.value.startedAt.compareTo(
+              b.value.startedAt,
+            );
+            if (startedCompare != 0) {
+              return startedCompare;
+            }
+            return a.value.lastSeen.compareTo(b.value.lastSeen);
+          });
+
+    final text =
+        orderedTypers.length == 1
+            ? _singleTypingLabel(conv, orderedTypers.first)
+            : _multiTypingLabel(conv, orderedTypers);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: _TypingDots(),
-          ),
+          SizedBox(width: 16, height: 16, child: _TypingDots()),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white54
-                    : Colors.grey.shade600,
+                color:
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white54
+                        : Colors.grey.shade600,
                 fontStyle: FontStyle.italic,
               ),
               maxLines: 1,
@@ -583,139 +657,211 @@ class _ChatInputBarState extends State<ChatInputBar> {
     );
   }
 
+  String _singleTypingLabel(
+    Conversation conversation,
+    MapEntry<String, ChatTypingState> typer,
+  ) {
+    final displayName = _typingDisplayName(conversation, typer.key);
+    final suffix = _typingPlatformSuffix(typer.value.clientPlatform);
+    return '$displayName đang nhập tin nhắn$suffix...';
+  }
+
+  String _multiTypingLabel(
+    Conversation conversation,
+    List<MapEntry<String, ChatTypingState>> orderedTypers,
+  ) {
+    final visibleNames =
+        orderedTypers
+            .take(3)
+            .map((entry) => _typingDisplayName(conversation, entry.key))
+            .toList();
+    final remaining = orderedTypers.length - visibleNames.length;
+    final namesText = visibleNames.join(', ');
+
+    if (remaining > 0) {
+      return '$namesText và $remaining người khác đang nhập tin nhắn...';
+    }
+    return '$namesText đang nhập tin nhắn...';
+  }
+
+  String _typingDisplayName(Conversation conversation, String userId) {
+    final member =
+        conversation.members.where((m) => m.userId == userId).firstOrNull;
+    final nickname = member?.nickname?.trim();
+    if (nickname != null && nickname.isNotEmpty) {
+      return nickname;
+    }
+
+    final displayName = member?.user?.displayName.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    return 'Ai đó';
+  }
+
+  String _typingPlatformSuffix(String? platform) {
+    switch (platform) {
+      case 'DESKTOP':
+      case 'WEB':
+        return ' từ máy tính';
+      case 'ANDROID':
+      case 'IOS':
+      case 'MOBILE':
+        return ' từ điện thoại';
+      default:
+        return '';
+    }
+  }
+
   void _showAttachmentMenu(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final chatProvider = context.read<ChatProvider>();
-    final conv = chatProvider.conversations
-        .where((c) => c.id == widget.conversationId)
-        .firstOrNull;
-    if (conv == null) return;
-    final isGroup = widget.isGroup && conv.type == ConversationType.GROUP;
-    
-    bool canCreateNote = true;
-    bool canCreatePoll = true;
-    
-    if (isGroup) {
-      final userId = chatProvider.currentUserId;
-      final myMember = conv.members.firstWhere(
-        (m) => m.userId == userId,
-        orElse: () => ConversationMember(
-          conversationId: conv.id,
-          userId: userId ?? '',
-          role: MemberRole.MEMBER,
-          joinedAt: DateTime.now(),
-        ),
-      );
-      final isAdminOrDeputy = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
-      canCreateNote = conv.allowMemberCreateNote || isAdminOrDeputy;
-      canCreatePoll = conv.allowMemberCreatePoll || isAdminOrDeputy;
-    }
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 24),
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? DarkColors.divider : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Wrap(
-                spacing: 20,
-                runSpacing: 20,
-                alignment: WrapAlignment.start,
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildMenuButton(context, isDarkMode, Icons.location_on, const Color(0xFFE56353), 'Vị trí', () {
-                    Navigator.pop(context);
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => LocationPickerSheet(
-                        onLocationSelected: (address, lat, lng) {
-                          widget.onSend('📍 $address');
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color:
+                            isDarkMode
+                                ? DarkColors.divider
+                                : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 20,
+                    runSpacing: 20,
+                    alignment: WrapAlignment.start,
+                    children: [
+                      _buildMenuButton(
+                        context,
+                        isDarkMode,
+                        Icons.location_on,
+                        const Color(0xFFE56353),
+                        'Vị trí',
+                        () {
+                          Navigator.pop(context);
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder:
+                                (_) => LocationPickerSheet(
+                                  onLocationSelected: (address, lat, lng) {
+                                    widget.onSend('📍 $address');
+                                  },
+                                ),
+                          );
                         },
                       ),
-                    );
-                  }),
-                  _buildMenuButton(context, isDarkMode, Icons.attach_file, const Color(0xFF4A89DF), 'Tài liệu', () {
-                    Navigator.pop(context);
-                    _pickFile();
-                  }),
-                  _buildMenuButton(context, isDarkMode, Icons.videocam, AppColors.success, 'Video', () {
-                    Navigator.pop(context);
-                    _pickVideo();
-                  }),
-                  _buildMenuButton(context, isDarkMode, Icons.alarm, AppColors.warning, 'Nhắc hẹn', () {
-                    Navigator.pop(context);
-                    if (!canCreateNote) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Bạn không có quyền tạo nhắc hẹn'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                      return;
-                    }
-                    showDialog(
-                      context: context,
-                      builder: (_) => ReminderDialog(
-                        onReminderSet: (title, reminderTime) {
-                          widget.onSend('⏰ Nhắc hẹn: $title - ${_formatReminderTime(reminderTime)}');
+                      _buildMenuButton(
+                        context,
+                        isDarkMode,
+                        Icons.attach_file,
+                        const Color(0xFF4A89DF),
+                        'Tài liệu',
+                        () {
+                          Navigator.pop(context);
+                          _pickFile();
                         },
                       ),
-                    );
-                  }),
-                  _buildMenuButton(context, isDarkMode, Icons.poll_rounded, AppColors.primary, 'Bình chọn', () {
-                    Navigator.pop(context);
-                    if (!canCreatePoll) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Bạn không có quyền tạo bình chọn'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => GroupBoardScreen(conversation: conv, initialTabIndex: 1),
-                      ),
-                    );
-                  }),
-                  _buildMenuButton(context, isDarkMode, Icons.chat, const Color(0xFF4A89DF), 'Tin nhắn nhanh', () {
-                    Navigator.pop(context);
-                    showModalBottomSheet(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => QuickMessageSheet(
-                        onQuickMessageSelected: (msg) {
-                          widget.onSend(msg);
+                      _buildMenuButton(
+                        context,
+                        isDarkMode,
+                        Icons.videocam,
+                        AppColors.success,
+                        'Video',
+                        () {
+                          Navigator.pop(context);
+                          _pickVideo();
                         },
                       ),
-                    );
-                  }),
+                      _buildMenuButton(
+                        context,
+                        isDarkMode,
+                        Icons.alarm,
+                        AppColors.warning,
+                        'Nhắc hẹn',
+                        () {
+                          Navigator.pop(context);
+                          showDialog(
+                            context: context,
+                            builder:
+                                (_) => ReminderDialog(
+                                  onReminderSet: (title, reminderTime) {
+                                    widget.onSend(
+                                      '⏰ Nhắc hẹn: $title - ${_formatReminderTime(reminderTime)}',
+                                    );
+                                  },
+                                ),
+                          );
+                        },
+                      ),
+                      _buildMenuButton(
+                        context,
+                        isDarkMode,
+                        Icons.poll_rounded,
+                        AppColors.primary,
+                        'Bình chọn',
+                        () {
+                          Navigator.pop(context);
+                          final chatProvider = context.read<ChatProvider>();
+                          final conversation = chatProvider.conversations
+                              .where((c) => c.id == widget.conversationId)
+                              .firstOrNull;
+                          if (conversation == null) return;
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CreatePollScreen(
+                                conversation: conversation,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuButton(
+                        context,
+                        isDarkMode,
+                        Icons.chat,
+                        const Color(0xFF4A89DF),
+                        'Tin nhắn nhanh',
+                        () {
+                          Navigator.pop(context);
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            builder:
+                                (_) => QuickMessageSheet(
+                                  onQuickMessageSelected: (msg) {
+                                    widget.onSend(msg);
+                                  },
+                                ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -728,7 +874,14 @@ class _ChatInputBarState extends State<ChatInputBar> {
     return 'lúc ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget _buildMenuButton(BuildContext context, bool isDarkMode, IconData icon, Color color, String label, VoidCallback onTap) {
+  Widget _buildMenuButton(
+    BuildContext context,
+    bool isDarkMode,
+    IconData icon,
+    Color color,
+    String label,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -740,10 +893,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
             Container(
               width: 54,
               height: 54,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               child: Icon(icon, color: Colors.white, size: 28),
             ),
             const SizedBox(height: 8),
@@ -769,14 +919,18 @@ class _TypingDots extends StatefulWidget {
   State<_TypingDots> createState() => _TypingDotsState();
 }
 
-class _TypingDotsState extends State<_TypingDots> with TickerProviderStateMixin {
+class _TypingDotsState extends State<_TypingDots>
+    with TickerProviderStateMixin {
   late AnimationController _controller;
   late List<Animation<double>> _animations;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(duration: const Duration(milliseconds: 1200), vsync: this)..repeat();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat();
     _animations = List.generate(3, (i) {
       return Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
@@ -808,7 +962,9 @@ class _TypingDotsState extends State<_TypingDots> with TickerProviderStateMixin 
               width: 4,
               height: 4,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.4 + _animations[i].value * 0.6),
+                color: color.withValues(
+                  alpha: 0.4 + _animations[i].value * 0.6,
+                ),
                 shape: BoxShape.circle,
               ),
             );

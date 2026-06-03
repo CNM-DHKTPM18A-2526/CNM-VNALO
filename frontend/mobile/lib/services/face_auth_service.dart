@@ -53,9 +53,8 @@ class FaceAuthService {
           response.body.isNotEmpty ? _tryParse(response.body) : {},
         );
         message = body['message'] ?? body['error'] ?? message;
-      } catch (_) {
-        // Response parsing failed; keep the HTTP status code message.
-      }
+      } catch (_) {}
+      throw ApiException(statusCode: response.statusCode, message: message);
     }
     try {
       return Map<String, dynamic>.from(_tryParse(response.body));
