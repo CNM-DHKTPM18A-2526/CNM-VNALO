@@ -19,9 +19,17 @@ class MessageReactions extends StatelessWidget {
   Widget build(BuildContext context) {
     if (reactions.isEmpty) return const SizedBox.shrink();
 
+    // Hide poll-vote reactions from the generic reaction chips UI.
+    // Poll votes are rendered by PollWidget itself.
+    final visible = reactions
+        .where((r) => !(r.emoji.startsWith('vote:') || r.emoji.startsWith('v:')))
+        .toList();
+
+    if (visible.isEmpty) return const SizedBox.shrink();
+
     // Group reactions by emoji
     final Map<String, List<MessageReaction>> groupedReactions = {};
-    for (final reaction in reactions) {
+    for (final reaction in visible) {
       if (!groupedReactions.containsKey(reaction.emoji)) {
         groupedReactions[reaction.emoji] = [];
       }
@@ -83,7 +91,7 @@ class _ReactionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
-          color: hasReacted 
+          color: hasReacted
               ? const Color(0xFFE3F2FD) // Light blue for reacted
               : Colors.grey[100],
           borderRadius: BorderRadius.circular(16),
@@ -104,8 +112,8 @@ class _ReactionChip extends StatelessWidget {
                 count.toString(),
                 style: TextStyle(
                   fontSize: 11,
-                  color: hasReacted 
-                      ? const Color(0xFF2196F3) 
+                  color: hasReacted
+                      ? const Color(0xFF2196F3)
                       : Colors.grey[600],
                   fontWeight: FontWeight.w600,
                 ),

@@ -139,23 +139,15 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
   String _resolveAuthorName(String authorId) {
     final auth = context.read<AuthProvider>();
     if (authorId == auth.user?.id) return auth.user?.displayName ?? authorId;
-    try {
-      final contact = context.read<ContactProvider>().friends.firstWhere((u) => u.id == authorId);
-      return contact.displayName;
-    } catch (_) {
-      return authorId;
-    }
+    final user = context.read<ContactProvider>().getUserById(authorId);
+    return user?.displayName ?? authorId;
   }
 
   String? _resolveAuthorAvatar(String authorId) {
     final auth = context.read<AuthProvider>();
     if (authorId == auth.user?.id) return auth.user?.avatarUrl;
-    try {
-      final contact = context.read<ContactProvider>().friends.firstWhere((u) => u.id == authorId);
-      return contact.avatarUrl;
-    } catch (_) {
-      return null;
-    }
+    final user = context.read<ContactProvider>().getUserById(authorId);
+    return user?.avatarUrl;
   }
 
   @override

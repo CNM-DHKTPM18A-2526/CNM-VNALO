@@ -41,6 +41,15 @@ class SocketService with ChangeNotifier {
   StreamController<Map<String, dynamic>> _callErrorController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _reactionAddedController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _reactionRemovedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _postCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _postUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _postDeletedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _reactionUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _commentCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _storyCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _storyDeletedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _storyViewedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _storyExpiredController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _groupDisbandedController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _friendshipUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _friendRequestReceivedController = StreamController<Map<String, dynamic>>.broadcast();
@@ -50,6 +59,9 @@ class SocketService with ChangeNotifier {
   StreamController<Map<String, dynamic>> _groupRoleChangedController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _groupAdminTransferredController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _blockCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _blockUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _blockRemovedController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _groupCallSignalController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<void> _connectController = StreamController<void>.broadcast();
 
@@ -68,6 +80,15 @@ class SocketService with ChangeNotifier {
     _callErrorController.close();
     _reactionAddedController.close();
     _reactionRemovedController.close();
+    _postCreatedController.close();
+    _postUpdatedController.close();
+    _postDeletedController.close();
+    _reactionUpdatedController.close();
+    _commentCreatedController.close();
+    _storyCreatedController.close();
+    _storyDeletedController.close();
+    _storyViewedController.close();
+    _storyExpiredController.close();
     _groupDisbandedController.close();
     _friendshipUpdatedController.close();
     _friendRequestReceivedController.close();
@@ -77,6 +98,9 @@ class SocketService with ChangeNotifier {
     _groupRoleChangedController.close();
     _groupAdminTransferredController.close();
     _sendErrorController.close();
+    _blockCreatedController.close();
+    _blockUpdatedController.close();
+    _blockRemovedController.close();
     _groupCallSignalController.close();
     _connectController.close();
   }
@@ -97,6 +121,15 @@ class SocketService with ChangeNotifier {
   Stream<Map<String, dynamic>> get onCallError => _callErrorController.stream;
   Stream<Map<String, dynamic>> get onReactionAdded => _reactionAddedController.stream;
   Stream<Map<String, dynamic>> get onReactionRemoved => _reactionRemovedController.stream;
+  Stream<Map<String, dynamic>> get onPostCreated => _postCreatedController.stream;
+  Stream<Map<String, dynamic>> get onPostUpdated => _postUpdatedController.stream;
+  Stream<Map<String, dynamic>> get onPostDeleted => _postDeletedController.stream;
+  Stream<Map<String, dynamic>> get onReactionUpdated => _reactionUpdatedController.stream;
+  Stream<Map<String, dynamic>> get onCommentCreated => _commentCreatedController.stream;
+  Stream<Map<String, dynamic>> get onStoryCreated => _storyCreatedController.stream;
+  Stream<Map<String, dynamic>> get onStoryDeleted => _storyDeletedController.stream;
+  Stream<Map<String, dynamic>> get onStoryViewed => _storyViewedController.stream;
+  Stream<Map<String, dynamic>> get onStoryExpired => _storyExpiredController.stream;
   Stream<Map<String, dynamic>> get onGroupDisbanded => _groupDisbandedController.stream;
   Stream<Map<String, dynamic>> get onFriendshipUpdated => _friendshipUpdatedController.stream;
   Stream<Map<String, dynamic>> get onFriendRequestReceived => _friendRequestReceivedController.stream;
@@ -106,6 +139,9 @@ class SocketService with ChangeNotifier {
   Stream<Map<String, dynamic>> get onGroupRoleChanged => _groupRoleChangedController.stream;
   Stream<Map<String, dynamic>> get onGroupAdminTransferred => _groupAdminTransferredController.stream;
   Stream<Map<String, dynamic>> get onSendError => _sendErrorController.stream;
+  Stream<Map<String, dynamic>> get onBlockCreated => _blockCreatedController.stream;
+  Stream<Map<String, dynamic>> get onBlockUpdated => _blockUpdatedController.stream;
+  Stream<Map<String, dynamic>> get onBlockRemoved => _blockRemovedController.stream;
 
   void _emitCallSignal(String type, dynamic data) {
     if (data is! Map) return;
@@ -342,6 +378,49 @@ class SocketService with ChangeNotifier {
     _socket!.on('message.reaction.removed', (data) {
       _reactionRemovedController.add(Map<String, dynamic>.from(data));
     });
+
+    Map<String, dynamic> _safePayload(dynamic data) {
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {'data': data};
+    }
+
+    _socket!.on('post.created', (data) {
+      debugPrint('[SOCKET][SOCIAL] post.created: $data');
+      _postCreatedController.add(_safePayload(data));
+    });
+    _socket!.on('post.updated', (data) {
+      debugPrint('[SOCKET][SOCIAL] post.updated: $data');
+      _postUpdatedController.add(_safePayload(data));
+    });
+    _socket!.on('post.deleted', (data) {
+      debugPrint('[SOCKET][SOCIAL] post.deleted: $data');
+      _postDeletedController.add(_safePayload(data));
+    });
+    _socket!.on('reaction.updated', (data) {
+      debugPrint('[SOCKET][SOCIAL] reaction.updated: $data');
+      _reactionUpdatedController.add(_safePayload(data));
+    });
+    _socket!.on('comment.created', (data) {
+      debugPrint('[SOCKET][SOCIAL] comment.created: $data');
+      _commentCreatedController.add(_safePayload(data));
+    });
+    _socket!.on('story.created', (data) {
+      debugPrint('[SOCKET][SOCIAL] story.created: $data');
+      _storyCreatedController.add(_safePayload(data));
+    });
+    _socket!.on('story.deleted', (data) {
+      debugPrint('[SOCKET][SOCIAL] story.deleted: $data');
+      _storyDeletedController.add(_safePayload(data));
+    });
+    _socket!.on('story.viewed', (data) {
+      debugPrint('[SOCKET][SOCIAL] story.viewed: $data');
+      _storyViewedController.add(_safePayload(data));
+    });
+    _socket!.on('story.expired', (data) {
+      debugPrint('[SOCKET][SOCIAL] story.expired: $data');
+      _storyExpiredController.add(_safePayload(data));
+    });
+
     _socket!.on('group.disbanded', (data) {
       _groupDisbandedController.add(Map<String, dynamic>.from(data));
     });
@@ -371,6 +450,8 @@ class SocketService with ChangeNotifier {
       _groupAdminTransferredController.add(Map<String, dynamic>.from(data));
     });
     _socket!.onAny((event, data) {
+      // Reduce noise: heartbeat emits frequently and can flood logs.
+      if (event == 'heartbeat' || event == 'heartbeat.ack') return;
       debugPrint('📩 [SOCKET ANY] Event: $event | Data: $data');
     });
 
@@ -384,6 +465,25 @@ class SocketService with ChangeNotifier {
         _friendRequestReceivedController.add(Map<String, dynamic>.from(data as Map));
       } else {
         _friendRequestReceivedController.add({});
+      }
+    });
+
+    _socket!.on('block.created', (data) {
+      debugPrint('[SOCKET] 🚫 block.created: $data');
+      if (data is Map) {
+        _blockCreatedController.add(Map<String, dynamic>.from(data));
+      }
+    });
+    _socket!.on('block.updated', (data) {
+      debugPrint('[SOCKET] 🚫 block.updated: $data');
+      if (data is Map) {
+        _blockUpdatedController.add(Map<String, dynamic>.from(data));
+      }
+    });
+    _socket!.on('block.removed', (data) {
+      debugPrint('[SOCKET] ✅ block.removed: $data');
+      if (data is Map) {
+        _blockRemovedController.add(Map<String, dynamic>.from(data));
       }
     });
 
@@ -429,26 +529,30 @@ class SocketService with ChangeNotifier {
 
   // Join a conversation by emitting a 'conversation.join' event with the conversation ID
   void joinConversation(String conversationId) {
-    if (_joinedRooms.contains(conversationId)) {
-      debugPrint('[SocketService] joinConversation: already joined $conversationId');
+    final id = conversationId.trim();
+    if (id.isEmpty) return;
+
+    if (_joinedRooms.contains(id)) {
+      debugPrint('[SocketService] joinConversation: already joined $id');
       return;
     }
-    
+
     if (_socket == null) {
-      debugPrint('[SocketService] joinConversation FAILED: socket is null');
+      debugPrint('[SocketService] joinConversation FAILED: socket is null (queued)');
+      _pendingRoomJoins.add(id);
       return;
     }
-    
+
     if (!_socket!.connected) {
       debugPrint('[SocketService] joinConversation WARNING: socket not connected yet, queuing for retry');
-      _pendingRoomJoins.add(conversationId);
+      _pendingRoomJoins.add(id);
       return;
     }
-    
-    debugPrint('[SocketService] joinConversation: conv=$conversationId connected=${_socket!.connected}');
-    _socket?.emit('conversation.join', {'conversationId': conversationId});
-    _joinedRooms.add(conversationId);
-    debugPrint('[SocketService] ✅ Joined room (total: ${_joinedRooms.length}): $conversationId');
+
+    debugPrint('[SocketService] joinConversation: conv=$id connected=${_socket!.connected}');
+    _socket?.emit('conversation.join', {'conversationId': id});
+    _joinedRooms.add(id);
+    debugPrint('[SocketService] ✅ Joined room (total: ${_joinedRooms.length}): $id');
   }
 
   // Leave a conversation by emitting a 'conversation.leave' event with the conversation ID
@@ -456,6 +560,76 @@ class SocketService with ChangeNotifier {
     _socket?.emit('conversation.leave', {'conversationId': conversationId});
     _joinedRooms.remove(conversationId);
   }
+
+  // Emit group.removeMember to trigger real-time updates for leaving or kicking members
+  void emitRemoveMember(String conversationId, String targetUserId) {
+    _socket?.emit('group.removeMember', {
+      'conversationId': conversationId,
+      'targetUserId': targetUserId,
+    });
+  }
+
+  Future<Map<String, dynamic>> emitRemoveMemberWithAck(String conversationId, String targetUserId) async {
+    final completer = Completer<Map<String, dynamic>>();
+    
+    if (_socket == null || !_socket!.connected) {
+      completer.completeError(Exception('Socket not connected'));
+      return completer.future;
+    }
+
+    _socket!.emitWithAck('group.removeMember', {
+      'conversationId': conversationId,
+      'targetUserId': targetUserId,
+    }, ack: (dynamic data) {
+      if (!completer.isCompleted) {
+        if (data is Map) {
+          completer.complete(Map<String, dynamic>.from(data));
+        } else {
+          completer.complete({'event': 'unknown', 'data': data});
+        }
+      }
+    });
+
+    // Timeout
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!completer.isCompleted) {
+        completer.completeError(TimeoutException('Socket emitRemoveMember timed out'));
+      }
+    });
+
+    return completer.future;
+  }
+
+  Future<Map<String, dynamic>> emitDisbandGroupWithAck(String conversationId) async {
+    final completer = Completer<Map<String, dynamic>>();
+    
+    if (_socket == null || !_socket!.connected) {
+      completer.completeError(Exception('Socket not connected'));
+      return completer.future;
+    }
+
+    _socket!.emitWithAck('group.disband', {
+      'conversationId': conversationId,
+    }, ack: (dynamic data) {
+      if (!completer.isCompleted) {
+        if (data is Map) {
+          completer.complete(Map<String, dynamic>.from(data));
+        } else {
+          completer.complete({'event': 'unknown', 'data': data});
+        }
+      }
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!completer.isCompleted) {
+        completer.completeError(TimeoutException('Socket emitDisbandGroup timed out'));
+      }
+    });
+
+    return completer.future;
+  }
+
+
 
   // M-01: Send a message with ACK timeout — prevents silent message loss on socket stalling.
   // If no server ACK within 3 seconds, emits error to _sendErrorController for UI feedback.
@@ -896,6 +1070,15 @@ class SocketService with ChangeNotifier {
     if (_callErrorController.isClosed) _callErrorController = StreamController<Map<String, dynamic>>.broadcast();
     if (_reactionAddedController.isClosed) _reactionAddedController = StreamController<Map<String, dynamic>>.broadcast();
     if (_reactionRemovedController.isClosed) _reactionRemovedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_postCreatedController.isClosed) _postCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_postUpdatedController.isClosed) _postUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_postDeletedController.isClosed) _postDeletedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_reactionUpdatedController.isClosed) _reactionUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_commentCreatedController.isClosed) _commentCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_storyCreatedController.isClosed) _storyCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_storyDeletedController.isClosed) _storyDeletedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_storyViewedController.isClosed) _storyViewedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_storyExpiredController.isClosed) _storyExpiredController = StreamController<Map<String, dynamic>>.broadcast();
     if (_groupDisbandedController.isClosed) _groupDisbandedController = StreamController<Map<String, dynamic>>.broadcast();
     if (_friendshipUpdatedController.isClosed) _friendshipUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
     if (_friendRequestReceivedController.isClosed) _friendRequestReceivedController = StreamController<Map<String, dynamic>>.broadcast();
@@ -904,6 +1087,9 @@ class SocketService with ChangeNotifier {
     if (_groupMemberRemovedController.isClosed) _groupMemberRemovedController = StreamController<Map<String, dynamic>>.broadcast();
     if (_groupRoleChangedController.isClosed) _groupRoleChangedController = StreamController<Map<String, dynamic>>.broadcast();
     if (_groupAdminTransferredController.isClosed) _groupAdminTransferredController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_blockCreatedController.isClosed) _blockCreatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_blockUpdatedController.isClosed) _blockUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_blockRemovedController.isClosed) _blockRemovedController = StreamController<Map<String, dynamic>>.broadcast();
     if (_groupCallSignalController.isClosed) _groupCallSignalController = StreamController<Map<String, dynamic>>.broadcast();
     if (_connectController.isClosed) _connectController = StreamController<void>.broadcast();
     if (_sendErrorController.isClosed) _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();

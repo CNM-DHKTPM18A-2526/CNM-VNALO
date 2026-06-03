@@ -6,6 +6,15 @@ import 'package:uuid/uuid.dart';
 import 'dart:developer' as developer;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/main.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
+import 'package:vnalo_mobile/services/storage_service.dart';
+import 'package:vnalo_mobile/core/utils/device_info_util.dart';
+import 'package:vnalo_mobile/config/app_config.dart';
+import 'package:vnalo_mobile/services/notification_formatter.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -138,12 +147,54 @@ class NotificationService {
     // 4. Handle Background/Terminated Messages
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       developer.log('App opened from notification: ${message.data}');
+      _handleNotificationTap(message.data);
+    });
+
+    // Handle token refresh
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      developer.log('[NotificationService] FCM Token refreshed');
+      final storage = StorageService();
+      final token = await storage.getAccessToken();
+      if (token != null && token.isNotEmpty) {
+        final info = await DeviceInfoUtil.getDeviceInfo();
+        await registerTokenToBackend(
+          accessToken: token,
+          deviceId: info.deviceId,
+          platform: info.platform,
+          coreServiceUrl: AppConfig.instance.coreServiceUrl,
+        );
+      }
     });
 
     // 5. Setup CallKit Listeners
     FlutterCallkitIncoming.onEvent.listen(_onCallKitEvent);
 
     _initialized = true;
+  }
+
+  void _handleNotificationTap(Map<String, dynamic> data) {
+    try {
+      final type = data['type']?.toString();
+      final conversationId = data['conversationId']?.toString();
+      
+      if (type == 'chat_message' && conversationId != null && conversationId.isNotEmpty) {
+        final context = navigatorKey.currentContext;
+        if (context != null) {
+          final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+          final idx = chatProvider.conversations.indexWhere((c) => c.id == conversationId);
+          if (idx != -1) {
+            final conv = chatProvider.conversations[idx];
+            Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: conv))
+            );
+          } else {
+            developer.log('[NotificationService] Conversation $conversationId not found locally.');
+          }
+        }
+      }
+    } catch (e) {
+      developer.log('[NotificationService] _handleNotificationTap error: $e');
+    }
   }
 
   static void _onCallKitEvent(CallEvent? event) {
@@ -172,9 +223,10 @@ class NotificationService {
       final isGroup = type == 'group_call_started';
       final callId = data['callId']?.toString() ?? const Uuid().v4();
       final conversationId = data['conversationId']?.toString() ?? '';
-      final senderName =
-          data['senderName']?.toString() ??
-          (isGroup ? 'Cuộc gọi nhóm' : 'VNALO Call');
+      
+      final formatted = NotificationFormatter.formatNotification(data: data);
+      final senderName = formatted.title != 'VNALO' ? formatted.title : (isGroup ? 'Cuộc gọi nhóm' : 'VNALO Call');
+
       final senderAvatar = data['senderAvatar']?.toString();
       final audioOnly = data['audioOnly']?.toString() == 'true';
 
@@ -230,7 +282,26 @@ class NotificationService {
     }
   }
 
-  Future<void> ensureInitialized() => initialize();
+  Future<void> ensureInitialized() async {
+    await initialize();
+    await _checkInitialMessage();
+  }
+
+  Future<void> _checkInitialMessage() async {
+    if (_disabled || _fcm == null) return;
+    try {
+      final initialMessage = await _fcm!.getInitialMessage();
+      if (initialMessage != null) {
+        developer.log('[NotificationService] Opened from terminated state: ${initialMessage.data}');
+        // Delay slightly to let the router and UI initialize
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          _handleNotificationTap(initialMessage.data);
+        });
+      }
+    } catch (e) {
+      developer.log('[NotificationService] checkInitialMessage error: $e');
+    }
+  }
 
   Future<String?> getToken() async {
     await ensureInitialized();
@@ -266,10 +337,16 @@ class NotificationService {
       iOS: iosDetails,
     );
 
+    final displayContent = NotificationFormatter.formatNotification(
+      data: message.data,
+      remoteTitle: message.notification?.title,
+      remoteBody: message.notification?.body,
+    );
+
     await _localNotifications.show(
       id: message.hashCode,
-      title: message.notification?.title,
-      body: message.notification?.body,
+      title: displayContent.title,
+      body: displayContent.body,
       notificationDetails: details,
       payload: message.data.toString(),
     );

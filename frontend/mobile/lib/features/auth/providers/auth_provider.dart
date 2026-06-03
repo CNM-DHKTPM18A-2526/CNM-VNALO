@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/auth_events.dart';
@@ -574,6 +575,12 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (_) {
       // Ignore network errors during logout; local cleanup still applies.
+    }
+
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+    } catch (e) {
+      debugPrint('[Auth] Failed to delete FCM token: $e');
     }
 
     _socketService.disconnect();

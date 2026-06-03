@@ -145,7 +145,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final auth = context.read<AuthProvider>();
-    final contactProvider = context.read<ContactProvider>();
+    final contactProvider = context.watch<ContactProvider>();
 
     String authorName = _currentStory.authorId;
     String? authorAvatar;
@@ -154,12 +154,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
       authorName = auth.user?.displayName ?? _currentStory.authorId;
       authorAvatar = auth.user?.avatarUrl;
     } else {
-      try {
-        final friend = contactProvider.friends.firstWhere((u) => u.id == _currentStory.authorId);
-        authorName = friend.displayName;
-        authorAvatar = friend.avatarUrl;
-      } catch (e) {
-        // Fallback to ID if friend not found
+      final user = contactProvider.getUserById(_currentStory.authorId);
+      if (user != null) {
+        authorName = user.displayName;
+        authorAvatar = user.avatarUrl;
       }
     }
 

@@ -26,41 +26,28 @@ class AvatarResolver {
   }
 
   static bool _checkIsInternal(String url) {
-    if (url.startsWith('/')) return true;
-
     // S3 and other cloud storage URLs are public - no auth needed
     if (url.contains('amazonaws.com') || 
         url.contains('s3.') ||
         url.contains('cloudfront.net') ||
-        url.contains('digitaloceanspaces.com')) {
+        url.contains('digitaloceanspaces.com') ||
+        url.contains('cdn.')) {
       return false;
     }
-
-    if (!AppConfig.isInitialized) return false;
     
-    final mediaBase = AppConfig.instance.mediaServiceUrl.replaceAll(RegExp(r'/+$'), '');
-    final normalizedUrl = url.replaceAll(RegExp(r'/+$'), '');
+    // If it starts with / it's likely an internal path
+    if (url.startsWith('/')) return true;
 
-    // Public routes don't need authentication even if they are on our server
-    if (normalizedUrl.contains('/media/public/') || 
-        normalizedUrl.contains('/media/public-file')) {
-      return false;
+    // If it already has a full URL with a known external domain, it's external
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      // Check if it's our own server
+      if (!AppConfig.isInitialized) return false;
+      final mediaBase = AppConfig.instance.mediaServiceUrl.replaceAll(RegExp(r'/+$'), '');
+      return url.startsWith(mediaBase);
     }
 
-    if (normalizedUrl.startsWith(mediaBase)) return true;
-
-    // Additional check for internal media service path patterns
-    // This handles cases where the host might change (IP vs domain) but it's clearly our service
-    if (normalizedUrl.contains('/api/v1/media/')) return true;
-
-    // Additional check for IP-based matching
-    final mediaUri = Uri.tryParse(mediaBase);
-    final inputUri = Uri.tryParse(url);
-    if (mediaUri != null && inputUri != null) {
-      if (mediaUri.host == inputUri.host && mediaUri.port == inputUri.port) return true;
-    }
-
-    return false;
+    // Relative path without leading slash - treat as internal
+    return true;
   }
 
   /// Resolve [raw] to an absolute URL.
@@ -88,32 +75,20 @@ class AvatarResolver {
       return normalized;
     }
 
+    // Handle relative paths (with or without leading slash)
+    String fullInput = normalized;
+    if (!fullInput.startsWith('/')) {
+      fullInput = '/$fullInput';
+    }
+
     // Build base from media-service URL
-    if (!AppConfig.isInitialized) return normalized;
+    if (!AppConfig.isInitialized) return fullInput;
 
     final mediaUrl = AppConfig.instance.mediaServiceUrl;
     final mediaUri = Uri.parse(mediaUrl);
 
     // Extract the base path from mediaServiceUrl (e.g. "/api/v1")
     String basePath = mediaUri.path.replaceAll(RegExp(r'/+$'), '');
-
-    // The normalized input could be something like:
-    //   /api/v1/media/public-file?key=stickers/pack/img.png
-    //   /media/public/abc-123
-    //   /stickers/packs
-    //   media/public/abc-123
-    //
-    // We need to:
-    // 1. Separate the path from query parameters
-    // 2. Prepend basePath if not already present
-    // 3. Reconstruct with scheme://host:port + path + query
-
-    // Parse the normalized value as a relative URI to extract path/query
-    // But Uri.parse needs a scheme, so we use a trick:
-    String fullInput = normalized;
-    if (!fullInput.startsWith('/')) {
-      fullInput = '/$fullInput';
-    }
 
     // Split path and query manually since Uri constructor strips query from path
     String pathPart = fullInput;

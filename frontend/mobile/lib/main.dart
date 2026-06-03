@@ -17,6 +17,7 @@ import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/services/block_service.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
@@ -166,6 +167,9 @@ class VnaloApp extends StatelessWidget {
         Provider<FriendService>(
           create: (context) => FriendService(context.read<ApiService>()),
         ),
+        Provider<BlockService>(
+          create: (context) => BlockService(context.read<ApiService>()),
+        ),
         Provider<UserService>(
           create: (context) => UserService(context.read<ApiService>()),
         ),
@@ -224,12 +228,14 @@ class VnaloApp extends StatelessWidget {
           create: (ctx) => ContactProvider(
             ctx.read<FriendService>(),
             ctx.read<SocketService>(),
+            ctx.read<UserService>(),
           ),
           update: (ctx, auth, socket, contact) {
             final currentContact = contact ??
                 ContactProvider(
                   ctx.read<FriendService>(),
                   socket,
+                  ctx.read<UserService>(),
                 );
             currentContact.update(auth.user?.id, socket);
             return currentContact;
@@ -243,6 +249,7 @@ class VnaloApp extends StatelessWidget {
             db: context.read<LocalDatabase>(),
             notificationService: context.read<NotificationService>(),
             aiComposeDraftBus: context.read<AiComposeDraftBus>(),
+            storageService: context.read<StorageService>(),
           ),
           update: (context, auth, socket, chat) {
             final currentChat = chat ??
@@ -253,13 +260,20 @@ class VnaloApp extends StatelessWidget {
                   db: context.read<LocalDatabase>(),
                   notificationService: context.read<NotificationService>(),
                   aiComposeDraftBus: context.read<AiComposeDraftBus>(),
+                  storageService: context.read<StorageService>(),
                 );
             currentChat.update(auth.user?.id, socket);
             return currentChat;
           },
         ),
-        ChangeNotifierProvider<PostProvider>(
-          create: (context) => PostProvider(context.read<ContentService>()),
+        ChangeNotifierProxyProvider<SocketService, PostProvider>(
+          create: (context) => PostProvider(context.read<ContentService>())
+            ..attachRealtime(context.read<SocketService>()),
+          update: (context, socket, previous) {
+            final provider = previous ?? PostProvider(context.read<ContentService>());
+            provider.attachRealtime(socket);
+            return provider;
+          },
         ),
         ChangeNotifierProxyProvider<ChatProvider, ForwardProvider>(
           create: (context) => ForwardProvider(context.read<ChatProvider>()),

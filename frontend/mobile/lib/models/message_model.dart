@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 
 class Message {
@@ -125,23 +126,34 @@ class Message {
     return null;
   }
 
-  // Factory constructor to create a Message instance from JSON
-  factory Message.fromJson(Map<String, dynamic> json) => Message(
-    id: json['id'] ?? json['_id'] ?? '',
-    conversationId: json['conversationId'] ??
-        json['conversation_id'] ??
-        json['cid'] ??
-        json['conversation']?['id'] ??
-        '',
-    serverSeq: _toInt(json['serverSeq'] ?? json['server_seq']),
-    senderId: json['senderId'] ?? json['sender_id'] ?? '',
-    senderName: json['senderName'] ?? json['sender_name'],
-    senderAvatarUrl: json['senderAvatarUrl'] ?? json['sender_avatar_url'],
-    clientMessageId: json['clientMessageId'] ?? json['client_message_id'],
-    messageType: enumFromString(
-      MessageType.values,
-      json['messageType'] ?? json['message_type'] ?? 'TEXT',
-    ),
+  factory Message.fromJson(Map<String, dynamic> json) {
+    String typeStr = json['messageType'] ?? json['message_type'] ?? 'TEXT';
+    final content = json['content'];
+    
+    // Force SYSTEM type for JSON contents that have an 'action' field, 
+    // even if they were sent as TEXT from the web client.
+    if (typeStr == 'TEXT' && content != null && content is String && content.trimLeft().startsWith('{')) {
+      try {
+        final decoded = jsonDecode(content);
+        if (decoded is Map && decoded.containsKey('action')) {
+          typeStr = 'SYSTEM';
+        }
+      } catch (_) {}
+    }
+
+    return Message(
+      id: json['id'] ?? json['_id'] ?? '',
+      conversationId: json['conversationId'] ??
+          json['conversation_id'] ??
+          json['cid'] ??
+          json['conversation']?['id'] ??
+          '',
+      serverSeq: _toInt(json['serverSeq'] ?? json['server_seq']),
+      senderId: json['senderId'] ?? json['sender_id'] ?? '',
+      senderName: json['senderName'] ?? json['sender_name'],
+      senderAvatarUrl: json['senderAvatarUrl'] ?? json['sender_avatar_url'],
+      clientMessageId: json['clientMessageId'] ?? json['client_message_id'],
+      messageType: enumFromString(MessageType.values, typeStr),
     content: json['content'],
     mediaUrl: json['mediaUrl'] ?? json['media_url'],
     mediaThumbnailUrl: json['mediaThumbnailUrl'] ?? json['media_thumbnail_url'],
@@ -169,4 +181,5 @@ class Message {
             ? DateTime.parse(json['createdAt'] ?? json['created_at'])
             : DateTime.now(),
   );
+}
 }

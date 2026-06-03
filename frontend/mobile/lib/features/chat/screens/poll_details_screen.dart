@@ -51,6 +51,18 @@ class _PollDetailsScreenState extends State<PollDetailsScreen> {
     if (currentUserId == null) return;
 
     final reactions = chatProvider.getReactionsForMessage(widget.message.id);
+    final options = (_pollData?['options'] as List<dynamic>?) ?? const [];
+
+    // Support both formats:
+    // - vote:0 / vote:1 (index-based)
+    // - vote:<optionId> (id-based)
+    final Map<String, String> indexToOptionId = {
+      for (int i = 0; i < options.length; i++)
+        i.toString(): (options[i] is Map
+            ? ((options[i] as Map)['id']?.toString() ?? i.toString())
+            : i.toString()),
+    };
+
     for (final reaction in reactions) {
       if (reaction.userId == currentUserId) {
         final emoji = reaction.emoji;
@@ -60,7 +72,8 @@ class _PollDetailsScreenState extends State<PollDetailsScreen> {
           for (final optId in optionIds) {
             final trimmed = optId.trim();
             if (trimmed.isNotEmpty) {
-              _selectedOptionIds.add(trimmed);
+              final resolved = indexToOptionId[trimmed] ?? trimmed;
+              _selectedOptionIds.add(resolved);
             }
           }
         }
@@ -111,7 +124,7 @@ class _PollDetailsScreenState extends State<PollDetailsScreen> {
     setState(() => _isLoading = true);
     try {
       final chatProvider = context.read<ChatProvider>();
-      final newEmoji = 'vote:${_selectedOptionIds.join(',')}';
+      final newEmoji = 'v:${_selectedOptionIds.join(',')}';
       await chatProvider.addReaction(widget.message.id, newEmoji);
       
       if (mounted) {
