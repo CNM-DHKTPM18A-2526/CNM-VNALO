@@ -265,8 +265,16 @@ class VnaloApp extends StatelessWidget {
           create: (context) => ForwardProvider(context.read<ChatProvider>()),
           update: (context, chat, previous) => previous ?? ForwardProvider(chat),
         ),
-        ChangeNotifierProvider<AiAssistantProvider>(
-          create: (context) => AiAssistantProvider(context.read<AiService>()),
+        ChangeNotifierProxyProvider<AuthProvider, AiAssistantProvider>(
+          create:
+              (context) =>
+                  AiAssistantProvider(context.read<AiService>()),
+          update: (context, auth, previous) {
+            final provider =
+                previous ?? AiAssistantProvider(context.read<AiService>());
+            unawaited(provider.bindAuthUser(auth.scopedUserId));
+            return provider;
+          },
         ),
         ChangeNotifierProvider<NotificationProvider>(
           create: (context) => NotificationProvider(context.read<ApiService>()),

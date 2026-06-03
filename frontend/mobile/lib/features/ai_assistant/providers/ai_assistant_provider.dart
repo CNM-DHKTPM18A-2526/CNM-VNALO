@@ -7,15 +7,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_stt_resilience_policy.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
 
 // ---------------------------------------------------------------------------
 // Public enums
 // ---------------------------------------------------------------------------
 
 enum AiState { idle, listening, thinking, speaking }
+
+enum AiThinkingPhase { idle, understanding, executingAction, composingResponse }
 
 enum AiResponseSurface { bubble, conversation, contextual, voice }
 
@@ -27,21 +32,40 @@ String normalizeAiTextEncoding(String value) {
   var best = value;
   var bestScore = _mojibakeScore(best);
 
-  for (var pass = 0; pass < 3; pass++) {
+  for (var pass = 0; pass < 4; pass++) {
+    final candidates = <String>{};
+
     final encodedBytes = _encodeWindows1252Bytes(best);
-    if (encodedBytes == null) {
+    if (encodedBytes != null) {
+      candidates.add(utf8.decode(encodedBytes, allowMalformed: true));
+    }
+
+    final latin1Bytes = _encodeLatin1Bytes(best);
+    if (latin1Bytes != null) {
+      candidates.add(utf8.decode(latin1Bytes, allowMalformed: true));
+    }
+
+    String? improvedCandidate;
+    var improvedScore = bestScore;
+
+    for (final candidate in candidates) {
+      if (candidate.trim().isEmpty || candidate == best) {
+        continue;
+      }
+
+      final candidateScore = _mojibakeScore(candidate);
+      if (candidateScore < improvedScore) {
+        improvedCandidate = candidate;
+        improvedScore = candidateScore;
+      }
+    }
+
+    if (improvedCandidate == null) {
       break;
     }
 
-    final candidate = utf8.decode(encodedBytes, allowMalformed: true);
-
-    final candidateScore = _mojibakeScore(candidate);
-    if (candidateScore >= bestScore || candidate.trim().isEmpty) {
-      break;
-    }
-
-    best = candidate;
-    bestScore = candidateScore;
+    best = improvedCandidate;
+    bestScore = improvedScore;
   }
 
   return best;
@@ -54,11 +78,18 @@ int _mojibakeScore(String value) {
     '\u00C4',
     '\u00C2',
     '\u00C6',
+    '\u00C5',
+    '\u00D0',
     '\u00E2\u20AC',
     '\u00E2\u20AC\u2122',
     '\u00E2\u20AC\u0153',
     '\u00E2\u20AC\u009d',
     '\u00F0\u0178',
+    '\u00E1\u00BA',
+    '\u00E1\u00BB',
+    '\u00C4\u2018',
+    '\u00C6\u00B0',
+    '\u00C6\u00A1',
   ];
 
   for (final marker in markers) {
@@ -73,7 +104,7 @@ int _mojibakeScore(String value) {
     }
   }
 
-  return score;
+  return score - _vietnameseCharacterBonus(value);
 }
 
 List<int>? _encodeWindows1252Bytes(String value) {
@@ -121,6 +152,35 @@ List<int>? _encodeWindows1252Bytes(String value) {
     bytes.add(mapped);
   }
   return bytes;
+}
+
+List<int>? _encodeLatin1Bytes(String value) {
+  final bytes = <int>[];
+  for (final rune in value.runes) {
+    if (rune > 0xff) {
+      return null;
+    }
+    bytes.add(rune);
+  }
+  return bytes;
+}
+
+int _vietnameseCharacterBonus(String value) {
+  var bonus = 0;
+  for (final rune in value.runes) {
+    if (_isVietnameseCodePoint(rune)) {
+      bonus += 1;
+    }
+  }
+  return bonus.clamp(0, 24);
+}
+
+bool _isVietnameseCodePoint(int rune) {
+  return rune == 0x0111 ||
+      rune == 0x0110 ||
+      (rune >= 0x0102 && rune <= 0x0103) ||
+      (rune >= 0x01A0 && rune <= 0x01B0) ||
+      (rune >= 0x1EA0 && rune <= 0x1EF9);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +281,35 @@ class AiCommand {
   };
 }
 
+class AiDisambiguationSelection {
+  final String selectedName;
+  final String source;
+  final DateTime createdAt;
+
+  const AiDisambiguationSelection({
+    required this.selectedName,
+    required this.source,
+    required this.createdAt,
+  });
+}
+
+class AiClarificationState {
+  final String message;
+  final String source;
+  final List<String> candidates;
+  final DateTime createdAt;
+
+  const AiClarificationState({
+    required this.message,
+    required this.source,
+    required this.candidates,
+    required this.createdAt,
+  });
+
+  bool get isAmbiguous => source.startsWith('ai_action_ambiguity');
+  bool get isMissingTarget => source.startsWith('ai_action_missing');
+}
+
 // ---------------------------------------------------------------------------
 // AiAssistantProvider
 //
@@ -230,7 +319,7 @@ class AiCommand {
 // - AiSurfaceController responsibilities: visibility state, auto-hide timer,
 //   surface routing (bubble vs conversation vs contextual)
 // - AiHistoryStore responsibilities: conversation history, cloud backup/sync
-// - AiCommandRouter responsibilities: stateless — delegates to MainShell via
+// - AiCommandRouter responsibilities: stateless -- delegates to MainShell via
 //   systemActionStream. Shared helpers live here; routing logic lives in
 //   MainShell._handleAiSystemAction()
 // ---------------------------------------------------------------------------
@@ -246,12 +335,13 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _serverConversationIdPrefKey =
       'vnalo_ai_server_conversation_id';
   static const String _syncedEntryIdsPrefKey = 'vnalo_ai_synced_entry_ids_v1';
+  static const String _guestScopeKey = 'guest';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
-  static const Duration _sttListenFor = Duration(seconds: 8);
-  static const Duration _sttPauseFor = Duration(seconds: 2);
+  static const Duration _sttListenFor = Duration(seconds: 10);
+  static const Duration _sttPauseFor = Duration(seconds: 10);
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
-  static const Duration _emptySummonAutoHideDelay = Duration(seconds: 6);
+  static const Duration _emptySummonAutoHideDelay = Duration(seconds: 10);
   static const int _maxConversationEntries = 200;
   static const String aiConversationId = '00000000-0000-0000-0000-000000000000';
   static const String _legacyAiConversationId = 'AI_ASSISTANT_LOCAL';
@@ -273,14 +363,22 @@ class AiAssistantProvider with ChangeNotifier {
   String _lastUserPrompt = '';
   String _aiResponse = '';
   String _currentEmotion = 'neutral';
+  AiThinkingPhase _thinkingPhase = AiThinkingPhase.idle;
+  bool _isResponseDegraded = false;
+  String _providerStatus = 'LIVE_PROVIDER_ACTIVE';
   double _soundLevel = 0;
   bool _isSessionActive = false;
   bool _isSttInitialized = false;
   bool _isPipelineLocked = false;
+  String? _queuedTextPrompt;
+  String? _queuedTextPromptSource;
+  AiResponseSurface? _queuedTextPromptSurface;
   int _operationToken = 0;
   String _activeTraceId = '';
   String? _resolvedLocaleId;
   Timer? _listenGuardTimer;
+  Timer? _sttRestartTimer;
+  DateTime? _listenStartedAt;
   DateTime? _lastFinalResultAt;
   String _lastFinalResultText = '';
   DateTime? _lastSoundLevelNotifyAt;
@@ -297,24 +395,51 @@ class AiAssistantProvider with ChangeNotifier {
   bool _conversationCreated = false;
   bool _cloudBackupEnabled = false;
   String? _serverConversationId;
+  String _activeScopeKey = _guestScopeKey;
   final Set<String> _syncedEntryIds = <String>{};
   final List<AiConversationEntry> _conversationHistory = [];
   final List<Map<String, String>> _sessionHistory = [];
   Timer? _cloudBackupDebounceTimer;
   int _historyClearGeneration = 0;
+  int _scopeLoadGeneration = 0;
 
   // ------------------------- Other ------------------------------------------
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
   final bool _enableDeepSummary = false;
+  final bool _enableFlowLogging;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
+  final StreamController<AiDisambiguationSelection>
+  _disambiguationSelectionController =
+      StreamController<AiDisambiguationSelection>.broadcast();
+  AiClarificationState? _clarificationState;
   bool _isDisposed = false;
 
   // ------------------------- Construction -----------------------------------
-  AiAssistantProvider(this._aiService) {
+  AiAssistantProvider(this._aiService, {bool enableFlowLogging = true})
+    : _enableFlowLogging = enableFlowLogging {
     _activeTraceId = _uuid.v4();
     _initTts();
     unawaited(_initPersistence());
+  }
+
+  String get _scopedHistoryPrefKey => _scopedPrefKey(_historyPrefKey);
+  String get _scopedConversationCreatedPrefKey =>
+      _scopedPrefKey(_conversationCreatedPrefKey);
+  String get _scopedCloudBackupPrefKey => _scopedPrefKey(_cloudBackupPrefKey);
+  String get _scopedServerConversationIdPrefKey =>
+      _scopedPrefKey(_serverConversationIdPrefKey);
+  String get _scopedSyncedEntryIdsPrefKey =>
+      _scopedPrefKey(_syncedEntryIdsPrefKey);
+
+  String _scopedPrefKey(String baseKey) => '${baseKey}_$_activeScopeKey';
+
+  String _resolveScopeKey(String? userId) {
+    final normalized = userId?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return _guestScopeKey;
+    }
+    return normalized;
   }
 
   // ------------------------- Public getters ---------------------------------
@@ -323,12 +448,81 @@ class AiAssistantProvider with ChangeNotifier {
   String get lastWords => _lastWords;
   String get lastUserPrompt => _lastUserPrompt;
   String get aiResponse => _aiResponse;
+  bool get isResponseDegraded => _isResponseDegraded;
+  String get providerStatus => _providerStatus;
+  bool get hasProviderIssue =>
+      _isResponseDegraded || _providerStatus != 'LIVE_PROVIDER_ACTIVE';
+  bool get isProviderHardFailure =>
+      _providerStatus == 'AI_PROVIDER_UNAVAILABLE' ||
+      _providerStatus == 'AI_ENDPOINT_NOT_FOUND' ||
+      _providerStatus == 'AI_AUTH_REQUIRED' ||
+      _providerStatus == 'AI_NETWORK_UNAVAILABLE' ||
+      _providerStatus == 'AI_REQUEST_FAILED';
   AiResponseSurface get lastResponseSurface => _lastResponseSurface;
   bool get shouldBubbleAutoShowResponse =>
       _lastResponseSurface == AiResponseSurface.bubble ||
       _lastResponseSurface == AiResponseSurface.voice ||
       _lastResponseSurface == AiResponseSurface.contextual;
   String get currentEmotion => _currentEmotion;
+  AiThinkingPhase get thinkingPhase => _thinkingPhase;
+  bool get isProviderUnavailable =>
+      _providerStatus == 'AI_PROVIDER_UNAVAILABLE';
+  bool get isProviderTimeout => _providerStatus == 'AI_PROVIDER_TIMEOUT';
+  bool get isProviderNetworkUnavailable =>
+      _providerStatus == 'AI_NETWORK_UNAVAILABLE';
+  bool get isProviderEndpointMissing =>
+      _providerStatus == 'AI_ENDPOINT_NOT_FOUND';
+  bool get isProviderAuthRequired => _providerStatus == 'AI_AUTH_REQUIRED';
+  bool get isProviderRateLimited => _providerStatus == 'AI_RATE_LIMITED';
+  bool get isFallbackProviderActive =>
+      _providerStatus == 'FALLBACK_PROVIDER_ACTIVE';
+  String get providerIssueMessage {
+    if (_isResponseDegraded && _providerStatus == 'LIVE_PROVIDER_ACTIVE') {
+      return 'AI đang chạy ở chế độ dự phòng.';
+    }
+
+    return switch (_providerStatus) {
+      'AI_PROVIDER_TIMEOUT' =>
+        'AI phản hồi chậm. Vui lòng thử lại sau vài giây.',
+      'AI_NETWORK_UNAVAILABLE' =>
+        'Không kết nối được AI. Kiểm tra mạng rồi thử lại.',
+      'AI_ENDPOINT_NOT_FOUND' =>
+        'Cấu hình endpoint AI chưa đúng. Vui lòng kiểm tra môi trường dev/prod.',
+      'AI_AUTH_REQUIRED' =>
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      'AI_RATE_LIMITED' =>
+        'Bạn đang gửi quá nhanh. Vui lòng thử lại sau vài giây.',
+      'AI_PROVIDER_UNAVAILABLE' =>
+        'AI đang tạm thời không sẵn sàng. Một số thao tác cục bộ vẫn dùng được.',
+      'FALLBACK_PROVIDER_ACTIVE' => 'AI đang chạy ở chế độ dự phòng.',
+      'AI_REQUEST_FAILED' => 'Yêu cầu AI chưa hoàn tất. Vui lòng thử lại.',
+      _ => 'AI đang hoạt động',
+    };
+  }
+
+  bool get isAssistantGenerating => _state == AiState.thinking;
+  String get assistantActivityLabel {
+    if (_state == AiState.listening) {
+      if (_lastWords.isNotEmpty) {
+        return 'Đang nghe, bạn nói tiếp nhé...';
+      }
+      return 'Đang nghe... sẽ tự tắt sau ${_sttListenFor.inSeconds} giây nếu bạn chưa nói.';
+    }
+    if (_state == AiState.speaking) {
+      return 'Đang phản hồi...';
+    }
+    if (_state != AiState.thinking) {
+      return 'Đang hoạt động';
+    }
+
+    return switch (_thinkingPhase) {
+      AiThinkingPhase.understanding => 'Đang hiểu yêu cầu...',
+      AiThinkingPhase.executingAction => 'Đang thực hiện thao tác...',
+      AiThinkingPhase.composingResponse => 'Đang soạn phản hồi...',
+      AiThinkingPhase.idle => 'Đang xử lý...',
+    };
+  }
+
   double get soundLevel => _soundLevel;
 
   bool get persistentEnabled => _persistentEnabled;
@@ -359,11 +553,119 @@ class AiAssistantProvider with ChangeNotifier {
 
   bool get isBusy => _state != AiState.idle || _isPipelineLocked;
   bool get isMascotVisible =>
-      _persistentEnabled ||
-      _provisionallyVisible ||
-      (_isSessionActive && _activeSurface != AiResponseSurface.conversation);
+      _activeSurface != AiResponseSurface.conversation &&
+      (_persistentEnabled || _provisionallyVisible || _isSessionActive);
 
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
+  Stream<AiDisambiguationSelection> get disambiguationSelectionStream =>
+      _disambiguationSelectionController.stream;
+  AiClarificationState? get clarificationState => _clarificationState;
+
+  Future<void> bindAuthUser(String? userId) async {
+    final nextScopeKey = _resolveScopeKey(userId);
+    if (_activeScopeKey == nextScopeKey || _isDisposed) {
+      return;
+    }
+
+    _cancelActiveOperation(reason: 'auth_scope_change');
+    await _stopAllInteractions(
+      reason: 'auth_scope_change',
+      keepResponse: false,
+    );
+    _cancelIdleAutoHide();
+    _cloudBackupDebounceTimer?.cancel();
+    _scopeLoadGeneration++;
+    final loadGeneration = _scopeLoadGeneration;
+
+    _activeScopeKey = nextScopeKey;
+    _resetScopedConversationState(clearCurrentResponse: true);
+
+    final prefs = await SharedPreferences.getInstance();
+    await _loadScopedPersistence(
+      prefs: prefs,
+      notify: false,
+      expectedGeneration: loadGeneration,
+    );
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
+
+    _logEvent(
+      'AUTH_SCOPE_BOUND',
+      data: {
+        'scopeKey': _activeScopeKey,
+        'historySize': _conversationHistory.length,
+      },
+    );
+    notifyListeners();
+  }
+
+  void addActionFeedback(
+    String message, {
+    String source = 'ai_action_feedback',
+    bool keepBubbleVisible = false,
+    AiResponseSurface? responseSurface,
+  }) {
+    final normalized = normalizeAiTextEncoding(message).trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    final resolvedSurface =
+        responseSurface ??
+        (keepBubbleVisible && _activeSurface != AiResponseSurface.conversation
+            ? _activeSurface
+            : AiResponseSurface.conversation);
+
+    _aiResponse = normalized;
+    _lastResponseSurface = resolvedSurface;
+    if (source.startsWith('ai_action_ambiguity') ||
+        source.startsWith('ai_action_missing')) {
+      _clarificationState = AiClarificationState(
+        message: normalized,
+        source: source,
+        candidates: AiCommandRouting.parseAmbiguityCandidatesFromSource(source),
+        createdAt: DateTime.now().toUtc(),
+      );
+    } else {
+      _clarificationState = null;
+    }
+    _addConversationEntry(
+      role: AiConversationRole.assistant,
+      text: normalized,
+      source: source,
+    );
+
+    if (keepBubbleVisible && _activeSurface != AiResponseSurface.conversation) {
+      _setProvisionallyVisible(true, reason: '$source.visible');
+      _scheduleIdleAutoHide(reason: source);
+    }
+  }
+
+  void submitDisambiguationSelection(
+    String selectedName, {
+    String source = 'ai_disambiguation_chip',
+  }) {
+    final normalized = normalizeAiTextEncoding(selectedName).trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    _recordUserHistory(
+      text: 'Mình muốn chọn $normalized',
+      source: source,
+      entryId: _newEntryId(),
+    );
+    _clarificationState = null;
+    if (!_disambiguationSelectionController.isClosed) {
+      _disambiguationSelectionController.add(
+        AiDisambiguationSelection(
+          selectedName: normalized,
+          source: source,
+          createdAt: DateTime.now().toUtc(),
+        ),
+      );
+    }
+  }
 
   List<Message> getHistoryAsMessages(
     String currentUserId, {
@@ -377,6 +679,7 @@ class AiAssistantProvider with ChangeNotifier {
         senderId: isUser ? currentUserId : 'ai_assistant',
         senderName: isUser ? 'Bạn' : currentMascot.name,
         senderAvatarUrl: isUser ? userAvatarUrl : currentMascot.previewImageUrl,
+        clientMessageId: entry.source,
         content: entry.text,
         messageType: MessageType.TEXT,
         status: MessageStatus.SENT,
@@ -408,6 +711,47 @@ class AiAssistantProvider with ChangeNotifier {
     return AiResponseSurface.bubble;
   }
 
+  AiResponseSurface _resolveSurface(
+    String source, {
+    AiResponseSurface? explicitSurface,
+  }) {
+    return explicitSurface ?? _surfaceForSource(source);
+  }
+
+  void enterConversationSurface({String reason = 'conversation_open'}) {
+    _cancelIdleAutoHide();
+    _keepVisibleUntil = null;
+    _activeSurface = AiResponseSurface.conversation;
+    if (_provisionallyVisible) {
+      _provisionallyVisible = false;
+    }
+    _logEvent('SURFACE_ENTER_CONVERSATION', data: {'reason': reason});
+    notifyListeners();
+  }
+
+  void leaveConversationSurface({
+    String reason = 'conversation_close',
+    bool notify = true,
+  }) {
+    if (_activeSurface != AiResponseSurface.conversation) {
+      return;
+    }
+    _activeSurface = AiResponseSurface.bubble;
+    if (_persistentEnabled || _isSessionActive || _aiResponse.isNotEmpty) {
+      _provisionallyVisible = true;
+      if (!_persistentEnabled &&
+          _state == AiState.idle &&
+          _aiResponse.isEmpty &&
+          !_isSessionActive) {
+        _scheduleIdleAutoHide(reason: reason);
+      }
+    }
+    _logEvent('SURFACE_LEAVE_CONVERSATION', data: {'reason': reason});
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
   void _setProvisionallyVisible(bool visible, {required String reason}) {
     if (_provisionallyVisible == visible) {
       return;
@@ -427,7 +771,9 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     _idleAutoHideTimer = Timer(_idleAutoHideDelay, () {
-      if (_persistentEnabled ||
+      // HARDEN(late-callback): guard against timer firing after dispose
+      if (_isDisposed ||
+          _persistentEnabled ||
           _isSessionActive ||
           _state != AiState.idle ||
           _aiResponse.isNotEmpty ||
@@ -478,6 +824,10 @@ class AiAssistantProvider with ChangeNotifier {
     final previous = _state;
     _state = next;
 
+    if (next != AiState.thinking) {
+      _thinkingPhase = AiThinkingPhase.idle;
+    }
+
     _logEvent(
       'STATE_CHANGE',
       traceId: traceId,
@@ -492,7 +842,7 @@ class AiAssistantProvider with ChangeNotifier {
   void _startListenGuard({required int token, required String traceId}) {
     _cancelListenGuard();
     _listenGuardTimer = Timer(
-      _sttListenFor + const Duration(seconds: 1),
+      _sttListenFor,
       () =>
           unawaited(_handleListenGuardTimeout(token: token, traceId: traceId)),
     );
@@ -501,6 +851,177 @@ class AiAssistantProvider with ChangeNotifier {
   void _cancelListenGuard() {
     _listenGuardTimer?.cancel();
     _listenGuardTimer = null;
+    _sttRestartTimer?.cancel();
+    _sttRestartTimer = null;
+  }
+
+  Duration _elapsedListeningTime() {
+    final startedAt = _listenStartedAt;
+    if (startedAt == null) {
+      return Duration.zero;
+    }
+    return DateTime.now().difference(startedAt);
+  }
+
+  bool _hasCapturedFinalTranscript() {
+    return _lastFinalResultAt != null && _lastFinalResultText.trim().isNotEmpty;
+  }
+
+  SpeechListenOptions _speechListenOptions() {
+    return SpeechListenOptions(
+      cancelOnError: true,
+      partialResults: true,
+      listenMode: ListenMode.dictation,
+    );
+  }
+
+  bool _shouldIgnorePrematureSttEnd({required bool isPermanentError}) {
+    return AiSttResiliencePolicy.shouldHoldListening(
+      isListening: _state == AiState.listening,
+      isPipelineLocked: _isPipelineLocked,
+      hasCapturedFinalTranscript: _hasCapturedFinalTranscript(),
+      elapsed: _elapsedListeningTime(),
+      minimumListenFor: _sttListenFor,
+      isPermanentError: isPermanentError,
+    );
+  }
+
+  void _restartListeningUntilGuardWindow({
+    required String reason,
+    required int token,
+    required String traceId,
+  }) {
+    if (!_shouldIgnorePrematureSttEnd(isPermanentError: false)) {
+      return;
+    }
+
+    _sttRestartTimer?.cancel();
+    _sttRestartTimer = Timer(const Duration(milliseconds: 180), () async {
+      if (!_isCurrentOperation(token) ||
+          _state != AiState.listening ||
+          _isPipelineLocked ||
+          !_shouldIgnorePrematureSttEnd(isPermanentError: false)) {
+        return;
+      }
+
+      try {
+        // ignore: deprecated_member_use
+        await _stt.listen(
+          onResult:
+              (result) =>
+                  _handleSpeechResult(result, token: token, traceId: traceId),
+          onSoundLevelChange: _handleSoundLevelChange,
+          // ignore: deprecated_member_use
+          listenFor: _sttListenFor,
+          // ignore: deprecated_member_use
+          pauseFor: _sttPauseFor,
+          // ignore: deprecated_member_use
+          localeId: _resolvedLocaleId ?? _defaultLocaleId,
+          listenOptions: _speechListenOptions(),
+        );
+        _logEvent(
+          'STT_LISTEN_RESTARTED',
+          traceId: traceId,
+          data: {
+            'reason': reason,
+            'elapsedMs': _elapsedListeningTime().inMilliseconds,
+            'minimumMs': _sttListenFor.inMilliseconds,
+          },
+        );
+      } catch (error) {
+        _logEvent(
+          'STT_RESTART_ERROR',
+          traceId: traceId,
+          level: 'WARN',
+          data: {'error': error.toString(), 'reason': reason},
+        );
+      }
+    });
+  }
+
+  void _handleSpeechResult(
+    dynamic result, {
+    required int token,
+    required String traceId,
+  }) {
+    if (!_isCurrentOperation(token)) {
+      return;
+    }
+
+    _lastWords = result.recognizedWords.trim();
+    notifyListeners();
+
+    if (result.finalResult &&
+        _lastWords.isNotEmpty &&
+        !_isDuplicateFinalResult(_lastWords)) {
+      _lastFinalResultAt = DateTime.now();
+      _lastFinalResultText = _lastWords;
+      _lastResponseSurface = _activeSurface;
+      unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
+    }
+  }
+
+  void _handleSttTerminalStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    if ((normalized != 'done' && normalized != 'notlistening') ||
+        _state != AiState.listening ||
+        _isPipelineLocked) {
+      return;
+    }
+
+    if (_shouldIgnorePrematureSttEnd(isPermanentError: false)) {
+      _logEvent(
+        'STT_EARLY_DONE_IGNORED',
+        data: {
+          'status': normalized,
+          'elapsedMs': _elapsedListeningTime().inMilliseconds,
+          'minimumMs': _sttListenFor.inMilliseconds,
+          'hasFinalTranscript': _hasCapturedFinalTranscript(),
+          'lastWordsLength': _lastWords.length,
+        },
+      );
+      _restartListeningUntilGuardWindow(
+        reason: 'terminal_status:$normalized',
+        token: _operationToken,
+        traceId: _activeTraceId,
+      );
+      return;
+    }
+
+    _finishListeningFromStt(reason: 'stt_done_status');
+  }
+
+  void _finishListeningFromStt({required String reason}) {
+    if (_lastWords.isEmpty &&
+        _shouldIgnorePrematureSttEnd(isPermanentError: false)) {
+      _logEvent(
+        'STT_FINISH_HELD_UNTIL_GUARD',
+        level: 'WARN',
+        data: {
+          'reason': reason,
+          'elapsedMs': _elapsedListeningTime().inMilliseconds,
+          'minimumMs': _sttListenFor.inMilliseconds,
+        },
+      );
+      _restartListeningUntilGuardWindow(
+        reason: 'finish:$reason',
+        token: _operationToken,
+        traceId: _activeTraceId,
+      );
+      return;
+    }
+
+    _cancelListenGuard();
+    _listenStartedAt = null;
+    _isSessionActive = false;
+    _soundLevel = 0;
+    _transitionTo(AiState.idle, reason: reason, notify: false);
+    if (_lastWords.isEmpty) {
+      _aiResponse = '';
+      _scheduleIdleAutoHide(reason: '${reason}_no_words');
+    }
+    _syncVisibilityAfterSession();
+    notifyListeners();
   }
 
   void _handleSoundLevelChange(double rawLevel) {
@@ -535,6 +1056,7 @@ class AiAssistantProvider with ChangeNotifier {
     _operationToken += 1;
     _isPipelineLocked = false;
     _cancelListenGuard();
+    _listenStartedAt = null;
     _logEvent('PIPELINE_CANCELLED', level: 'WARN', data: {'reason': reason});
   }
 
@@ -543,23 +1065,24 @@ class AiAssistantProvider with ChangeNotifier {
   // ==================== PERSISTENCE =======================================
 
   Future<void> _initPersistence() async {
+    final loadGeneration = _scopeLoadGeneration;
     final prefs = await SharedPreferences.getInstance();
     await _loadMascot(prefs: prefs);
-    _persistentEnabled = prefs.getBool(_visibilityPrefKey) ?? false;
-    _cloudBackupEnabled = prefs.getBool(_cloudBackupPrefKey) ?? false;
-    _conversationCreated = prefs.getBool(_conversationCreatedPrefKey) ?? false;
-    _serverConversationId = prefs.getString(_serverConversationIdPrefKey);
-    await _loadConversationHistory(prefs: prefs);
-    _loadSyncedEntryIds(prefs: prefs);
-
-    if (_cloudBackupEnabled && _serverConversationId != null) {
-      unawaited(_restoreConversationHistoryFromServer());
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
     }
+    _persistentEnabled = prefs.getBool(_visibilityPrefKey) ?? false;
+    await _loadScopedPersistence(
+      prefs: prefs,
+      notify: false,
+      expectedGeneration: loadGeneration,
+    );
 
     _logEvent(
       'PERSISTENCE_LOADED',
       data: {
         'persistentEnabled': _persistentEnabled,
+        'scopeKey': _activeScopeKey,
         'mascotId': _currentMascot.id,
         'cloudBackupEnabled': _cloudBackupEnabled,
         'hasConversation': hasConversation,
@@ -570,9 +1093,41 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _loadScopedPersistence({
+    required SharedPreferences prefs,
+    bool notify = true,
+    int? expectedGeneration,
+  }) async {
+    final loadGeneration = expectedGeneration ?? _scopeLoadGeneration;
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
+
+    _cloudBackupEnabled = prefs.getBool(_scopedCloudBackupPrefKey) ?? false;
+    _conversationCreated =
+        prefs.getBool(_scopedConversationCreatedPrefKey) ?? false;
+    _serverConversationId = prefs.getString(_scopedServerConversationIdPrefKey);
+    await _loadConversationHistory(prefs: prefs);
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
+    _loadSyncedEntryIds(prefs: prefs);
+
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
+    if (_cloudBackupEnabled && _serverConversationId != null) {
+      unawaited(_restoreConversationHistoryFromServer());
+    }
+
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
   Future<void> _loadConversationHistory({SharedPreferences? prefs}) async {
     final store = prefs ?? await SharedPreferences.getInstance();
-    final raw = store.getString(_historyPrefKey);
+    final raw = store.getString(_scopedHistoryPrefKey);
     if (raw == null || raw.trim().isEmpty) {
       return;
     }
@@ -601,10 +1156,29 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   void _loadSyncedEntryIds({required SharedPreferences prefs}) {
-    final ids = prefs.getStringList(_syncedEntryIdsPrefKey) ?? const <String>[];
+    final ids =
+        prefs.getStringList(_scopedSyncedEntryIdsPrefKey) ?? const <String>[];
     _syncedEntryIds
       ..clear()
       ..addAll(ids.where((id) => id.trim().isNotEmpty));
+  }
+
+  void _resetScopedConversationState({bool clearCurrentResponse = false}) {
+    _historyClearGeneration++;
+    _conversationHistory.clear();
+    _syncedEntryIds.clear();
+    _conversationCreated = false;
+    _cloudBackupEnabled = false;
+    _sessionHistory.clear();
+    _lastUserPrompt = '';
+    _lastWords = '';
+    _lastFinalResultText = '';
+    _lastFinalResultAt = null;
+    _serverConversationId = null;
+    _clarificationState = null;
+    if (clearCurrentResponse) {
+      _aiResponse = '';
+    }
   }
 
   Future<void> _loadMascot({SharedPreferences? prefs}) async {
@@ -632,6 +1206,7 @@ class AiAssistantProvider with ChangeNotifier {
     unawaited(_stt.cancel());
     unawaited(_tts.stop());
     _systemActionController.close();
+    _disambiguationSelectionController.close();
     super.dispose();
   }
 
@@ -687,7 +1262,7 @@ class AiAssistantProvider with ChangeNotifier {
     _cloudBackupEnabled = enabled;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_cloudBackupPrefKey, enabled);
+    await prefs.setBool(_scopedCloudBackupPrefKey, enabled);
 
     _logEvent('CLOUD_BACKUP_SET', data: {'enabled': enabled, 'reason': reason});
 
@@ -719,6 +1294,7 @@ class AiAssistantProvider with ChangeNotifier {
     _conversationCreated = false;
     _sessionHistory.clear();
     _lastUserPrompt = '';
+    _clarificationState = null;
     _serverConversationId = null;
 
     if (clearCurrentResponse) {
@@ -728,10 +1304,10 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_historyPrefKey);
-    await prefs.remove(_serverConversationIdPrefKey);
-    await prefs.remove(_syncedEntryIdsPrefKey);
-    await prefs.setBool(_conversationCreatedPrefKey, false);
+    await prefs.remove(_scopedHistoryPrefKey);
+    await prefs.remove(_scopedServerConversationIdPrefKey);
+    await prefs.remove(_scopedSyncedEntryIdsPrefKey);
+    await prefs.setBool(_scopedConversationCreatedPrefKey, false);
 
     _logEvent(
       'CONVERSATION_HISTORY_CLEARED',
@@ -775,6 +1351,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     _persistentEnabled = false;
     _provisionallyVisible = false;
+    _clarificationState = null;
     _aiResponse = '';
 
     final prefs = await SharedPreferences.getInstance();
@@ -795,17 +1372,21 @@ class AiAssistantProvider with ChangeNotifier {
     bool startListening = true,
     bool persist = false,
     String source = 'discover',
+    AiResponseSurface? startListeningSurface,
   }) async {
     if (persist) {
       await setPersistentEnabled(true, reason: '$source.persist');
     } else {
       _provisionallyVisible = true;
-      _keepVisibleUntil = DateTime.now().add(_emptySummonAutoHideDelay);
+      final summonHoldWindow =
+          startListening ? _sttListenFor : _emptySummonAutoHideDelay;
+      _keepVisibleUntil = DateTime.now().add(summonHoldWindow);
       _logEvent(
         'VISIBILITY_SUMMON_CONTEXTUAL',
         data: {
           'source': source,
-          'autoHideMs': _emptySummonAutoHideDelay.inMilliseconds,
+          'autoHideMs': summonHoldWindow.inMilliseconds,
+          'startListening': startListening,
         },
       );
       notifyListeners();
@@ -813,13 +1394,22 @@ class AiAssistantProvider with ChangeNotifier {
 
     if (startListening) {
       await Future.delayed(const Duration(milliseconds: 120));
-      await onPrimaryAction(source: '$source.auto_listen');
+      if (_isDisposed || _state == AiState.listening) {
+        return;
+      }
+      await onPrimaryAction(
+        source: '$source.auto_listen',
+        surface: startListeningSurface,
+      );
     }
   }
 
-  Future<void> onPrimaryAction({String source = 'bubble'}) async {
-    final surface = _surfaceForSource(source);
-    final keepBubbleVisible = surface != AiResponseSurface.conversation;
+  Future<void> onPrimaryAction({
+    String source = 'bubble',
+    AiResponseSurface? surface,
+  }) async {
+    final resolvedSurface = _resolveSurface(source, explicitSurface: surface);
+    final keepBubbleVisible = resolvedSurface != AiResponseSurface.conversation;
 
     if (_state == AiState.listening) {
       await stopListening(
@@ -834,7 +1424,7 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
-    await startListening(source: source);
+    await startListening(source: source, surface: resolvedSurface);
   }
 
   // ==================== STT / TTS ========================================
@@ -866,7 +1456,10 @@ class AiAssistantProvider with ChangeNotifier {
     });
   }
 
-  Future<void> startListening({String source = 'bubble'}) async {
+  Future<void> startListening({
+    String source = 'bubble',
+    AiResponseSurface? surface,
+  }) async {
     if (_state == AiState.listening) {
       _logEvent(
         'STT_START_SKIPPED',
@@ -884,9 +1477,9 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
-    final surface = _surfaceForSource(source);
-    _activeSurface = surface;
-    _lastResponseSurface = surface;
+    final resolvedSurface = _resolveSurface(source, explicitSurface: surface);
+    _activeSurface = resolvedSurface;
+    _lastResponseSurface = resolvedSurface;
 
     final traceId = _newTraceId('stt');
     final token = _beginOperation(traceId: traceId);
@@ -895,7 +1488,9 @@ class AiAssistantProvider with ChangeNotifier {
     _cancelIdleAutoHide();
     _cancelListenGuard();
     _soundLevel = 0;
-    if (surface != AiResponseSurface.conversation) {
+    _lastFinalResultAt = null;
+    _lastFinalResultText = '';
+    if (resolvedSurface != AiResponseSurface.conversation) {
       _setProvisionallyVisible(true, reason: 'stt_start:$source');
     }
 
@@ -917,13 +1512,13 @@ class AiAssistantProvider with ChangeNotifier {
 
     // HARDEN(mic-permission): when mic unavailable/permission denied, the
     // bubble stays visible (not stuck) and shows an error message. State is
-    // always reset to idle — no orphan listening states.
+    // always reset to idle -- no orphan listening states.
     if (!available) {
       _cancelActiveOperation(reason: 'stt_unavailable:$source');
       _isSessionActive = false;
       _aiResponse = 'Thiết bị chưa sẵn sàng micro để nghe lệnh.';
       _transitionTo(AiState.idle, reason: 'stt_unavailable', traceId: traceId);
-      if (surface != AiResponseSurface.conversation) {
+      if (resolvedSurface != AiResponseSurface.conversation) {
         _setProvisionallyVisible(true, reason: 'stt_unavailable_visible');
         _scheduleIdleAutoHide(reason: 'stt_unavailable');
       }
@@ -933,6 +1528,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     _isSessionActive = true;
     _lastWords = '';
+    _listenStartedAt = DateTime.now();
     _transitionTo(
       AiState.listening,
       reason: 'start_listening',
@@ -942,35 +1538,22 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      _startListenGuard(token: token, traceId: traceId);
+      // ignore: deprecated_member_use
       await _stt.listen(
-        onResult: (result) {
-          // HARDEN(late-callback): STT result arriving after operation changed
-          if (!_isCurrentOperation(token)) {
-            return;
-          }
-
-          _lastWords = result.recognizedWords.trim();
-          notifyListeners();
-
-          if (result.finalResult &&
-              _lastWords.isNotEmpty &&
-              !_isDuplicateFinalResult(_lastWords)) {
-            _lastResponseSurface = surface;
-            unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
-          }
-        },
+        onResult:
+            (result) =>
+                _handleSpeechResult(result, token: token, traceId: traceId),
         onSoundLevelChange: _handleSoundLevelChange,
+        // ignore: deprecated_member_use
         listenFor: _sttListenFor,
+        // ignore: deprecated_member_use
         pauseFor: _sttPauseFor,
+        // ignore: deprecated_member_use
         localeId: _resolvedLocaleId ?? _defaultLocaleId,
-        listenOptions: SpeechListenOptions(
-          cancelOnError: true,
-          partialResults: true,
-          listenMode: ListenMode.dictation,
-        ),
+        listenOptions: _speechListenOptions(),
       );
 
-      _startListenGuard(token: token, traceId: traceId);
       _logEvent(
         'STT_LISTEN_STARTED',
         traceId: traceId,
@@ -982,10 +1565,11 @@ class AiAssistantProvider with ChangeNotifier {
       );
     } catch (error) {
       // HARDEN(mic-permission): catch listen() throwing (not just returning
-      // false from initialize) — ensures state is always cleaned up.
+      // false from initialize) -- ensures state is always cleaned up.
       if (!_isCurrentOperation(token)) {
         return;
       }
+      _cancelListenGuard();
 
       _logEvent(
         'STT_LISTEN_ERROR',
@@ -1003,7 +1587,7 @@ class AiAssistantProvider with ChangeNotifier {
         traceId: traceId,
         notify: false,
       );
-      if (surface != AiResponseSurface.conversation) {
+      if (resolvedSurface != AiResponseSurface.conversation) {
         _setProvisionallyVisible(true, reason: 'stt_listen_error_visible');
         _scheduleIdleAutoHide(reason: 'stt_listen_error');
       }
@@ -1016,6 +1600,7 @@ class AiAssistantProvider with ChangeNotifier {
     bool keepBubbleVisible = true,
   }) async {
     _cancelListenGuard();
+    _listenStartedAt = null;
     try {
       await _stt.stop();
     } catch (error) {
@@ -1051,36 +1636,47 @@ class AiAssistantProvider with ChangeNotifier {
           // HARDEN(late-callback): guard STT status callback after dispose
           if (_isDisposed) return;
           _logEvent('STT_STATUS', data: {'status': status});
-          final normalized = status.trim().toLowerCase();
-          if ((normalized == 'done' || normalized == 'notlistening') &&
-              _state == AiState.listening &&
-              !_isPipelineLocked) {
-            _cancelListenGuard();
-            _isSessionActive = false;
-            _soundLevel = 0;
-            _transitionTo(
-              AiState.idle,
-              reason: 'stt_done_status',
-              notify: false,
-            );
-            if (_lastWords.isEmpty) {
-              _aiResponse = '';
-              _scheduleIdleAutoHide(reason: 'stt_done_no_words');
-            }
-            _syncVisibilityAfterSession();
-            notifyListeners();
-          }
+          _handleSttTerminalStatus(status);
         },
         onError: (error) {
           // HARDEN(late-callback): guard STT error callback after dispose
           if (_isDisposed) return;
+          final normalizedError = error.errorMsg.trim().toLowerCase();
           _logEvent(
             'STT_ERROR',
             level: 'ERROR',
-            data: {'error': error.toString()},
+            data: {'error': error.toString(), 'errorMsg': error.errorMsg},
           );
+          final isPermanentError = AiSttResiliencePolicy.isPermanentError(
+            normalizedError,
+          );
+          final isTransientError = AiSttResiliencePolicy.isTransientError(
+            normalizedError,
+          );
+          if (_shouldIgnorePrematureSttEnd(
+            isPermanentError: isPermanentError,
+          )) {
+            _logEvent(
+              'STT_TRANSIENT_ERROR_IGNORED',
+              level: 'WARN',
+              data: {
+                'errorMsg': error.errorMsg,
+                'elapsedMs': _elapsedListeningTime().inMilliseconds,
+                'minimumMs': _sttListenFor.inMilliseconds,
+                'isTransientError': isTransientError,
+                'isPermanentError': isPermanentError,
+              },
+            );
+            _restartListeningUntilGuardWindow(
+              reason: 'transient_error:${error.errorMsg}',
+              token: _operationToken,
+              traceId: _activeTraceId,
+            );
+            return;
+          }
           if (_state == AiState.listening && !_isPipelineLocked) {
             _cancelListenGuard();
+            _listenStartedAt = null;
             _isSessionActive = false;
             _soundLevel = 0;
             _transitionTo(AiState.idle, reason: 'stt_error', notify: false);
@@ -1155,17 +1751,19 @@ class AiAssistantProvider with ChangeNotifier {
   Future<void> submitTextPrompt(
     String text, {
     String source = 'chat_board',
+    AiResponseSurface? surface,
   }) async {
     final normalized = text.trim();
     if (normalized.isEmpty) {
       return;
     }
+    _clarificationState = null;
 
-    final responseSurface = _surfaceForSource(source);
+    final responseSurface = _resolveSurface(source, explicitSurface: surface);
     _activeSurface = responseSurface;
     _lastResponseSurface = responseSurface;
 
-    await _ensureConversationCreated(source: '$source.text_interaction');
+    unawaited(_ensureConversationCreated(source: '$source.text_interaction'));
 
     _cancelIdleAutoHide();
     if (responseSurface != AiResponseSurface.conversation) {
@@ -1173,14 +1771,41 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     if (_state == AiState.listening) {
-      await stopListening(
-        reason: '$source.stop_listening',
-        keepBubbleVisible: responseSurface != AiResponseSurface.conversation,
+      final keepBubbleVisible =
+          responseSurface != AiResponseSurface.conversation;
+      _cancelListenGuard();
+      _listenStartedAt = null;
+      _isSessionActive = false;
+      _soundLevel = 0;
+      _transitionTo(
+        AiState.idle,
+        reason: '$source.stop_listening_preempt',
+        notify: false,
+      );
+      notifyListeners();
+
+      unawaited(
+        stopListening(
+          reason: '$source.stop_listening',
+          keepBubbleVisible: keepBubbleVisible,
+        ),
       );
     }
 
     if (_state == AiState.thinking || _state == AiState.speaking) {
       await stopCurrentPipeline(reason: '$source.preempt');
+    }
+
+    if (_isPipelineLocked) {
+      _queuedTextPrompt = normalized;
+      _queuedTextPromptSource = source;
+      _queuedTextPromptSurface = surface;
+      _logEvent(
+        'PIPELINE_QUEUE',
+        level: 'INFO',
+        data: {'source': source, 'text': normalized},
+      );
+      return;
     }
 
     await _handleCommand(normalized, parentTraceId: _newTraceId(source));
@@ -1217,11 +1842,36 @@ class AiAssistantProvider with ChangeNotifier {
     _cancelListenGuard();
     _cancelIdleAutoHide();
     _isSessionActive = true;
+    _thinkingPhase = AiThinkingPhase.understanding;
     _transitionTo(
       AiState.thinking,
       reason: 'command_received',
       traceId: traceId,
     );
+
+    final userEntryId = _newEntryId();
+    final assistantEntryId = _newEntryId();
+    final List<Map<String, dynamic>> structuredHistory = [];
+    final historySubset =
+        _conversationHistory.length > 10
+            ? _conversationHistory.sublist(_conversationHistory.length - 10)
+            : _conversationHistory;
+    for (final entry in historySubset) {
+      final role = entry.role == AiConversationRole.user ? 'user' : 'assistant';
+      structuredHistory.add({
+        'role': role,
+        'content': entry.text,
+        'createdAt': entry.createdAt.toUtc().toIso8601String(),
+        'clientEntryId': entry.entryId,
+      });
+    }
+
+    _recordUserHistory(
+      text: normalized,
+      source: 'assistant_chat',
+      entryId: userEntryId,
+    );
+
     try {
       await _stt.stop();
     } catch (error) {
@@ -1233,26 +1883,7 @@ class AiAssistantProvider with ChangeNotifier {
       );
     }
 
-    final userEntryId = _newEntryId();
-    final assistantEntryId = _newEntryId();
-
     try {
-      final List<Map<String, dynamic>> structuredHistory = [];
-      final historySubset =
-          _conversationHistory.length > 10
-              ? _conversationHistory.sublist(_conversationHistory.length - 10)
-              : _conversationHistory;
-      for (final entry in historySubset) {
-        final role =
-            entry.role == AiConversationRole.user ? 'user' : 'assistant';
-        structuredHistory.add({
-          'role': role,
-          'content': entry.text,
-          'createdAt': entry.createdAt.toUtc().toIso8601String(),
-          'clientEntryId': entry.entryId,
-        });
-      }
-
       final response = await _aiService
           .chat(
             normalized,
@@ -1269,31 +1900,52 @@ class AiAssistantProvider with ChangeNotifier {
         return;
       }
 
+      final normalizedResponse = _normalizeAiResponsePayload(response);
       _aiResponse =
           normalizeAiTextEncoding(
-            (response['textReply'] ?? '').toString(),
+            (normalizedResponse['textReply'] ?? '').toString(),
           ).trim();
-      _currentEmotion = (response['emotion'] ?? 'neutral').toString();
-      final actionCommand = response['actionCommand']?.toString();
-      final actionParams = response['actionParams'];
+      _currentEmotion =
+          (normalizedResponse['emotion'] ?? response['emotion'] ?? 'neutral')
+              .toString();
+      _updateProviderRuntimeState(
+        degraded: normalizedResponse['degraded'] == true,
+        providerStatus:
+            (normalizedResponse['providerStatus'] ?? 'LIVE_PROVIDER_ACTIVE')
+                .toString(),
+      );
+      final actionCommand = normalizedResponse['actionCommand']?.toString();
+      final actionParams = normalizedResponse['actionParams'];
 
       if (response['conversationId'] != null) {
         _serverConversationId = response['conversationId'].toString();
       }
 
-      _recordHistory(
-        userText: normalized,
-        aiText: _aiResponse,
-        userEntryId: response['userEntryId']?.toString() ?? userEntryId,
-        assistantEntryId:
-            response['assistantEntryId']?.toString() ?? assistantEntryId,
-      );
+      final hasActionCommand =
+          actionCommand != null && actionCommand.isNotEmpty;
+      if (!hasActionCommand) {
+        _recordAssistantHistory(
+          text: _aiResponse,
+          source: 'assistant_chat',
+          entryId: response['assistantEntryId']?.toString() ?? assistantEntryId,
+        );
+        _trimSessionHistory();
+      }
 
-      if (actionCommand != null && actionCommand.isNotEmpty) {
+      if (hasActionCommand) {
+        _aiResponse = _actionPendingMessage(actionCommand);
+        _recordAssistantHistory(
+          text: _aiResponse,
+          source: 'ai_action_pending.${actionCommand.toUpperCase()}',
+          entryId: response['assistantEntryId']?.toString() ?? assistantEntryId,
+        );
+        _thinkingPhase = AiThinkingPhase.executingAction;
+        notifyListeners();
         _executeSystemAction(actionCommand, actionParams, traceId: traceId);
       }
 
-      if (_aiResponse.isNotEmpty) {
+      if (!hasActionCommand && _aiResponse.isNotEmpty) {
+        _thinkingPhase = AiThinkingPhase.composingResponse;
         _transitionTo(
           AiState.speaking,
           reason: 'speak_response',
@@ -1311,6 +1963,7 @@ class AiAssistantProvider with ChangeNotifier {
           fallbackMessage: 'AI đang phản hồi chậm, vui lòng thử lại sau.',
           userText: normalized,
           source: 'assistant_chat',
+          recordUserInHistory: false,
           userEntryId: userEntryId,
           assistantEntryId: assistantEntryId,
         );
@@ -1321,10 +1974,14 @@ class AiAssistantProvider with ChangeNotifier {
           token: token,
           traceId: traceId,
           event: 'AI_ERROR',
-          fallbackMessage: 'Xin lỗi, tôi đang gặp chút trục trặc mạng.',
+          fallbackMessage: _resolveAssistantErrorMessage(
+            error,
+            fallbackMessage: 'Xin lỗi, tôi đang gặp chút trục trặc mạng.',
+          ),
           error: error,
           userText: normalized,
           source: 'assistant_chat',
+          recordUserInHistory: false,
           userEntryId: userEntryId,
           assistantEntryId: assistantEntryId,
         );
@@ -1346,6 +2003,23 @@ class AiAssistantProvider with ChangeNotifier {
           _scheduleIdleAutoHide(reason: 'pipeline_complete_empty');
         }
         notifyListeners();
+
+        final queuedTextPrompt = _queuedTextPrompt;
+        final queuedTextPromptSource = _queuedTextPromptSource;
+        final queuedTextPromptSurface = _queuedTextPromptSurface;
+        _queuedTextPrompt = null;
+        _queuedTextPromptSource = null;
+        _queuedTextPromptSurface = null;
+
+        if (queuedTextPrompt != null && queuedTextPrompt.trim().isNotEmpty) {
+          unawaited(
+            submitTextPrompt(
+              queuedTextPrompt,
+              source: queuedTextPromptSource ?? 'chat_board',
+              surface: queuedTextPromptSurface,
+            ),
+          );
+        }
       }
     }
   }
@@ -1396,7 +2070,7 @@ class AiAssistantProvider with ChangeNotifier {
 
   /// HARDEN(flow-contextual): contextual prompts (analyze/translate/summarize)
   /// set _activeSurface to contextual (not conversation) so responses can
-  /// appear in the bubble board. This is intentional — context analysis is
+  /// appear in the bubble board. This is intentional -- context analysis is
   /// driven by the bubble mascot experience.
   Future<void> _runContextualPrompt({
     required String source,
@@ -1449,8 +2123,14 @@ class AiAssistantProvider with ChangeNotifier {
 
       _aiResponse =
           normalizeAiTextEncoding(
-            (response['textReply'] ?? '').toString(),
+            (_normalizeAiResponsePayload(response)['textReply'] ?? '')
+                .toString(),
           ).trim();
+      _updateProviderRuntimeState(
+        degraded: response['degraded'] == true,
+        providerStatus:
+            (response['providerStatus'] ?? 'LIVE_PROVIDER_ACTIVE').toString(),
+      );
       if (_aiResponse.isEmpty) {
         _aiResponse = fallbackMessage;
       }
@@ -1528,9 +2208,20 @@ class AiAssistantProvider with ChangeNotifier {
     Object? error,
     String? userText,
     String source = 'assistant_chat',
+    bool recordUserInHistory = true,
     String? userEntryId,
     String? assistantEntryId,
   }) async {
+    if (event == 'AI_TIMEOUT' ||
+        event == 'AI_ERROR' ||
+        event == 'CONTEXT_TIMEOUT' ||
+        event == 'CONTEXT_ERROR') {
+      _updateProviderRuntimeState(
+        degraded: true,
+        providerStatus: _resolveProviderStatusForFailure(event, error),
+      );
+    }
+
     _logEvent(
       event,
       traceId: traceId,
@@ -1541,19 +2232,324 @@ class AiAssistantProvider with ChangeNotifier {
     _aiResponse = fallbackMessage;
     _currentEmotion = 'neutral';
     if (userText != null && userText.trim().isNotEmpty) {
-      final fallbackAssistantEntryId =
-          assistantEntryId != null ? _newEntryId() : null;
-      _recordHistory(
-        userText: userText,
-        aiText: _aiResponse,
+      if (recordUserInHistory) {
+        _recordUserHistory(
+          text: userText,
+          source: source,
+          entryId: userEntryId,
+        );
+      }
+      _recordAssistantHistory(
+        text: _aiResponse,
         source: source,
-        userEntryId: userEntryId,
-        assistantEntryId: fallbackAssistantEntryId,
+        entryId: assistantEntryId,
       );
+      _trimSessionHistory();
     }
     _transitionTo(AiState.speaking, reason: 'fallback_speak', traceId: traceId);
     notifyListeners();
     await _safeSpeak(_aiResponse, token: token, traceId: traceId);
+  }
+
+  void _updateProviderRuntimeState({
+    required bool degraded,
+    required String providerStatus,
+    bool notify = false,
+  }) {
+    _isResponseDegraded = degraded;
+    _providerStatus =
+        providerStatus.trim().isEmpty
+            ? 'LIVE_PROVIDER_ACTIVE'
+            : providerStatus.trim();
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  Map<String, dynamic> _normalizeAiResponsePayload(
+    Map<String, dynamic> response,
+  ) {
+    final normalized = Map<String, dynamic>.from(response);
+    final rawTextReply = normalized['textReply']?.toString();
+    final embeddedPayload = _tryDecodeEmbeddedAiPayload(rawTextReply);
+    final displayText = _coerceAssistantDisplayText(rawTextReply);
+    if (displayText.isNotEmpty) {
+      normalized['textReply'] = displayText;
+    }
+    if (embeddedPayload == null) {
+      return normalized;
+    }
+
+    final embeddedText =
+        normalizeAiTextEncoding(
+          (embeddedPayload['textReply'] ?? '').toString(),
+        ).trim();
+    if (embeddedText.isNotEmpty) {
+      normalized['textReply'] = embeddedText;
+    }
+
+    for (final key in const [
+      'actionCommand',
+      'actionParams',
+      'emotion',
+      'providerStatus',
+      'degraded',
+      'conversationId',
+      'assistantEntryId',
+    ]) {
+      final candidate = embeddedPayload[key];
+      if (_isBlankAiPayloadValue(normalized[key]) &&
+          !_isBlankAiPayloadValue(candidate)) {
+        normalized[key] = candidate;
+      }
+    }
+
+    return normalized;
+  }
+
+  String _coerceAssistantDisplayText(String? rawTextReply) {
+    if (rawTextReply == null) {
+      return '';
+    }
+
+    final normalized = normalizeAiTextEncoding(rawTextReply).trim();
+    if (normalized.isEmpty) {
+      return '';
+    }
+
+    final structuredPayload = _tryDecodeStructuredAiPayload(normalized);
+    if (structuredPayload == null) {
+      return normalized;
+    }
+
+    final embeddedText =
+        normalizeAiTextEncoding(
+          (structuredPayload['textReply'] ??
+                  structuredPayload['summary'] ??
+                  structuredPayload['message'] ??
+                  structuredPayload['description'] ??
+                  structuredPayload['result'] ??
+                  '')
+              .toString(),
+        ).trim();
+    if (embeddedText.isNotEmpty && embeddedText != normalized) {
+      return embeddedText;
+    }
+
+    final bulletLines = <String>[];
+    final scalarLabelMap = <String, String>{
+      'intent': 'Ý định',
+      'sentiment': 'Cảm xúc',
+      'language': 'Ngôn ngữ',
+      'ocrText': 'Văn bản nhận diện',
+      'caption': 'Mô tả',
+      'scene': 'Bối cảnh',
+    };
+    for (final entry in scalarLabelMap.entries) {
+      final value = structuredPayload[entry.key]?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        bulletLines.add('- ${entry.value}: $value');
+      }
+    }
+
+    final collectionLabelMap = <String, String>{
+      'objects': 'Đối tượng',
+      'labels': 'Nhãn',
+      'faces': 'Khuôn mặt',
+      'texts': 'Văn bản',
+      'keywords': 'Từ khóa',
+    };
+    for (final entry in collectionLabelMap.entries) {
+      final summary = _summarizeStructuredAiCollection(
+        structuredPayload[entry.key],
+      );
+      if (summary != null && summary.isNotEmpty) {
+        bulletLines.add('- ${entry.value}: $summary');
+      }
+    }
+
+    if (bulletLines.isEmpty) {
+      return normalized;
+    }
+
+    return 'Kết quả phân tích:\n${bulletLines.join('\n')}';
+  }
+
+  Map<String, dynamic>? _tryDecodeStructuredAiPayload(String rawTextReply) {
+    if (!rawTextReply.startsWith('{') || !rawTextReply.endsWith('}')) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(rawTextReply);
+      if (decoded is! Map) {
+        return null;
+      }
+      return decoded.map((key, value) => MapEntry(key.toString(), value));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _summarizeStructuredAiCollection(Object? value) {
+    if (value is! List || value.isEmpty) {
+      return null;
+    }
+
+    final normalizedItems = value
+        .take(3)
+        .map((item) {
+          if (item is String) {
+            return item.trim();
+          }
+          if (item is Map) {
+            for (final key in const [
+              'name',
+              'label',
+              'text',
+              'title',
+              'value',
+            ]) {
+              final candidate = item[key]?.toString().trim();
+              if (candidate != null && candidate.isNotEmpty) {
+                return candidate;
+              }
+            }
+          }
+          return item.toString().trim();
+        })
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+
+    if (normalizedItems.isEmpty) {
+      return null;
+    }
+
+    final suffix = value.length > normalizedItems.length ? '…' : '';
+    return '${normalizedItems.join(', ')}$suffix';
+  }
+
+  Map<String, dynamic>? _tryDecodeEmbeddedAiPayload(String? rawTextReply) {
+    if (rawTextReply == null) {
+      return null;
+    }
+
+    final normalized = normalizeAiTextEncoding(rawTextReply).trim();
+    if (!normalized.startsWith('{') || !normalized.endsWith('}')) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(normalized);
+      if (decoded is! Map) {
+        return null;
+      }
+
+      final payload = decoded.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      if (!payload.containsKey('textReply')) {
+        return null;
+      }
+      return payload;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _isBlankAiPayloadValue(Object? value) {
+    if (value == null) {
+      return true;
+    }
+    if (value is String) {
+      return value.trim().isEmpty;
+    }
+    return false;
+  }
+
+  String _resolveAssistantErrorMessage(
+    Object error, {
+    required String fallbackMessage,
+  }) {
+    if (error is ApiException) {
+      if (error.statusCode == 0) {
+        final normalized = error.message.toLowerCase();
+        if (normalized.contains('timed out')) {
+          return 'AI phản hồi chậm. Vui lòng thử lại sau vài giây.';
+        }
+        if (normalized.contains('internet') ||
+            normalized.contains('socket') ||
+            normalized.contains('client error')) {
+          return 'Không kết nối được AI. Kiểm tra mạng rồi thử lại.';
+        }
+        return 'Không thể kết nối tới AI. Vui lòng thử lại.';
+      }
+
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+      }
+
+      if (error.statusCode == 404) {
+        return 'Không tìm thấy endpoint AI. Vui lòng kiểm tra cấu hình môi trường.';
+      }
+
+      if (error.statusCode == 429) {
+        return 'Bạn đang gửi quá nhanh. Vui lòng thử lại sau vài giây.';
+      }
+
+      if (error.statusCode >= 500) {
+        return 'AI đang tạm thời không sẵn sàng. Vui lòng thử lại sau.';
+      }
+
+      final normalizedMessage = normalizeAiTextEncoding(error.message).trim();
+      if (normalizedMessage.isNotEmpty) {
+        return normalizedMessage;
+      }
+    }
+
+    return fallbackMessage;
+  }
+
+  String _resolveProviderStatusForFailure(String event, Object? error) {
+    if (event == 'AI_TIMEOUT' || event == 'CONTEXT_TIMEOUT') {
+      return 'AI_PROVIDER_TIMEOUT';
+    }
+
+    if (error is ApiException) {
+      final message = error.message.toLowerCase();
+      if (error.statusCode == 0) {
+        if (message.contains('timed out')) {
+          return 'AI_PROVIDER_TIMEOUT';
+        }
+        return 'AI_NETWORK_UNAVAILABLE';
+      }
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        return 'AI_AUTH_REQUIRED';
+      }
+      if (error.statusCode == 404) {
+        return 'AI_ENDPOINT_NOT_FOUND';
+      }
+      if (error.statusCode == 429) {
+        return 'AI_RATE_LIMITED';
+      }
+      if (error.statusCode >= 500) {
+        return 'AI_PROVIDER_UNAVAILABLE';
+      }
+    }
+
+    return 'AI_REQUEST_FAILED';
+  }
+
+  String _actionPendingMessage(String command) {
+    return switch (command.trim().toUpperCase()) {
+      'OPEN_CHAT' => 'Mình sẽ mở cuộc trò chuyện phù hợp.',
+      'COMPOSE_MESSAGE' => 'Mình sẽ chuẩn bị tin nhắn để bạn kiểm tra.',
+      'CREATE_GROUP' => 'Mình sẽ chuẩn bị tạo nhóm và chờ bạn xác nhận.',
+      'START_CALL' => 'Mình sẽ chuẩn bị cuộc gọi và chờ bạn xác nhận.',
+      'NAVIGATE_TO' => 'Mình sẽ điều hướng tới màn hình phù hợp.',
+      'RECALL_MESSAGE' => 'Mình sẽ kiểm tra tin nhắn có thể thu hồi.',
+      _ => 'Mình sẽ thực hiện thao tác phù hợp.',
+    };
   }
 
   Future<void> _stopAllInteractions({
@@ -1561,6 +2557,7 @@ class AiAssistantProvider with ChangeNotifier {
     required bool keepResponse,
   }) async {
     _cancelListenGuard();
+    _listenStartedAt = null;
     try {
       await _stt.stop();
     } catch (error) {
@@ -1604,29 +2601,54 @@ class AiAssistantProvider with ChangeNotifier {
     String? userEntryId,
     String? assistantEntryId,
   }) {
-    final normalizedUser = normalizeAiTextEncoding(userText).trim();
-    final normalizedAi = normalizeAiTextEncoding(aiText).trim();
+    _recordUserHistory(text: userText, source: source, entryId: userEntryId);
+    _recordAssistantHistory(
+      text: aiText,
+      source: source,
+      entryId: assistantEntryId,
+    );
+    _trimSessionHistory();
+  }
 
-    if (normalizedUser.isNotEmpty) {
-      _sessionHistory.add({'role': 'User', 'text': normalizedUser});
-      _addConversationEntry(
-        role: AiConversationRole.user,
-        text: normalizedUser,
-        source: source,
-        entryId: userEntryId,
-      );
+  void _recordUserHistory({
+    required String text,
+    required String source,
+    String? entryId,
+  }) {
+    final normalized = normalizeAiTextEncoding(text).trim();
+    if (normalized.isEmpty) {
+      return;
     }
 
-    if (normalizedAi.isNotEmpty) {
-      _sessionHistory.add({'role': 'AI', 'text': normalizedAi});
-      _addConversationEntry(
-        role: AiConversationRole.assistant,
-        text: normalizedAi,
-        source: source,
-        entryId: assistantEntryId,
-      );
+    _sessionHistory.add({'role': 'User', 'text': normalized});
+    _addConversationEntry(
+      role: AiConversationRole.user,
+      text: normalized,
+      source: source,
+      entryId: entryId,
+    );
+  }
+
+  void _recordAssistantHistory({
+    required String text,
+    required String source,
+    String? entryId,
+  }) {
+    final normalized = normalizeAiTextEncoding(text).trim();
+    if (normalized.isEmpty) {
+      return;
     }
 
+    _sessionHistory.add({'role': 'AI', 'text': normalized});
+    _addConversationEntry(
+      role: AiConversationRole.assistant,
+      text: normalized,
+      source: source,
+      entryId: entryId,
+    );
+  }
+
+  void _trimSessionHistory() {
     if (_sessionHistory.length > 10) {
       _sessionHistory.removeRange(0, _sessionHistory.length - 10);
     }
@@ -1639,7 +2661,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     _conversationCreated = true;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_conversationCreatedPrefKey, true);
+    await prefs.setBool(_scopedConversationCreatedPrefKey, true);
     _logEvent('CONVERSATION_CREATED', data: {'source': source});
     notifyListeners();
   }
@@ -1686,17 +2708,20 @@ class AiAssistantProvider with ChangeNotifier {
   Future<void> _persistConversationHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_conversationCreatedPrefKey, _conversationCreated);
+      await prefs.setBool(
+        _scopedConversationCreatedPrefKey,
+        _conversationCreated,
+      );
       if (_serverConversationId != null) {
         await prefs.setString(
-          _serverConversationIdPrefKey,
+          _scopedServerConversationIdPrefKey,
           _serverConversationId!,
         );
       } else {
-        await prefs.remove(_serverConversationIdPrefKey);
+        await prefs.remove(_scopedServerConversationIdPrefKey);
       }
       await prefs.setString(
-        _historyPrefKey,
+        _scopedHistoryPrefKey,
         jsonEncode(
           _conversationHistory.map((entry) => entry.toJson()).toList(),
         ),
@@ -1714,7 +2739,7 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final ids = _syncedEntryIds.toList(growable: false)..sort();
-      await prefs.setStringList(_syncedEntryIdsPrefKey, ids);
+      await prefs.setStringList(_scopedSyncedEntryIdsPrefKey, ids);
     } catch (error) {
       _logEvent(
         'SYNCED_ENTRY_IDS_PERSIST_ERROR',
@@ -1732,6 +2757,8 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     _cloudBackupDebounceTimer = Timer(const Duration(seconds: 2), () {
+      // HARDEN(late-callback): guard against timer firing after dispose
+      if (_isDisposed) return;
       unawaited(_syncConversationHistoryToCloud());
     });
   }
@@ -1930,7 +2957,10 @@ class AiAssistantProvider with ChangeNotifier {
     required int token,
     required String traceId,
   }) async {
-    if (!_isCurrentOperation(token) || _state != AiState.listening) {
+    // HARDEN(late-callback): guard against timer firing after dispose
+    if (_isDisposed ||
+        !_isCurrentOperation(token) ||
+        _state != AiState.listening) {
       return;
     }
 
@@ -1955,7 +2985,22 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
+    final capturedPrompt = _lastWords.trim();
+    if (capturedPrompt.isNotEmpty && !_hasCapturedFinalTranscript()) {
+      _logEvent(
+        'STT_GUARD_SUBMIT_PARTIAL_TRANSCRIPT',
+        traceId: traceId,
+        data: {'textLength': capturedPrompt.length},
+      );
+      _lastFinalResultAt = DateTime.now();
+      _lastFinalResultText = capturedPrompt;
+      _lastResponseSurface = _activeSurface;
+      unawaited(_handleCommand(capturedPrompt, parentTraceId: traceId));
+      return;
+    }
+
     _cancelListenGuard();
+    _listenStartedAt = null;
     _isSessionActive = false;
     _soundLevel = 0;
     _transitionTo(
@@ -2033,6 +3078,9 @@ class AiAssistantProvider with ChangeNotifier {
     String? traceId,
     Map<String, dynamic>? data,
   }) {
+    if (!_enableFlowLogging) {
+      return;
+    }
     final payload = <String, dynamic>{
       'ts': DateTime.now().toIso8601String(),
       'scope': 'AI_ASSISTANT',
@@ -2107,6 +3155,7 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   void clearAiResponse({bool keepBubbleVisible = true}) {
+    _clarificationState = null;
     _aiResponse = '';
     if (keepBubbleVisible && !_persistentEnabled) {
       _setProvisionallyVisible(true, reason: 'response_cleared.keep_visible');

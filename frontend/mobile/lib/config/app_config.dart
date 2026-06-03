@@ -15,10 +15,7 @@ class AppConfig {
         'AppConfig.initialize() must be called before accessing AppConfig.instance. '
         'Ensure main() calls AppConfig.initialize() before runApp().';
 
-    assert(
-      _config != null,
-      errorMessage,
-    );
+    assert(_config != null, errorMessage);
 
     if (_config == null) {
       throw StateError(errorMessage);
@@ -37,34 +34,36 @@ class AppConfig {
     String? coreServiceUrl,
     String? messageServiceUrl,
     String? mediaServiceUrl,
+    String? contentServiceUrl,
     String? socketUrl,
     String? aiServiceUrl,
-    String? contentServiceUrl,
   }) {
     switch (env) {
       case Environment.dev:
-        final resolvedCore = _normalizeApiBaseUrl(coreServiceUrl ?? _defaultDevCore);
+        final resolvedCore = _normalizeApiBaseUrl(
+          coreServiceUrl ?? _defaultDevCore,
+        );
         final coreUri = Uri.parse(resolvedCore);
         _config = EnvConfig(
           environment: Environment.dev,
           coreServiceUrl: resolvedCore,
-          messageServiceUrl:
-              _normalizeApiBaseUrl(
-                messageServiceUrl ?? resolvedCore, // All routed via Nginx on IP
-              ),
-          mediaServiceUrl:
-              _normalizeApiBaseUrl(
-                mediaServiceUrl ?? resolvedCore,
-              ),
-          contentServiceUrl:
-              _normalizeApiBaseUrl(
-                contentServiceUrl ?? resolvedCore,
-              ),
+          messageServiceUrl: _normalizeApiBaseUrl(
+            messageServiceUrl ?? resolvedCore, // All routed via Nginx on IP
+          ),
+          mediaServiceUrl: _normalizeApiBaseUrl(
+            mediaServiceUrl ?? resolvedCore,
+          ),
+          contentServiceUrl: _normalizeApiBaseUrl(
+            contentServiceUrl ?? resolvedCore,
+          ),
           socketUrl: _normalizeSocketUrl(
             socketUrl ?? resolvedCore.replaceAll('/api/v1', ''),
           ),
           aiServiceUrl: _normalizeApiBaseUrl(
-            aiServiceUrl ?? resolvedCore,
+            aiServiceUrl ??
+                (_shouldUseDirectAiService(coreUri)
+                    ? _buildServiceUrl(coreUri, 8094, '/api/v1')
+                    : resolvedCore),
           ),
           enableLogging: true,
         );
@@ -87,6 +86,35 @@ class AppConfig {
         );
         break;
     }
+  }
+
+  static bool _shouldUseDirectAiService(Uri uri) {
+    final host = uri.host.toLowerCase();
+    if (host.isEmpty) {
+      return false;
+    }
+
+    if (host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '::1' ||
+        host == '10.0.2.2') {
+      return true;
+    }
+
+    final segments = host.split('.');
+    if (segments.length != 4 ||
+        segments.any((segment) => int.tryParse(segment) == null)) {
+      return false;
+    }
+
+    final octets = segments.map(int.parse).toList(growable: false);
+    if (octets[0] == 10) {
+      return true;
+    }
+    if (octets[0] == 192 && octets[1] == 168) {
+      return true;
+    }
+    return octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31;
   }
 
   static bool isLikelyLocalOnlyHost(String rawUrl) {
@@ -137,7 +165,10 @@ class AppConfig {
       }
       if (!normalizedPath.endsWith('/api/v1')) {
         if (normalizedPath.contains('/api/v')) {
-          normalizedPath = normalizedPath.replaceFirst(RegExp(r'/api/v\d*.*$'), '/api/v1');
+          normalizedPath = normalizedPath.replaceFirst(
+            RegExp(r'/api/v\d*.*$'),
+            '/api/v1',
+          );
         } else {
           normalizedPath = '$normalizedPath/api/v1';
         }
@@ -148,15 +179,14 @@ class AppConfig {
         .replace(path: normalizedPath)
         .toString()
         .replaceAll(RegExp(r'/+$'), '');
-        
+
     // Force HTTPS for production domain
     if (finalUrl.contains('vnalo.fit') && finalUrl.startsWith('http://')) {
       finalUrl = finalUrl.replaceFirst('http://', 'https://');
     }
-    
+
     return finalUrl;
   }
-
 
   static String _normalizeSocketUrl(String rawUrl) {
     final trimmed = rawUrl.trim();
@@ -169,7 +199,10 @@ class AppConfig {
       return trimmed;
     }
 
-    var finalUrl = uri.replace(path: '').toString().replaceAll(RegExp(r'/+$'), '');
+    var finalUrl = uri
+        .replace(path: '')
+        .toString()
+        .replaceAll(RegExp(r'/+$'), '');
 
     // Force HTTPS/WSS for production domain
     if (finalUrl.contains('vnalo.fit')) {
@@ -188,7 +221,9 @@ class AppConfig {
   static FirebaseOptions getFirebaseOptions() {
     final apiKey = _requireConfigValue('FIREBASE_API_KEY');
     final appId = _requireConfigValue('FIREBASE_APP_ID');
-    final messagingSenderId = _requireConfigValue('FIREBASE_MESSAGING_SENDER_ID');
+    final messagingSenderId = _requireConfigValue(
+      'FIREBASE_MESSAGING_SENDER_ID',
+    );
     final projectId = _requireConfigValue('FIREBASE_PROJECT_ID');
     final storageBucket = _readConfigValue('FIREBASE_STORAGE_BUCKET');
 

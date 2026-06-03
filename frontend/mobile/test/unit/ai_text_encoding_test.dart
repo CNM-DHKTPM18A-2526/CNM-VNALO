@@ -28,6 +28,7 @@ void main() {
       'lib/features/ai_assistant/widgets/ai_chat_board.dart',
       'lib/features/ai_assistant/widgets/ai_floating_bubble.dart',
       'lib/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart',
+      'lib/features/ai_assistant/services/ai_action_presentation_resolver.dart',
     ];
 
     for (final relativePath in files) {
