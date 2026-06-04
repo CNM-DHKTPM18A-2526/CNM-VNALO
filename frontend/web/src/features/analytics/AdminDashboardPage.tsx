@@ -493,9 +493,9 @@ export function AdminDashboardPage() {
       analyticsFetchWithTimeout<DailyTrendPointResponse[]>('/actions/trend', params),
     ])
 
-    const extract = <T,>(r: PromiseSettledResult<unknown> & { status: 'fulfilled'; value: T }): T | null => {
-      if (r.status === 'fulfilled') return extractAnalyticsData<T>(r.value)
-      return null
+    const extract = <T,>(r: PromiseSettledResult<T>): T | null => {
+      if (r.status !== 'fulfilled') return null
+      return extractAnalyticsData<T>(r.value)
     }
 
     setDashboard(extract<AnalyticsDashboardResponse>(dashResult))
