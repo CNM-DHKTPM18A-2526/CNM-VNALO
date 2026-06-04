@@ -202,6 +202,140 @@ function normalizeIncomingText(value: string) {
 }
 
 
+type SanitizedAiPayload = {
+  textReply: string
+  actionCommand: AiActionCommand | null
+  actionParams: Record<string, unknown> | null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function extractJsonObjectCandidate(rawText: string) {
+  const normalized = normalizeIncomingText(rawText).trim()
+  if (!normalized) return ''
+
+  const fencedMatch = normalized.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  const candidate = (fencedMatch?.[1] ?? normalized).trim()
+  if (candidate.startsWith('{') && candidate.endsWith('}')) return candidate
+
+  const firstBrace = candidate.indexOf('{')
+  const lastBrace = candidate.lastIndexOf('}')
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return candidate.slice(firstBrace, lastBrace + 1).trim()
+  }
+
+  return ''
+}
+
+function tryDecodeAiPayload(rawText?: string | null): Record<string, unknown> | null {
+  if (!rawText) return null
+  const candidate = extractJsonObjectCandidate(rawText)
+  if (!candidate) return null
+
+  try {
+    const decoded = JSON.parse(candidate)
+    return isRecord(decoded) ? decoded : null
+  } catch {
+    return null
+  }
+}
+
+function summarizeStructuredAiCollection(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0) return ''
+
+  const items = value
+    .slice(0, 3)
+    .map((item) => {
+      if (typeof item === 'string') return item.trim()
+      if (isRecord(item)) {
+        for (const key of ['name', 'label', 'text', 'title', 'value']) {
+          const candidate = item[key]
+          if (candidate !== null && candidate !== undefined && String(candidate).trim()) {
+            return String(candidate).trim()
+          }
+        }
+      }
+      return String(item).trim()
+    })
+    .filter(Boolean)
+
+  return items.length > 0 ? items.join(', ') + (value.length > items.length ? '\u2026' : '') : ''
+}
+
+function coerceAssistantDisplayText(rawText?: string | null) {
+  const normalized = normalizeIncomingText(rawText ?? '').trim()
+  if (!normalized) return ''
+
+  const payload = tryDecodeAiPayload(normalized)
+  if (!payload) return normalized
+
+  const directText = normalizeIncomingText(String(
+    payload.textReply ?? payload.summary ?? payload.message ?? payload.description ?? payload.result ?? '',
+  )).trim()
+  if (directText && directText !== normalized) return directText
+
+  const scalarLabels: Array<[string, string]> = [
+    ['intent', '\u00dd \u0111\u1ecbnh'],
+    ['sentiment', 'C\u1ea3m x\u00fac'],
+    ['language', 'Ng\u00f4n ng\u1eef'],
+    ['ocrText', 'V\u0103n b\u1ea3n nh\u1eadn di\u1ec7n'],
+    ['caption', 'M\u00f4 t\u1ea3'],
+    ['scene', 'B\u1ed1i c\u1ea3nh'],
+  ]
+  const collectionLabels: Array<[string, string]> = [
+    ['objects', '\u0110\u1ed1i t\u01b0\u1ee3ng'],
+    ['labels', 'Nh\u00e3n'],
+    ['faces', 'Khu\u00f4n m\u1eb7t'],
+    ['texts', 'V\u0103n b\u1ea3n'],
+    ['keywords', 'T\u1eeb kh\u00f3a'],
+  ]
+
+  const bulletLines: string[] = []
+  for (const [key, label] of scalarLabels) {
+    const value = payload[key]
+    if (value !== null && value !== undefined && String(value).trim()) {
+      bulletLines.push('- ' + label + ': ' + String(value).trim())
+    }
+  }
+  for (const [key, label] of collectionLabels) {
+    const value = summarizeStructuredAiCollection(payload[key])
+    if (value) bulletLines.push('- ' + label + ': ' + value)
+  }
+
+  return bulletLines.length > 0 ? 'K\u1ebft qu\u1ea3 ph\u00e2n t\u00edch:\n' + bulletLines.join('\n') : ''
+}
+
+function normalizeActionCommand(value: unknown): AiActionCommand | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toUpperCase()
+  return isKnownAiActionCommand(normalized) ? normalized : null
+}
+
+function sanitizeAiResponsePayload(response: {
+  textReply?: string | null
+  actionCommand?: string | null
+  actionParams?: Record<string, unknown> | null
+}): SanitizedAiPayload {
+  const embedded = tryDecodeAiPayload(response.textReply)
+  const embeddedCommand = normalizeActionCommand(embedded?.actionCommand ?? embedded?.action)
+  const topLevelCommand = normalizeActionCommand(response.actionCommand)
+  const actionCommand = topLevelCommand ?? embeddedCommand
+
+  const embeddedParams = embedded?.actionParams ?? embedded?.params
+  const actionParams = isRecord(response.actionParams)
+    ? response.actionParams
+    : isRecord(embeddedParams)
+      ? embeddedParams
+      : null
+
+  return {
+    textReply: coerceAssistantDisplayText(response.textReply),
+    actionCommand,
+    actionParams,
+  }
+}
 function buildAiStorageKey(userId?: string | number | null) {
   if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
     return null
@@ -254,7 +388,8 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
       if (!item || typeof item !== 'object') return null
       const value = item as Record<string, unknown>
       const role = value.role === 'assistant' ? 'assistant' : value.role === 'user' ? 'user' : null
-      const content = typeof value.content === 'string' ? normalizeIncomingText(value.content).trim() : ''
+      const rawContent = typeof value.content === 'string' ? value.content : ''
+      const content = role === 'assistant' ? coerceAssistantDisplayText(rawContent) || normalizeIncomingText(rawContent).trim() : normalizeIncomingText(rawContent).trim()
       const timestamp = typeof value.timestamp === 'string' && value.timestamp.trim() ? value.timestamp : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       if (!role || !content || isStaleRawAiError(content)) return null
 
@@ -661,18 +796,18 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         clientAssistantEntryId: buildClientEntryId('web-assistant'),
         clientPlatform: 'WEB',
       })
-      const responseActionCommand = (aiResponse.actionCommand as AiActionCommand | undefined) ?? null
-      const safeActionCommand = responseActionCommand && isKnownAiActionCommand(responseActionCommand) ? responseActionCommand : null
+      const sanitizedResponse = sanitizeAiResponsePayload(aiResponse)
+      const safeActionCommand = sanitizedResponse.actionCommand
       const assistantMessage: AiMessage = {
         role: 'assistant',
         content: safeActionCommand
           ? buildAiDeferredActionReply(safeActionCommand)
-          : aiResponse.textReply || 'Mình chưa thể xử lý yêu cầu này ngay lúc này.',
+          : sanitizedResponse.textReply || 'M\u00ecnh ch\u01b0a th\u1ec3 x\u1eed l\u00fd y\u00eau c\u1ea7u n\u00e0y ngay l\u00fac n\u00e0y.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
         actionCommand: safeActionCommand,
-        actionParams: aiResponse.actionParams ?? null,
+        actionParams: sanitizedResponse.actionParams,
         requiresConfirmation: aiResponse.requiresConfirmation ?? null,
         riskLevel: aiResponse.riskLevel ?? null,
       }
