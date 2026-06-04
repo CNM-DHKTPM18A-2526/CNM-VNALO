@@ -2375,13 +2375,38 @@ class AiAssistantProvider with ChangeNotifier {
     return 'Kết quả phân tích:\n${bulletLines.join('\n')}';
   }
 
+  String _extractJsonObjectCandidate(String rawText) {
+    final normalized = normalizeAiTextEncoding(rawText).trim();
+    if (normalized.isEmpty) {
+      return '';
+    }
+
+    final fencedMatch = RegExp(
+      r'```(?:json)?\s*([\s\S]*?)\s*```',
+      caseSensitive: false,
+    ).firstMatch(normalized);
+    final candidate = (fencedMatch?.group(1) ?? normalized).trim();
+    if (candidate.startsWith('{') && candidate.endsWith('}')) {
+      return candidate;
+    }
+
+    final firstBrace = candidate.indexOf('{');
+    final lastBrace = candidate.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      return candidate.substring(firstBrace, lastBrace + 1).trim();
+    }
+
+    return '';
+  }
+
   Map<String, dynamic>? _tryDecodeStructuredAiPayload(String rawTextReply) {
-    if (!rawTextReply.startsWith('{') || !rawTextReply.endsWith('}')) {
+    final candidate = _extractJsonObjectCandidate(rawTextReply);
+    if (candidate.isEmpty) {
       return null;
     }
 
     try {
-      final decoded = jsonDecode(rawTextReply);
+      final decoded = jsonDecode(candidate);
       if (decoded is! Map) {
         return null;
       }
@@ -2425,7 +2450,7 @@ class AiAssistantProvider with ChangeNotifier {
       return null;
     }
 
-    final suffix = value.length > normalizedItems.length ? '…' : '';
+    final suffix = value.length > normalizedItems.length ? '\u2026' : '';
     return '${normalizedItems.join(', ')}$suffix';
   }
 
@@ -2435,12 +2460,13 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     final normalized = normalizeAiTextEncoding(rawTextReply).trim();
-    if (!normalized.startsWith('{') || !normalized.endsWith('}')) {
+    final candidate = _extractJsonObjectCandidate(normalized);
+    if (candidate.isEmpty) {
       return null;
     }
 
     try {
-      final decoded = jsonDecode(normalized);
+      final decoded = jsonDecode(candidate);
       if (decoded is! Map) {
         return null;
       }

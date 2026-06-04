@@ -172,7 +172,7 @@ class MainShellState extends State<MainShell> {
     final message = error.toString().replaceFirst('Bad state: ', '').trim();
     _showErrorSnackBar(
       message.isEmpty
-          ? 'Minh gap truc trac khi thuc hien thao tac nay. Ban thu lai giup minh nhe.'
+          ? 'Mình gặp trục trặc khi thực hiện thao tác này. Bạn thử lại giúp mình nhé.'
           : message,
       feedbackSource: _resolveAiActionErrorSource(message, command: command),
     );
@@ -1429,7 +1429,7 @@ class MainShellState extends State<MainShell> {
       final selectedUser = matches.first;
       if (!selectedUserIds.add(selectedUser.id)) {
         _showErrorSnackBar(
-          'Tro ly can it nhat 2 thanh vien khac nhau de tao nhom.',
+          'Trợ lý cần ít nhất 2 thành viên khác nhau để tạo nhóm.',
         );
         return;
       }
@@ -1438,7 +1438,7 @@ class MainShellState extends State<MainShell> {
 
     if (selectedUsers.length < 2) {
       _showErrorSnackBar(
-        'Tro ly can resolve it nhat 2 thanh vien khac nhau de tao nhom.',
+        'Trợ lý cần xác định ít nhất 2 thành viên khác nhau để tạo nhóm.',
       );
       return;
     }
