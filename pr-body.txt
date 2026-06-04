@@ -1,0 +1,27 @@
+## Summary
+
+- **Enterprise Admin Dashboard** — full redesign voi 4-tab layout (Overview, User Analytics, System Health, Auth and Events), enterprise UI voi recharts charts (AreaChart, LineChart, BarChart, PieChart, Sparkline)
+- **Integrate analytics-service** — overview, dashboard, all trend endpoints (users, messages, media, conversations, reports, moderation actions), breakdowns, top active users
+- **System Health monitoring** — probe tat ca 6 microservices (core, message, media, ai, analytics, moderation)
+- **Auth and Events tab** — paginated event table, event type/platform filters, CSV export, activity sparkline
+- **Docker** — enable analytics-service (8084) va moderation-service (8082), fix DB names, Kafka deps, actuator health
+- **Nginx** — reverse proxy routing cho analytics, moderation, actuator health
+- **i18n** — day du EN/VI labels, auto-refresh 30s
+
+## Test plan
+
+- [ ] Build frontend: cd frontend/web && npm run build
+- [ ] TypeScript check: npx tsc --noEmit
+- [ ] ESLint: npx eslint src/features/analytics/ --max-warnings 0
+- [ ] Docker validate: cd docker && docker compose config
+- [ ] Manual: login as admin email in allowlist, visit /admin/monitoring
+
+## Files changed
+
+| Scope | Files |
+|-------|-------|
+| New dashboard | frontend/web/src/features/analytics/AdminDashboardPage.tsx, analytics.css, analytics.types.ts, analytics.client.ts |
+| Docker | docker/docker-compose.yml, .env.example |
+| Backend config | analytics-service/application.yml, moderation-service/application.yml |
+| Nginx | nginx.conf |
+| Routing | frontend/web/src/App.tsx, package.json |

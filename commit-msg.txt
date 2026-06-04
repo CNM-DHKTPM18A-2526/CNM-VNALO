@@ -1,8 +1,8 @@
-merge(nguyenvu): resolve conflicts — RBAC layer + enterprise dashboard merged
+fix: resolve analytics-service CORS and web CI/CD build failures
 
-- AdminMonitoringService: keep RBAC constants/methods, remove email-allowlist path
-- AdminMonitoringServiceTest: update tests to use RBAC permission mocks
-- docker/.env.example: keep separate analytics/moderation DB names
-- App.tsx: keep both /admin/monitoring routes (dashboard + legacy page)
-- AdminMonitoringPage.tsx: modern UI + RBAC panel + merged EN/VI labels
-- admin-monitoring.css: deduplicate rules, merge media queries + RBAC styles
+- Add missing corsConfigurationSource() bean to analytics-service SecurityConfig
+- Fix AdminMonitoringService stream() compilation error
+- Fix AdminMonitoringServiceTest mock stub values
+- Add AdminDashboardPage to App.tsx with correct import paths
+- Fix Tooltip formatter type in AdminDashboardPage
+- Fix extract() generic type and remove unused import
