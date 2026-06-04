@@ -16,6 +16,33 @@ import 'package:vnalo_mobile/core/utils/device_info_util.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/services/notification_formatter.dart';
 
+Future<void> registerTokenToBackend({
+  required String accessToken,
+  required String deviceId,
+  required String platform,
+  required String coreServiceUrl,
+}) async {
+  final token = await FirebaseMessaging.instance.getToken();
+  if (token == null) return;
+
+  try {
+    await http.post(
+      Uri.parse('$coreServiceUrl/notifications/register-token'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({
+        'fcmToken': token,
+        'deviceId': deviceId,
+        'platform': platform,
+      }),
+    );
+  } catch (e) {
+    developer.log('Failed to register FCM token: $e');
+  }
+}
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -29,36 +56,6 @@ class NotificationService {
 
   static const String _mainChannelId = 'vnalo_main_channel';
   static const String _mainChannelName = 'Main Notifications';
-  static const String _otpChannelId = 'otp_channel';
-  static const String _otpChannelName = 'OTP Notifications';
-
-  bool _shouldDisableFirebaseMessaging(Object error) {
-    final normalized = error.toString().toLowerCase();
-    return normalized.contains('fis_auth_error') ||
-        normalized.contains('firebase installations can not communicate') ||
-        normalized.contains('invalid configuration') ||
-        normalized.contains('permission_denied') ||
-        normalized.contains('the caller does not have permission');
-  }
-
-  void _handleFirebaseMessagingFailure(
-    String stage,
-    Object error, {
-    StackTrace? stackTrace,
-  }) {
-    developer.log(
-      '[NotificationService] $stage failed: $error',
-      error: error,
-      stackTrace: stackTrace,
-    );
-
-    if (_shouldDisableFirebaseMessaging(error)) {
-      _disabled = true;
-      developer.log(
-        '[NotificationService] Firebase Messaging disabled for this session due to invalid/unavailable Firebase Installations configuration.',
-      );
-    }
-  }
 
   Future<void> initialize() async {
     if (_initialized || _disabled) return;
@@ -73,9 +70,9 @@ class NotificationService {
       return;
     }
 
-    // 1. Request permissions
     try {
-      final settings = await _fcm!.requestPermission(
+      // 1. Request permissions
+      NotificationSettings settings = await _fcm!.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -84,65 +81,16 @@ class NotificationService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         developer.log('User granted notification permission');
       }
-    } catch (e, st) {
-      _handleFirebaseMessagingFailure('requestPermission', e, stackTrace: st);
-      if (_disabled) return;
-    }
 
-    // 2. Local Notifications Setup
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/app_icon');
-    const DarwinInitializationSettings iosSettings =
-        DarwinInitializationSettings();
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _localNotifications.initialize(
-      settings: initSettings,
-      onDidReceiveNotificationResponse: (details) {
-        // Handle notification click here
-      },
-    );
-
-    const AndroidNotificationChannel mainChannel = AndroidNotificationChannel(
-      _mainChannelId,
-      _mainChannelName,
-      description: 'General VNALO notifications',
-      importance: Importance.max,
-      playSound: true,
-      enableVibration: true,
-    );
-
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(mainChannel);
-
-    const AndroidNotificationChannel otpChannel = AndroidNotificationChannel(
-      _otpChannelId,
-      _otpChannelName,
-      description: 'High-priority OTP authentication notifications',
-      importance: Importance.max,
-      playSound: true,
-      enableVibration: true,
-    );
-
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(otpChannel);
-
-    // 3. Handle Foreground Messages
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      developer.log(
-        'Received foreground message: ${message.notification?.title}',
+      // 2. Local Notifications Setup
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@mipmap/app_icon');
+      const DarwinInitializationSettings iosSettings =
+          DarwinInitializationSettings();
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
       );
-      _showLocalNotification(message);
-    });
 
     // 4. Handle Background/Terminated Messages
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
@@ -166,10 +114,52 @@ class NotificationService {
       }
     });
 
-    // 5. Setup CallKit Listeners
-    FlutterCallkitIncoming.onEvent.listen(_onCallKitEvent);
+      await _localNotifications.initialize(
+        settings: initSettings,
+        onDidReceiveNotificationResponse: (details) {
+          // Handle notification click here
+        },
+      );
 
-    _initialized = true;
+      const AndroidNotificationChannel mainChannel = AndroidNotificationChannel(
+        _mainChannelId,
+        _mainChannelName,
+        description: 'General VNALO notifications',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(mainChannel);
+
+      // 3. Handle Foreground Messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        developer.log(
+          'Received foreground message: ${message.notification?.title}',
+        );
+        _showLocalNotification(message);
+      });
+
+      // 4. Handle Background/Terminated Messages
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        developer.log('App opened from notification: ${message.data}');
+      });
+
+      // 5. Setup CallKit Listeners
+      FlutterCallkitIncoming.onEvent.listen(_onCallKitEvent);
+
+      _initialized = true;
+    } catch (e, stackTrace) {
+      developer.log(
+        'NotificationService initialization failed: $e',
+        stackTrace: stackTrace,
+      );
+      _disabled = true;
+    }
   }
 
   void _handleNotificationTap(Map<String, dynamic> data) {
@@ -199,15 +189,12 @@ class NotificationService {
 
   static void _onCallKitEvent(CallEvent? event) {
     if (event == null) return;
-    developer.log('[NotificationService] CallKit Event: ${event.event}');
+    developer.log('[NotificationService] CallKit Event: ${event.eventName}');
 
-    switch (event.event) {
-      case Event.actionCallAccept:
-        // Handle acceptance - redirection is typically handled by IncomingCallCoordinator
-        // but we can log it here.
+    switch (event) {
+      case CallEventActionCallAccept():
         break;
-      case Event.actionCallDecline:
-        // Handle decline
+      case CallEventActionCallDecline():
         break;
       default:
         break;
@@ -238,8 +225,6 @@ class NotificationService {
         handle: isGroup ? 'Cuộc gọi nhóm' : 'VNALO',
         type: audioOnly ? 0 : 1, // 0: Audio, 1: Video
         duration: 30000,
-        textAccept: 'Trả lời',
-        textDecline: 'Từ chối',
         missedCallNotification: const NotificationParams(
           showNotification: true,
           isShowCallback: true,
@@ -260,6 +245,8 @@ class NotificationService {
           backgroundColor: '#0068FF',
           backgroundUrl: 'assets/images/call_bg.png',
           actionColor: '#4CAF50',
+          textAccept: 'Trả lời',
+          textDecline: 'Từ chối',
           incomingCallNotificationChannelName: 'VNALO Incoming Call',
         ),
         ios: const IOSParams(
@@ -306,11 +293,13 @@ class NotificationService {
   Future<String?> getToken() async {
     await ensureInitialized();
     if (_disabled || _fcm == null) return null;
-
     try {
       return await _fcm!.getToken();
-    } catch (e, st) {
-      _handleFirebaseMessagingFailure('getToken', e, stackTrace: st);
+    } catch (e, stackTrace) {
+      developer.log(
+        'NotificationService getToken failed: $e',
+        stackTrace: stackTrace,
+      );
       return null;
     }
   }
@@ -397,59 +386,6 @@ class NotificationService {
       payload: payload,
     );
   }
-
-  /// Registers the FCM device token with the backend notification service.
-  /// Returns true on success, false on failure (non-fatal).
-  Future<bool> registerTokenToBackend({
-    required String accessToken,
-    required String deviceId,
-    required String platform,
-    required String coreServiceUrl,
-  }) async {
-    if (_disabled || _fcm == null) return false;
-
-    final String? fcmToken = await getToken();
-    if (fcmToken == null || fcmToken.isEmpty) {
-      developer.log('[NotificationService] No FCM token available to register');
-      return false;
-    }
-
-    try {
-      final uri = Uri.parse(
-        '$coreServiceUrl/notifications/devices'.replaceAll(
-          '/api/v1',
-          '/api/v1',
-        ),
-      );
-      final response = await http
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $accessToken',
-            },
-            body: jsonEncode({
-              'deviceId': deviceId,
-              'platform': platform,
-              'fcmToken': fcmToken,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        developer.log(
-          '[NotificationService] FCM token registered successfully',
-        );
-        return true;
-      } else {
-        developer.log(
-          '[NotificationService] FCM token registration failed: ${response.statusCode}',
-        );
-        return false;
-      }
-    } catch (e) {
-      developer.log('[NotificationService] FCM token registration error: $e');
-      return false;
-    }
-  }
 }
+
+

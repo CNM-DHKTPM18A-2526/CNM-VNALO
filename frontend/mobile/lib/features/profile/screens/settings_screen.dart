@@ -8,7 +8,6 @@ import 'package:vnalo_mobile/features/auth/screens/welcome_screen.dart';
 import 'package:vnalo_mobile/features/profile/localization/profile_texts.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/appearance_settings_screen.dart';
-import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 import 'package:vnalo_mobile/core/models/menu_item_model.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 
@@ -82,7 +81,7 @@ class SettingsScreen extends StatelessWidget {
       MenuSection(
         items: [
           MenuItem(key: 'storage', icon: Icons.pie_chart_outline, title: t.deviceData),
-          MenuItem(key: 'backup', icon: Icons.cloud_sync_outlined, title: _isVi(context) ? 'Sao lưu và khôi phục' : 'Backup & Restore'),
+          MenuItem(key: 'backup', icon: Icons.cloud_sync_outlined, title: t.backupRestore),
         ],
       ),
       MenuSection(
@@ -111,8 +110,28 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.info_outline,
             title: _isVi(context) ? 'Thông tin về VNALO' : 'About VNALO',
             onTap: () {
-              Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('VNALO'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_isVi(context) ? 'Phiên bản 1.0.0' : 'Version 1.0.0'),
+                      const SizedBox(height: 8),
+                      Text(_isVi(context)
+                          ? 'VNALO là ứng dụng nhắn tin và gọi điện an toàn.'
+                          : 'VNALO is a secure messaging and calling application.'),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(_isVi(context) ? 'Đóng' : 'Close'),
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -358,10 +377,10 @@ class _SettingsSearchDelegate extends SearchDelegate<String> {
     t.accountAndSecurity,
     t.privacy,
     t.deviceData,
-    'Sao lưu và khôi phục',
+    t.backupRestore,
     t.notifications,
-    'Tin nhắn',
-    'Danh bạ',
+    t.messages,
+    t.contacts,
     t.appearance,
   ];
 

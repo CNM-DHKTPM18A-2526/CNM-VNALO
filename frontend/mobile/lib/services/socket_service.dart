@@ -16,7 +16,6 @@ class SocketService with ChangeNotifier {
   final _seenMessageKeys = <String>{};
   static const kMaxDedupCache = 500;
 
-  String? _lastToken;
   int _reinitCount = 0;
   int get reinitCount => _reinitCount;
   String? _globalToken;
@@ -31,6 +30,7 @@ class SocketService with ChangeNotifier {
   StreamController<Message> _messageController = StreamController<Message>.broadcast();
   StreamController<Map<String, dynamic>> _typingController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _presenceController = StreamController<Map<String, dynamic>>.broadcast();
+  // ignore: prefer_final_fields -- controller is recreated after socket reinitialization.
   StreamController<dynamic> _presenceListController = StreamController<dynamic>.broadcast();
   StreamController<Map<String, dynamic>> _readController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _deliveredController = StreamController<Map<String, dynamic>>.broadcast();
@@ -488,37 +488,37 @@ class SocketService with ChangeNotifier {
     });
 
     // ─── Group Call Signal Listeners ────────────────────────────────────────
-    void _emitGroupCallSignal(String type, dynamic data) {
+    void emitGroupCallSignal(String type, dynamic data) {
       if (data is! Map) return;
       final payload = Map<String, dynamic>.from(data);
       _groupCallSignalController.add({'type': type, ...payload});
     }
 
-    _socket!.on('group-call:started', (data) => _emitGroupCallSignal('started', data));
-    _socket!.on('group-call.started', (data) => _emitGroupCallSignal('started', data));
+    _socket!.on('group-call:started', (data) => emitGroupCallSignal('started', data));
+    _socket!.on('group-call.started', (data) => emitGroupCallSignal('started', data));
 
-    _socket!.on('group-call:join', (data) => _emitGroupCallSignal('join', data));
-    _socket!.on('group-call.join', (data) => _emitGroupCallSignal('join', data));
+    _socket!.on('group-call:join', (data) => emitGroupCallSignal('join', data));
+    _socket!.on('group-call.join', (data) => emitGroupCallSignal('join', data));
 
-    _socket!.on('group-call:user-joined', (data) => _emitGroupCallSignal('user-joined', data));
-    _socket!.on('group-call.user-joined', (data) => _emitGroupCallSignal('user-joined', data));
+    _socket!.on('group-call:user-joined', (data) => emitGroupCallSignal('user-joined', data));
+    _socket!.on('group-call.user-joined', (data) => emitGroupCallSignal('user-joined', data));
 
-    _socket!.on('group-call:offer', (data) => _emitGroupCallSignal('offer', data));
-    _socket!.on('group-call.offer', (data) => _emitGroupCallSignal('offer', data));
+    _socket!.on('group-call:offer', (data) => emitGroupCallSignal('offer', data));
+    _socket!.on('group-call.offer', (data) => emitGroupCallSignal('offer', data));
 
-    _socket!.on('group-call:answer', (data) => _emitGroupCallSignal('answer', data));
-    _socket!.on('group-call.answer', (data) => _emitGroupCallSignal('answer', data));
+    _socket!.on('group-call:answer', (data) => emitGroupCallSignal('answer', data));
+    _socket!.on('group-call.answer', (data) => emitGroupCallSignal('answer', data));
 
-    _socket!.on('group-call:ice-candidate', (data) => _emitGroupCallSignal('ice-candidate', data));
-    _socket!.on('group-call.ice-candidate', (data) => _emitGroupCallSignal('ice-candidate', data));
+    _socket!.on('group-call:ice-candidate', (data) => emitGroupCallSignal('ice-candidate', data));
+    _socket!.on('group-call.ice-candidate', (data) => emitGroupCallSignal('ice-candidate', data));
 
-    _socket!.on('group-call:user-left', (data) => _emitGroupCallSignal('user-left', data));
-    _socket!.on('group-call.user-left', (data) => _emitGroupCallSignal('user-left', data));
+    _socket!.on('group-call:user-left', (data) => emitGroupCallSignal('user-left', data));
+    _socket!.on('group-call.user-left', (data) => emitGroupCallSignal('user-left', data));
 
-    _socket!.on('group-call:ended', (data) => _emitGroupCallSignal('ended', data));
-    _socket!.on('group-call.ended', (data) => _emitGroupCallSignal('ended', data));
+    _socket!.on('group-call:ended', (data) => emitGroupCallSignal('ended', data));
+    _socket!.on('group-call.ended', (data) => emitGroupCallSignal('ended', data));
     _socket!.on('group-call:mute-state', (data) {
-      _emitGroupCallSignal('mute-state', data);
+      emitGroupCallSignal('mute-state', data);
     });
 
     _socket!.on('auth.logout.force', (data) {
@@ -718,9 +718,21 @@ class SocketService with ChangeNotifier {
   }
 
   void sendTyping(String conversationId, bool isTyping) {
+    final platform =
+        kIsWeb
+            ? 'WEB'
+            : switch (defaultTargetPlatform) {
+              TargetPlatform.iOS => 'IOS',
+              TargetPlatform.android => 'ANDROID',
+              TargetPlatform.macOS => 'MACOS',
+              TargetPlatform.windows => 'WINDOWS',
+              TargetPlatform.linux => 'LINUX',
+              TargetPlatform.fuchsia => 'FUCHSIA',
+            };
     _socket?.emit('message.typing', {
       'conversationId': conversationId,
       'isTyping': isTyping,
+      'clientPlatform': platform,
     });
   }
 
@@ -1119,10 +1131,12 @@ class SocketService with ChangeNotifier {
     _joinedRooms.clear(); // Clear joined rooms on disconnect
   }
 
+  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;
     disconnect();
     _disposeAllControllers();
+    super.dispose();
   }
 }

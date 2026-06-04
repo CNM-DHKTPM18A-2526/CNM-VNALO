@@ -51,6 +51,20 @@ class ProfileTexts {
   String get accountAndSecurity => _isVi ? 'Tài khoản và bảo mật' : 'Account and security';
   String get privacy => _isVi ? 'Quyền riêng tư' : 'Privacy';
 
+  // Profile more settings
+  String get profileInfo => _isVi ? 'Thông tin cá nhân' : 'Information';
+  String get changeProfilePhoto => _isVi ? 'Đổi ảnh đại diện' : 'Change profile photo';
+  String get changeCoverPhoto => _isVi ? 'Đổi ảnh bìa' : 'Change cover photo';
+  String get updateBio => _isVi ? 'Cập nhật tiểu sử' : 'Update bio';
+  String get myWallet => _isVi ? 'Ví của tôi' : 'My wallet';
+  String get myQrCode => _isVi ? 'Mã QR của tôi' : 'My QR code';
+  String get accountManagement => _isVi ? 'Quản lý tài khoản' : 'Account management';
+  String get generalSettings => _isVi ? 'Cài đặt chung' : 'General settings';
+  String get comingSoon => _isVi ? 'Tính năng đang được phát triển' : 'Feature under development';
+  String get backupRestore => _isVi ? 'Sao lưu và khôi phục' : 'Backup & Restore';
+  String get messages => _isVi ? 'Tin nhắn' : 'Messages';
+  String get contacts => _isVi ? 'Danh bạ' : 'Contacts';
+
   // Settings
   String get settings => _isVi ? 'Cài đặt' : 'Settings';
   String get appearance => _isVi ? 'Giao diện và ngôn ngữ' : 'Appearance';

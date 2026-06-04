@@ -3,11 +3,19 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/update_password_screen.dart';
 
 class AccountSecurityScreen extends StatelessWidget {
   const AccountSecurityScreen({super.key});
+
+  static String _getEmailSubtitle(User? user) {
+    if (user?.email?.isNotEmpty == true) {
+      return user!.email!;
+    }
+    return 'Chưa liên kết';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +91,7 @@ class AccountSecurityScreen extends StatelessWidget {
             context,
             icon: Icons.email_outlined,
             title: 'Email',
-            subtitle: 'Chưa liên kết',
+            subtitle: _getEmailSubtitle(user),
             backgroundColor: sectionBg,
             isDarkMode: isDarkMode,
           ),
@@ -101,10 +109,10 @@ class AccountSecurityScreen extends StatelessWidget {
             context,
             icon: Icons.verified_user_outlined,
             title: 'Kiểm tra bảo mật',
-            subtitle: '3 vấn đề bảo mật cần xử lý',
+            subtitle: 'Kiểm tra các vấn đề bảo mật của tài khoản (đang phát triển)',
             backgroundColor: sectionBg,
             isDarkMode: isDarkMode,
-            subtitleColor: AppColors.warning,
+            subtitleColor: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -130,12 +138,12 @@ class AccountSecurityScreen extends StatelessWidget {
             context,
             icon: Icons.security_outlined,
             title: 'Bảo mật 2 lớp',
-            subtitle: 'Thêm hình thức xác nhận để bảo vệ tài khoản khi đăng nhập trên thiết bị mới',
+            subtitle: 'Thêm hình thức xác nhận để bảo vệ tài khoản khi đăng nhập trên thiết bị mới (đang phát triển)',
             backgroundColor: sectionBg,
             isDarkMode: isDarkMode,
             trailing: Switch(
               value: false,
-              onChanged: (_) {},
+              onChanged: null,
               activeThumbColor: isDarkMode ? DarkColors.primary : AppColors.primary,
             ),
           ),

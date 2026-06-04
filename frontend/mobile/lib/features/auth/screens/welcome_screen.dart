@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
 import 'package:vnalo_mobile/features/auth/screens/register_screen.dart';
+import 'package:vnalo_mobile/features/auth/screens/face_login_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -289,6 +290,67 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const FaceLoginScreen(),
+                                ),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              side: BorderSide(
+                                color: isDarkMode ? DarkColors.divider : const Color(0xFFE5E7EB),
+                              ),
+                              foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.face_rounded,
+                                  size: 20,
+                                  color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Đăng nhập khuôn mặt',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode ? Colors.amber.shade900 : Colors.amber.shade100,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    'thử nghiệm',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
                           child: ElevatedButton(
                             onPressed: () {
                               Navigator.push(
@@ -301,7 +363,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(56),
                               backgroundColor: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
-                              foregroundColor: isDarkMode ? DarkColors.textPrimary : const Color(0xFF111827),
+                              foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),

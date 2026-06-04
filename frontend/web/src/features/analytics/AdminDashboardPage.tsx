@@ -295,7 +295,10 @@ function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }
               <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(v, name) => [`${formatNumber((v as number) ?? 0)} (${(((v as number) ?? 0) / total * 100).toFixed(1)}%)`, name]} />
+          <Tooltip formatter={(v: unknown) => {
+            const n = typeof v === 'number' ? v : 0
+            return [`${formatNumber(n)} (${((n / total) * 100).toFixed(1)}%)`, '']
+          }} />
         </PieChart>
       </ResponsiveContainer>
       <div className="donut-legend">
@@ -491,8 +494,8 @@ export function AdminDashboardPage() {
     ])
 
     const extract = <T,>(r: PromiseSettledResult<T>): T | null => {
-      if (r.status === 'fulfilled') return extractAnalyticsData<T>(r.value)
-      return null
+      if (r.status !== 'fulfilled') return null
+      return extractAnalyticsData<T>(r.value)
     }
 
     setDashboard(extract<AnalyticsDashboardResponse>(dashResult))
