@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { hasAdminMonitoringProfileAccess } from '../../features/auth/adminAccess'
+import { canAccessAdminMonitoring } from '../../features/auth/adminAccess'
 import { useAuth } from '../../features/auth/useAuth'
 import { useLanguage } from '../i18n/LanguageContext'
 import { Icon } from './Icon'
@@ -12,9 +12,9 @@ type SettingsMenuProps = {
 
 export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
   const { t } = useLanguage()
-  const { logout, user } = useAuth()
+  const { accessToken, logout, user } = useAuth()
   const navigate = useNavigate()
-  const canOpenDashboard = hasAdminMonitoringProfileAccess(user)
+  const canOpenDashboard = canAccessAdminMonitoring(user, accessToken)
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
   const buttonRef = React.useRef<HTMLButtonElement>(null)

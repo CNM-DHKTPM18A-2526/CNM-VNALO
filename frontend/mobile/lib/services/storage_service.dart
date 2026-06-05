@@ -7,6 +7,7 @@ class StorageService {
   static const _keyRefreshToken = 'refresh_token';
   static const _keyUserId = 'user_id';
   static const _keyBlockedConversationIdsPrefix = 'blocked_conversation_ids_';
+  static const _keyAnalyticsConsent = 'analytics_consent_enabled';
 
   // Save access and refresh tokens securely
   Future<void> saveTokens({
@@ -26,6 +27,14 @@ class StorageService {
 
   // Clear all stored data (e.g., on logout)
   Future<void> clearAll() => _storage.deleteAll();
+
+  Future<bool> getAnalyticsConsentEnabled() async {
+    final raw = await _storage.read(key: _keyAnalyticsConsent);
+    return raw != 'false';
+  }
+
+  Future<void> setAnalyticsConsentEnabled(bool enabled) =>
+      _storage.write(key: _keyAnalyticsConsent, value: enabled.toString());
 
   // Persist per-user blocked conversation IDs to avoid reappearing after leave/kick/disband.
   // This intentionally survives app restarts. Caller decides whether to keep across logout.

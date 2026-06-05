@@ -22,6 +22,7 @@ import { useLanguage } from '../../shared/i18n/LanguageContext'
 import type {
   AnalyticsOverviewResponse,
   AnalyticsDashboardResponse,
+  BehavioralAnalyticsSummaryResponse,
   DailyTrendPointResponse,
   TopActiveUserResponse,
   ActiveUserSummaryResponse,
@@ -38,8 +39,7 @@ import { dateRangeFromPreset } from './analytics.types'
 import { analyticsFetchWithTimeout, extractAnalyticsData } from './analytics.client'
 import { API_BASE_URL, AI_API_URL, MEDIA_API_URL, MESSAGE_API_URL } from '../../api.client'
 import './analytics.css'
-
-// ΓöÇΓöÇΓöÇ Utility ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Utility
 
 const FETCH_TIMEOUT = 10000
 
@@ -106,12 +106,10 @@ function SeverityBadge({ value }: { value: string }) {
 function StatusDot({ status }: { status: ServiceProbe['status'] }) {
   return <span className={`status-dot ${status}`} />
 }
-
-// ΓöÇΓöÇΓöÇ Chart Colors ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Charts
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
-
-// ΓöÇΓöÇΓöÇ Reusable KPI Card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// KPI cards
 
 function KpiCard({ label, value, sub, tone }: { label: string; value: string | number; sub?: string; tone?: 'neutral' | 'success' | 'danger' | 'warning' }) {
   return (
@@ -122,8 +120,7 @@ function KpiCard({ label, value, sub, tone }: { label: string; value: string | n
     </div>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Custom Tooltip ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Tooltip
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string; lang: string }) {
   if (!active || !payload?.length) return null
@@ -138,8 +135,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
     </div>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Trend Area Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Charts
 
 function TrendChart({ data, lang, height = 220 }: { data: DailyTrendPointResponse[]; lang: string; height?: number }) {
   if (!data?.length) return <div className="chart-empty">No data available</div>
@@ -181,8 +177,7 @@ function TrendChart({ data, lang, height = 220 }: { data: DailyTrendPointRespons
     </ResponsiveContainer>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Multi-Series Line Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Charts
 
 function MultiLineChart({
   data,
@@ -232,8 +227,7 @@ function MultiLineChart({
     </ResponsiveContainer>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Bar Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Charts
 
 function BarChartComp({
   data,
@@ -271,8 +265,7 @@ function BarChartComp({
     </ResponsiveContainer>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Donut Chart ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Charts
 
 function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }) {
   if (!data?.length) return <div className="chart-empty">No data available</div>
@@ -313,8 +306,7 @@ function DonutChart({ data }: { data: MessageTypeCountResponse[]; lang: string }
     </div>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Activity Sparkline (mini bar) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Activity
 
 function ActivitySparkline({ points }: { points: EventTrendPoint[]; lang: string }) {
   if (!points?.length) return null
@@ -336,8 +328,7 @@ function ActivitySparkline({ points }: { points: EventTrendPoint[]; lang: string
     </div>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Service Health List ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Service health
 
 function ServiceHealthList({ services, lang }: { services: ServiceProbe[]; lang: string }) {
   return (
@@ -361,7 +352,7 @@ function ServiceHealthList({ services, lang }: { services: ServiceProbe[]; lang:
   )
 }
 
-// ΓöÇΓöÇΓöÇ Tab Navigation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+//
 
 type TabId = 'overview' | 'users' | 'health' | 'auth'
 
@@ -388,13 +379,13 @@ function TabNav({ active, onChange, lang }: { active: TabId; onChange: (t: TabId
   )
 }
 
-// ΓöÇΓöÇΓöÇ Skeleton Loader ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+//
 
 function Skeleton({ width = '100%', height = 20 }: { width?: string; height?: number }) {
   return <div className="skeleton" style={{ width, height }} />
 }
 
-// ΓöÇΓöÇΓöÇ Date Range Picker ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+//
 
 function DateRangePicker({
   value,
@@ -426,19 +417,15 @@ function DateRangePicker({
   )
 }
 
-// ΓöÇΓöÇΓöÇ MAIN COMPONENT ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+//
 
 export function AdminDashboardPage() {
   const { language } = useLanguage()
-  const { accessToken, user } = useAuth()
-  const adminMonitoringEmails = (import.meta.env.VITE_ADMIN_MONITORING_ALLOWED_EMAILS ?? '')
-    .split(',')
-    .map((e: string) => e.trim().toLowerCase())
-    .filter(Boolean)
+  const { accessToken } = useAuth()
 
   const L = language === 'vi' ? VI_LABELS : EN_LABELS
 
-  // ΓöÇΓöÇΓöÇ State ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  //
   const [activeTab, setActiveTab] = React.useState<TabId>('overview')
   const [dateRange, setDateRange] = React.useState<DateRangePreset>('30d')
   const [autoRefresh, setAutoRefresh] = React.useState(true)
@@ -446,6 +433,7 @@ export function AdminDashboardPage() {
 
   // Analytics data
   const [dashboard, setDashboard] = React.useState<AnalyticsDashboardResponse | null>(null)
+  const [behaviorSummary, setBehaviorSummary] = React.useState<BehavioralAnalyticsSummaryResponse | null>(null)
   const [overview, setOverview] = React.useState<AnalyticsOverviewResponse | null>(null)
   const [activeUsers, setActiveUsers] = React.useState<ActiveUserSummaryResponse | null>(null)
   const [reportReasons, setReportReasons] = React.useState<ReasonCountResponse[]>([])
@@ -471,16 +459,26 @@ export function AdminDashboardPage() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [loadError, setLoadError] = React.useState<string | null>(null)
 
-  // ΓöÇΓöÇΓöÇ Data Fetching ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const loadAnalytics = React.useCallback(async () => {
     const { from, to } = dateRangeFromPreset(dateRange)
     const params = { from, to }
 
-    // Fetch all analytics data in parallel
-    const [dashResult, overviewResult, reasonsResult, typesResult,
-           userTResult, convTResult, msgTResult, mediaTResult,
-           , reportTResult, actionTResult] = await Promise.allSettled([
+    const [
+      dashResult,
+      behaviorResult,
+      overviewResult,
+      reasonsResult,
+      typesResult,
+      userTResult,
+      convTResult,
+      msgTResult,
+      mediaTResult,
+      groupTResult,
+      reportTResult,
+      actionTResult,
+    ] = await Promise.allSettled([
       analyticsFetchWithTimeout<AnalyticsDashboardResponse>('/dashboard', params),
+      analyticsFetchWithTimeout<BehavioralAnalyticsSummaryResponse>('/behavior/summary', params),
       analyticsFetchWithTimeout<AnalyticsOverviewResponse>('/overview', params),
       analyticsFetchWithTimeout<ReasonCountResponse[]>('/reports/reasons', params),
       analyticsFetchWithTimeout<MessageTypeCountResponse[]>('/messages/types', params),
@@ -499,6 +497,7 @@ export function AdminDashboardPage() {
     }
 
     setDashboard(extract<AnalyticsDashboardResponse>(dashResult))
+    setBehaviorSummary(extract<BehavioralAnalyticsSummaryResponse>(behaviorResult))
     setOverview(extract<AnalyticsOverviewResponse>(overviewResult))
     setReportReasons(extract<ReasonCountResponse[]>(reasonsResult) ?? [])
     setMessageTypes(extract<MessageTypeCountResponse[]>(typesResult) ?? [])
@@ -512,6 +511,9 @@ export function AdminDashboardPage() {
     if (dashResult.status === 'fulfilled') {
       const d = extractAnalyticsData<AnalyticsDashboardResponse>(dashResult.value)
       if (d?.activeUsers) setActiveUsers(d.activeUsers)
+    }
+    if (groupTResult.status === 'rejected') {
+      console.warn('[AdminDashboard] groups trend unavailable')
     }
   }, [dateRange])
 
@@ -596,8 +598,7 @@ export function AdminDashboardPage() {
       setIsLoading(false)
     }
   }, [loadAnalytics, loadCoreService])
-
-  // ΓöÇΓöÇΓöÇ Effects ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // Effects
   React.useEffect(() => { void loadAll() }, [loadAll])
 
   React.useEffect(() => {
@@ -608,12 +609,9 @@ export function AdminDashboardPage() {
 
   React.useEffect(() => { setEventPage(0) }, [dateRange, eventTypeFilter, platformFilter])
 
-  const hasAccess = Boolean(
-    user?.email &&
-    adminMonitoringEmails.includes(user.email?.toLowerCase() ?? '')
-  )
-
-  // ΓöÇΓöÇΓöÇ Derived ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  const accessMode = monitoringSummary?.accessMode ?? 'RBAC'
+  const canExportCsv = Boolean(monitoringSummary?.canExport)
+  // Derived data
   const okCount = services.filter(s => s.status === 'ok').length
   const warnCount = services.filter(s => s.status === 'warning').length
   const errCount = services.filter(s => s.status === 'error').length
@@ -630,19 +628,17 @@ export function AdminDashboardPage() {
       Messages: msgTrend.find(p => p.date === d)?.value ?? 0,
     }))
   }, [userTrend, convTrend, msgTrend])
-
-  // ΓöÇΓöÇΓöÇ Export CSV ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // Export CSV
   const handleExport = () => {
     if (!audits.length) return
     const csv = toCsv(audits)
     const stamp = new Date().toISOString().replaceAll(':', '-')
     downloadCsv(csv, `auth-events-${eventPage + 1}-${stamp}.csv`)
   }
-
-  // ΓöÇΓöÇΓöÇ Render ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // Render
   return (
     <div className="adm-page">
-      {/* ΓöÇΓöÇ Header ΓöÇΓöÇ */}
+      {/* Section */}
       <header className="adm-header">
         <div className="adm-header-left">
           <p className="adm-eyebrow">VNALO Enterprise</p>
@@ -655,7 +651,7 @@ export function AdminDashboardPage() {
             <span>{L.autoRefresh}</span>
           </label>
           <div className="adm-header-btns">
-            <button type="button" onClick={handleExport} disabled={!audits.length}>{L.exportCsv}</button>
+            <button type="button" onClick={handleExport} disabled={!canExportCsv || !audits.length} title={!canExportCsv ? L.exportDenied : undefined}>{L.exportCsv}</button>
             <button type="button" onClick={() => void loadAll()} disabled={isLoading}>
               {isLoading ? L.refreshing : L.refresh}
             </button>
@@ -663,14 +659,12 @@ export function AdminDashboardPage() {
         </div>
       </header>
 
-      {!hasAccess && (
-        <div className="adm-note adm-note--warn">{L.accessNote}</div>
-      )}
+      <div className="adm-note">{L.accessMode}: {accessMode}</div>
       {loadError && (
         <div className="adm-note adm-note--error">{loadError}</div>
       )}
 
-      {/* ΓöÇΓöÇ Controls ΓöÇΓöÇ */}
+      {/* Section */}
       <div className="adm-controls">
         <DateRangePicker value={dateRange} onChange={setDateRange} />
         {lastUpdated && (
@@ -680,10 +674,10 @@ export function AdminDashboardPage() {
         )}
       </div>
 
-      {/* ΓöÇΓöÇ Tab Nav ΓöÇΓöÇ */}
+      {/* Section */}
       <TabNav active={activeTab} onChange={setActiveTab} lang={language} />
 
-      {/* ΓöÇΓöÇ TAB: OVERVIEW ΓöÇΓöÇ */}
+      {/* Section */}
       {activeTab === 'overview' && (
         <div className="adm-tab-content">
           {/* KPI Row */}
@@ -718,18 +712,20 @@ export function AdminDashboardPage() {
                 <KpiCard
                   label={L.activeUsers}
                   value={activeUsers?.dau ?? 0}
-                  sub={`${L.dauLabel} ΓÇó ${L.wauLabel}: ${formatNumber(activeUsers?.wau ?? 0)}`}
+                  sub={`${L.dauLabel} / ${L.wauLabel}: ${formatNumber(activeUsers?.wau ?? 0)}`}
                   tone="success"
                 />
                 <KpiCard
-                  label={L.reportsFiled}
-                  value={overview?.reportsCreated ?? 0}
-                  tone={Number(overview?.reportsCreated) > 0 ? 'warning' : 'neutral'}
+                  label={L.behaviorEvents}
+                  value={behaviorSummary?.eventsTotal ?? 0}
+                  sub={`${L.screenViews}: ${formatNumber(behaviorSummary?.screenViews ?? 0)}`}
+                  tone="neutral"
                 />
                 <KpiCard
-                  label={L.actionsTaken}
-                  value={overview?.moderationActionsTaken ?? 0}
-                  tone="neutral"
+                  label={L.avgSessionDuration}
+                  value={behaviorSummary?.averageSessionDurationMinutes ?? 0}
+                  sub={L.minutes}
+                  tone="success"
                 />
               </>
             )}
@@ -739,7 +735,7 @@ export function AdminDashboardPage() {
           <section className="adm-panel">
             <div className="adm-panel-header">
               <h2>{L.growthOverview}</h2>
-              <span>{dateRangeFromPreset(dateRange).from} ΓÇö {dateRangeFromPreset(dateRange).to}</span>
+              <span>{dateRangeFromPreset(dateRange).from} → {dateRangeFromPreset(dateRange).to}</span>
             </div>
             {isLoading ? <Skeleton height={220} /> : (
               <MultiLineChart
@@ -797,7 +793,7 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ΓöÇΓöÇ TAB: USER ANALYTICS ΓöÇΓöÇ */}
+      {/* Section */}
       {activeTab === 'users' && (
         <div className="adm-tab-content">
           {/* DAU/WAU/MAU */}
@@ -876,7 +872,7 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ΓöÇΓöÇ TAB: SYSTEM HEALTH ΓöÇΓöÇ */}
+      {/* Section */}
       {activeTab === 'health' && (
         <div className="adm-tab-content">
           {/* Service Health KPIs */}
@@ -925,7 +921,7 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ΓöÇΓöÇ TAB: AUTH & EVENTS ΓöÇΓöÇ */}
+      {/* Section */}
       {activeTab === 'auth' && (
         <div className="adm-tab-content">
           {/* Auth KPIs */}
@@ -951,7 +947,7 @@ export function AdminDashboardPage() {
                 <div className="event-sparkline-meta">
                   <span>
                     {eventTrend.length > 0
-                      ? `${formatDate(eventTrend[0].bucket, language)} ΓÇö ${formatDate(eventTrend[eventTrend.length - 1].bucket, language)}`
+                      ? `${formatDate(eventTrend[0].bucket, language)} → ${formatDate(eventTrend[eventTrend.length - 1].bucket, language)}`
                       : L.noData}
                   </span>
                 </div>
@@ -1012,7 +1008,7 @@ export function AdminDashboardPage() {
                               <span className="td-date">{formatDate(a.createdAt, language)}</span>
                               <span className="td-clock">{formatTime(a.createdAt)}</span>
                             </>
-                          ) : 'ΓÇö'}
+                          ) : '—'}
                         </td>
                         <td><code className="event-type">{a.eventType ?? 'SESSION_EVENT'}</code></td>
                         <td><SeverityBadge value={a.severity ?? 'info'} /></td>
@@ -1048,15 +1044,14 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ΓöÇΓöÇ Footer ΓöÇΓöÇ */}
+      {/* Section */}
       <footer className="adm-footer">
         <p>{L.footerNote}</p>
       </footer>
     </div>
   )
 }
-
-// ΓöÇΓöÇΓöÇ Labels ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Labels
 
 const EN_LABELS = {
   dashboardTitle: 'Operations Dashboard',
@@ -1065,8 +1060,13 @@ const EN_LABELS = {
   refresh: 'Refresh',
   refreshing: 'Refreshing...',
   exportCsv: 'Export CSV',
+  exportDenied: 'Export requires ADMIN_MONITORING_EXPORT permission',
   lastUpdated: 'Updated',
-  accessNote: 'This page requires backend allowlist access. The UI hint is not a security boundary.',
+  accessMode: 'Access mode',
+  behaviorEvents: 'Behavior events',
+  screenViews: 'Screen views',
+  avgSessionDuration: 'Avg session duration',
+  minutes: 'minutes',
   // KPIs
   totalUsers: 'Users Registered',
   registeredInPeriod: 'in selected period',
@@ -1137,44 +1137,49 @@ const EN_LABELS = {
   page: 'Page',
   // Common
   noData: 'No data available',
-  footerNote: 'VNALO Admin Dashboard ΓÇö data is for operational monitoring only. Sensitive information is never exposed.',
+  footerNote: 'VNALO Admin Dashboard — data is for operational monitoring only. Sensitive information is never exposed.',
 }
 
 const VI_LABELS = {
-  dashboardTitle: 'Tổng quan điều khiển vận hành',
-  dashboardSubtitle: 'Phân tích thời gian thực, insight người dùng và giám sát sức khỏe hệ thống cho VNALO enterprise.',
+  dashboardTitle: 'Bảng điều khiển vận hành',
+  dashboardSubtitle: 'Phân tích thời gian thực, insight người dùng và giám sát sức khỏe hệ thống cho VNALO.',
   autoRefresh: 'Tự động làm mới 30s',
   refresh: 'Làm mới',
   refreshing: 'Đang tải...',
   exportCsv: 'Xuất CSV',
+  exportDenied: 'Xuất dữ liệu yêu cầu quyền ADMIN_MONITORING_EXPORT',
   lastUpdated: 'Cập nhật lúc',
-  accessNote: 'Trang này yêu cầu quyền truy cập từ backend allowlist. UI chỉ là gợi ý; backend mới là lớp kiểm soát thực sự.',
+  accessMode: 'Chế độ truy cập',
+  behaviorEvents: 'Sự kiện hành vi',
+  screenViews: 'Lượt xem màn hình',
+  avgSessionDuration: 'Thời lượng phiên TB',
+  minutes: 'phút',
   // KPIs
   totalUsers: 'Người dùng đăng ký',
   registeredInPeriod: 'trong kỳ đã chọn',
   totalConversations: 'Hội thoại tạo mới',
   totalMessages: 'Tin nhắn gửi đi',
-  activeUsers: 'Người dùng hàng ngày',
+  activeUsers: 'Người dùng hằng ngày',
   reportsFiled: 'Báo cáo đã gửi',
   actionsTaken: 'Hành động kiểm duyệt',
   // Overview charts
-  growthOverview: 'Tß╗òng quan t─âng tr╞░ß╗ƒng',
-  users: 'Ng╞░ß╗¥i d├╣ng',
-  conversations: 'Hß╗Öi thoß║íi',
-  messages: 'Tin nhß║»n',
-  messagesOverTime: 'Tin nhß║»n theo thß╗¥i gian',
+  growthOverview: 'Tổng quan tăng trưởng',
+  users: 'Người dùng',
+  conversations: 'Hội thoại',
+  messages: 'Tin nhắn',
+  messagesOverTime: 'Tin nhắn theo thời gian',
   mediaUploads: 'Tải lên media',
   reportsTrend: 'Xu hướng báo cáo',
   moderationActions: 'Hành động kiểm duyệt',
   // Users tab
   dau: 'DAU',
-  dauDesc: 'Người dùng hoạt động hàng ngày',
+  dauDesc: 'Người dùng hoạt động hằng ngày',
   dauLabel: 'DAU',
   wau: 'WAU',
-  wauDesc: 'Người dùng hoạt động hàng tuần',
+  wauDesc: 'Người dùng hoạt động hằng tuần',
   wauLabel: 'WAU',
   mau: 'MAU',
-  mauDesc: 'Người dùng hoạt động hàng tháng',
+  mauDesc: 'Người dùng hoạt động hằng tháng',
   userRegistrations: 'Đăng ký người dùng',
   messageTypes: 'Loại tin nhắn',
   topActiveUsers: 'Người dùng tích cực nhất',
@@ -1221,6 +1226,5 @@ const VI_LABELS = {
   noData: 'Chưa có dữ liệu',
   footerNote: 'VNALO Admin Dashboard — dữ liệu chỉ phục vụ giám sát vận hành. Thông tin nhạy cảm không bao giờ được hiển thị.',
 }
-
 const EVENT_TYPES = ['ALL', 'LOGIN_SUCCESS', 'LOGIN_FAILED', 'QR_LOGIN_APPROVED', 'SESSION_REVOKED_LOGOUT', 'SESSION_REVOKED_LOGOUT_ALL', 'OTP_REQUESTED', 'PASSWORD_CHANGED']
 const PLATFORMS = ['ALL', 'WEB', 'ANDROID', 'IOS']

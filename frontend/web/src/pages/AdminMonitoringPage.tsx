@@ -54,6 +54,7 @@ type AdminRoleAssignment = {
 type MonitoringSummary = {
   generatedAt?: string
   accessMode?: string
+  canExport?: boolean
   accounts?: {
     total?: number
     active?: number
@@ -271,7 +272,7 @@ export function AdminMonitoringPage() {
     ? {
         title: 'Giám sát vận hành',
         subtitle: 'Theo dõi sức khỏe dịch vụ, hành vi đăng nhập và tín hiệu rủi ro mà không lộ dữ liệu nhạy cảm.',
-        accessNote: 'Trang này yêu cầu email nằm trong allowlist admin ở backend. UI chỉ là gợi ý; backend mới là lớp kiểm soát thực sự.',
+        accessNote: 'Trang này yêu cầu quyền RBAC admin từ backend. UI chỉ hiển thị theo quyền; backend vẫn là lớp kiểm soát bắt buộc.',
         refresh: 'Làm mới',
         refreshing: 'Đang tải...',
         exportCsv: 'Xuất CSV',
@@ -326,7 +327,7 @@ export function AdminMonitoringPage() {
     : {
         title: 'Operations Monitoring',
         subtitle: 'Track service health, sign-in behavior, and operational risk signals without exposing sensitive data.',
-        accessNote: 'This page requires backend allowlist access. The UI hint is not a security boundary; the backend remains authoritative.',
+        accessNote: 'This page requires backend RBAC access. UI visibility is only a hint; the backend remains authoritative.',
         refresh: 'Refresh',
         refreshing: 'Refreshing...',
         exportCsv: 'Export CSV',
@@ -547,7 +548,7 @@ export function AdminMonitoringPage() {
   ]
 
   const handleExportCsv = () => {
-    if (audits.length === 0) return
+    if (!summary?.canExport || audits.length === 0) return
     const csv = toCsv(audits)
     const stamp = new Date().toISOString().replaceAll(':', '-')
     downloadCsv(csv, `monitoring-events-page-${page + 1}-${stamp}.csv`)
@@ -567,7 +568,7 @@ export function AdminMonitoringPage() {
             <span>{labels.autoRefresh}</span>
           </label>
           <div className='admin-monitoring-action-row'>
-            <button type='button' onClick={handleExportCsv} disabled={audits.length === 0}>{labels.exportCsv}</button>
+            <button type='button' onClick={handleExportCsv} disabled={!summary?.canExport || audits.length === 0}>{labels.exportCsv}</button>
             <button type='button' onClick={() => void load()} disabled={isLoading}>{isLoading ? labels.refreshing : labels.refresh}</button>
           </div>
         </div>

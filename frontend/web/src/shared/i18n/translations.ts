@@ -81,6 +81,8 @@ export const translations = {
     settings: {
       notifications: 'Notifications',
       notificationsDesc: 'Enable/disable notifications.',
+      analyticsConsent: 'Analytics & product improvement',
+      analyticsConsentDesc: 'Allow VNALO to collect sanitized usage events such as sessions, screens, features, and errors.',
       theme: 'Theme',
       themeDesc: 'Choose light or dark mode.',
       language: 'Language',
@@ -149,8 +151,7 @@ export const translations = {
       languageVietnamese: 'Tiếng Việt',
       loginError: 'Phone number or password is incorrect',
       registerHeroTitle: 'Create your VNALO account',
-      registerHeroCopy:
-        'Start your team chat workspace in minutes with smooth chat and notifications.',
+      registerHeroCopy: '',
       registerPoint1: 'Organize conversations by project, team, or private groups.',
       registerPoint2: 'Receive instant notifications for important updates.',
       registerPoint3: 'Desktop-first experience with fast and focused interactions.',
@@ -600,8 +601,7 @@ export const translations = {
       languageVietnamese: 'Tiếng Việt',
       loginError: 'Số điện thoại hoặc mật khẩu không chính xác',
       registerHeroTitle: 'Tạo tài khoản VNALO',
-      registerHeroCopy:
-        'Bắt đầu không gian trò chuyện cho nhóm của bạn chỉ trong vài phút, đồng bộ chat và thông báo liền mạch.',
+      registerHeroCopy: '',
       registerPoint1: 'Tổ chức hội thoại theo nhóm dự án, phòng ban hoặc cộng đồng riêng.',
       registerPoint2: 'Nhận thông báo tức thì để không bỏ lỡ tin nhắn quan trọng.',
       registerPoint3: 'Thiết kế tối ưu cho desktop, thao tác nhanh và gọn như ứng dụng chat hiện đại.',

@@ -87,10 +87,19 @@ export function SettingsModalContent({
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
+  const [analyticsConsentEnabled, setAnalyticsConsentEnabled] = React.useState(() => localStorage.getItem('vnalo.analyticsConsent') !== 'false')
   const canOpenAdminDashboard = canAccessAdminMonitoring(user, accessToken)
 
   const openAdminDashboard = () => {
     navigate('/admin/monitoring')
+  }
+
+  const toggleAnalyticsConsent = () => {
+    setAnalyticsConsentEnabled((prev) => {
+      const next = !prev
+      localStorage.setItem('vnalo.analyticsConsent', String(next))
+      return next
+    })
   }
 
   const closeChangePasswordModal = () => {
@@ -222,6 +231,12 @@ export function SettingsModalContent({
                 title={t('settings.notifications')}
                 description={t('settings.notificationsDesc')}
                 action={<ToggleSwitch enabled={notificationsEnabled} onChange={toggleNotifications} />}
+              />
+
+              <SettingsRow
+                title={t('settings.analyticsConsent')}
+                description={t('settings.analyticsConsentDesc')}
+                action={<ToggleSwitch enabled={analyticsConsentEnabled} onChange={toggleAnalyticsConsent} />}
               />
 
               <SettingsRow

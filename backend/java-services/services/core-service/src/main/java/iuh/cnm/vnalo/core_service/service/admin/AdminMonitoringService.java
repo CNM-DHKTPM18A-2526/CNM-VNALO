@@ -62,6 +62,7 @@ public class AdminMonitoringService {
         return new AdminMonitoringSummaryResponse(
                 now,
                 ACCESS_MODE_RBAC,
+                canExport(requesterId),
                 new AdminMonitoringSummaryResponse.AccountStats(
                         authAccountRepository.count(),
                         authAccountRepository.countByStatus(AccountStatus.ACTIVE),

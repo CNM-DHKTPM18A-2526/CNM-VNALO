@@ -10,93 +10,105 @@ type LegalSection = {
   body: string[]
 }
 
+type LegalContent = {
+  title: string
+  subtitle: string
+  summary: string[]
+  sections: LegalSection[]
+}
+
 const updatedAt = '01/06/2026'
 
-const content: Record<'vi' | 'en', Record<LegalPageKind, { title: string; subtitle: string; sections: LegalSection[] }>> = {
+const content: Record<'vi' | 'en', Record<LegalPageKind, LegalContent>> = {
   vi: {
     terms: {
       title: 'Điều khoản sử dụng VNALO',
-      subtitle: 'Các nguyên tắc sử dụng tài khoản, nhắn tin, gọi điện, AI và đăng nhập khuôn mặt trên VNALO.',
+      subtitle: 'Quy định sử dụng tài khoản, nhắn tin, gọi điện, AI assistant, face-auth và các tính năng cộng đồng trong VNALO.',
+      summary: ['Tối thiểu 16 tuổi', 'Không spam/lừa đảo', 'AI chỉ hỗ trợ, người dùng cần kiểm tra lại', 'Face-auth là tùy chọn'],
       sections: [
         {
-          title: '1. Tài khoản và độ tuổi',
+          title: '1. Tài khoản và điều kiện sử dụng',
           body: [
-            'Bạn cần cung cấp thông tin đăng ký chính xác, bảo mật mật khẩu và chịu trách nhiệm cho hoạt động phát sinh từ tài khoản của mình.',
-            'VNALO chỉ cho phép đăng ký khi người dùng đáp ứng yêu cầu độ tuổi tối thiểu đang được áp dụng trong sản phẩm.',
+            'Bạn cần cung cấp thông tin đăng ký chính xác, bảo mật mật khẩu/OTP và chịu trách nhiệm với hoạt động phát sinh từ tài khoản của mình.',
+            'VNALO áp dụng yêu cầu độ tuổi tối thiểu 16 tuổi. Nếu phát hiện thông tin không hợp lệ hoặc có rủi ro an toàn, hệ thống có thể yêu cầu xác minh bổ sung.',
           ],
         },
         {
-          title: '2. Hành vi được phép',
+          title: '2. Hành vi được phép và bị cấm',
           body: [
-            'Bạn không được dùng VNALO để spam, lừa đảo, phát tán mã độc, xâm phạm quyền riêng tư, quấy rối hoặc chia sẻ nội dung vi phạm pháp luật.',
-            'Các tính năng nhóm, mạng xã hội, cuộc gọi và chia sẻ tệp phải được sử dụng theo đúng mục đích giao tiếp hợp pháp.',
+            'Bạn không được sử dụng VNALO để spam, lừa đảo, phát tán mã độc, quấy rối, xâm phạm quyền riêng tư hoặc chia sẻ nội dung vi phạm pháp luật.',
+            'Tin nhắn, nhóm, mạng xã hội, cuộc gọi và chia sẻ tệp phải phục vụ mục đích giao tiếp hợp pháp, tôn trọng người dùng khác và không gây quá tải hệ thống.',
           ],
         },
         {
-          title: '3. AI và trợ lý ảo',
+          title: '3. AI assistant và action command',
           body: [
-            'Trợ lý AI có thể hỗ trợ soạn thảo, tóm tắt, tìm kiếm hoặc đề xuất thao tác trong ứng dụng. Bạn cần kiểm tra lại nội dung quan trọng trước khi sử dụng.',
-            'Không nhập mật khẩu, mã OTP, khóa bí mật, dữ liệu nhạy cảm hoặc nội dung bạn không có quyền xử lý vào trợ lý AI.',
+            'AI assistant có thể hỗ trợ soạn thảo, tóm tắt, tìm kiếm, phân tích ảnh hoặc gợi ý thao tác trong ứng dụng. Kết quả AI có thể sai và cần được bạn kiểm tra trước khi sử dụng.',
+            'Không nhập mật khẩu, OTP, token, khóa bí mật, dữ liệu sinh trắc học thô hoặc nội dung bạn không có quyền xử lý vào AI assistant.',
+            'Các thao tác có rủi ro như tạo nhóm, gửi lời mời, thay đổi dữ liệu hoặc gọi tính năng hệ thống cần được xác nhận rõ ràng trong ứng dụng.',
           ],
         },
         {
           title: '4. Đăng nhập khuôn mặt',
           body: [
-            'Đăng nhập khuôn mặt là tính năng tùy chọn. Bạn chỉ nên bật trên thiết bị tin cậy và có quyền tắt/xóa đăng ký khuôn mặt khi sản phẩm cung cấp tùy chọn này.',
-            'Bạn không được đăng ký hoặc xác thực bằng khuôn mặt của người khác nếu không có sự đồng ý hợp lệ.',
+            'Face-auth là tính năng tùy chọn, chỉ nên bật trên thiết bị đáng tin cậy. Bạn không được đăng ký hoặc xác thực bằng khuôn mặt của người khác nếu không có sự đồng ý hợp lệ.',
+            'VNALO có thể tạm ngừng face-auth khi model chưa sẵn sàng, phát hiện rủi ro bảo mật hoặc dịch vụ xác thực không khả dụng.',
           ],
         },
         {
-          title: '5. Tạm khóa và xử lý vi phạm',
+          title: '5. Xử lý vi phạm và an toàn hệ thống',
           body: [
-            'VNALO có thể giới hạn tính năng, tạm khóa phiên hoặc yêu cầu xác minh bổ sung khi phát hiện rủi ro bảo mật, gian lận hoặc vi phạm điều khoản.',
+            'VNALO có thể giới hạn tính năng, khóa phiên, yêu cầu xác minh bổ sung hoặc thu hồi quyền truy cập khi phát hiện gian lận, lạm dụng, rủi ro bảo mật hoặc vi phạm điều khoản.',
           ],
         },
       ],
     },
     privacy: {
       title: 'Chính sách quyền riêng tư VNALO',
-      subtitle: 'Tóm tắt dữ liệu VNALO xử lý, mục đích sử dụng và các kiểm soát quyền riêng tư quan trọng.',
+      subtitle: 'Mô tả các nhóm dữ liệu VNALO xử lý, mục đích sử dụng, dữ liệu hành vi phục vụ monitoring và các giới hạn bảo vệ dữ liệu nhạy cảm.',
+      summary: ['Không hiển thị dữ liệu nhạy cảm trong admin', 'Analytics cần consent phù hợp', 'Face data phải mã hóa', 'Không dùng dữ liệu sinh trắc cho quảng cáo'],
       sections: [
         {
-          title: '1. Dữ liệu tài khoản',
+          title: '1. Dữ liệu tài khoản và xác thực',
           body: [
-            'VNALO xử lý số điện thoại, email, tên hiển thị, ngày sinh, giới tính, ảnh đại diện, trạng thái phiên đăng nhập và thiết bị để tạo tài khoản, xác thực và đồng bộ trải nghiệm.',
+            'VNALO xử lý số điện thoại, email, tên hiển thị, ngày sinh, giới tính, ảnh đại diện, trạng thái tài khoản, phiên đăng nhập, token thiết bị và sự kiện bảo mật để tạo tài khoản, xác thực và bảo vệ người dùng.',
+            'Các sự kiện như đăng nhập thành công/thất bại, logout, QR login, OTP, đổi mật khẩu và khóa phiên được ghi nhận để phát hiện rủi ro và hỗ trợ vận hành.',
           ],
         },
         {
-          title: '2. Tin nhắn, media, cuộc gọi và danh bạ',
+          title: '2. Dữ liệu giao tiếp và nội dung',
           body: [
             'Tin nhắn, nhóm, phản ứng, tệp đính kèm, ảnh, video, nhật ký cuộc gọi và trạng thái kết nối được xử lý để cung cấp tính năng chat/gọi theo thời gian thực.',
-            'Danh bạ chỉ nên được dùng để gợi ý kết nối khi bạn cấp quyền. Bạn có thể thu hồi quyền danh bạ trong cài đặt hệ thống của thiết bị.',
+            'Nội dung tin nhắn hoặc prompt không nên được gửi vào analytics dạng raw nếu không có consent riêng và mục đích xử lý rõ ràng.',
           ],
         },
         {
-          title: '3. AI và lịch sử trợ lý',
+          title: '3. Dữ liệu hành vi và analytics sản phẩm',
           body: [
-            'Prompt, phản hồi AI, lịch sử hội thoại AI và các lệnh hành động có thể được xử lý để trả lời, duy trì ngữ cảnh, cải thiện độ ổn định và kiểm tra lỗi.',
-            'VNALO không nên ghi log mật khẩu, OTP, token truy cập hoặc nội dung nhạy cảm không cần thiết cho mục đích vận hành.',
+            'VNALO có thể ghi nhận phiên sử dụng, thời điểm mở app, thời lượng phiên, màn hình đã xem, tính năng đã dùng, số lượng tin nhắn, lỗi client/API, trạng thái online và mức độ sử dụng theo giờ/ngày/tuần/tháng.',
+            'Các chỉ số như người dùng đang hoạt động, DAU/WAU/MAU, session duration p50/p95, screen views, top features, AI success rate, face-auth success rate và error rate nên được tổng hợp để monitoring sản phẩm.',
+            'Dữ liệu hành vi dùng cho cải thiện sản phẩm cần được tối thiểu hóa, giới hạn kích thước payload, loại bỏ trường nhạy cảm và tuân thủ lựa chọn consent của người dùng.',
           ],
         },
         {
-          title: '4. Dữ liệu khuôn mặt',
+          title: '4. AI assistant',
           body: [
-            'Khi bật face-auth, ảnh khuôn mặt/đặc trưng sinh trắc học có thể được xử lý để đăng ký và xác minh. Dữ liệu này cần được bảo vệ bằng mã hóa, giới hạn truy cập và không dùng cho mục đích quảng cáo.',
-            'Trạng thái model, lỗi xác thực và số lần thất bại có thể được ghi nhận để bảo mật và chống lạm dụng, nhưng không nên hiển thị dữ liệu sinh trắc học thô trong dashboard admin.',
+            'Prompt, phản hồi AI, lịch sử hội thoại AI, action command và lỗi provider có thể được xử lý để trả lời yêu cầu, duy trì ngữ cảnh, kiểm tra độ an toàn và debug lỗi.',
+            'VNALO cần lọc bỏ mật khẩu, OTP, token, khóa bí mật và dữ liệu nhạy cảm không cần thiết trước khi lưu log hoặc hiển thị trong dashboard quản trị.',
           ],
         },
         {
-          title: '5. Lưu trữ dữ liệu và quyền của bạn',
+          title: '5. Face-auth và dữ liệu sinh trắc',
           body: [
-            'VNALO chỉ nên lưu dữ liệu trong thời gian cần thiết cho vận hành, bảo mật, nghĩa vụ pháp lý và xử lý tranh chấp; sau đó cần xóa hoặc ẩn danh theo chính sách nội bộ.',
-            'Bạn có quyền yêu cầu hỗ trợ cập nhật hồ sơ, thay đổi quyền thiết bị, vô hiệu hóa face-auth và nhận giải thích về các nhóm dữ liệu đang được xử lý.',
+            'Khi bật face-auth, ảnh khuôn mặt hoặc embedding sinh trắc có thể được xử lý để đăng ký và xác minh. Dữ liệu này phải được mã hóa, giới hạn quyền truy cập và không dùng cho quảng cáo.',
+            'Admin dashboard chỉ nên hiển thị metadata như modelReady, số lần enroll/verify, tỉ lệ thành công/thất bại và lỗi dịch vụ; không hiển thị ảnh khuôn mặt hoặc embedding thô.',
           ],
         },
         {
-          title: '6. Giám sát vận hành và quyền của bạn',
+          title: '6. Lưu giữ, quyền kiểm soát và minh bạch',
           body: [
-            'VNALO có thể ghi nhận sự kiện đăng nhập, đăng xuất, QR approval, lỗi dịch vụ, trạng thái push token và sự kiện bảo mật để vận hành hệ thống.',
-            'Bạn có thể cập nhật hồ sơ, thay đổi quyền thiết bị và yêu cầu hỗ trợ về dữ liệu cá nhân qua kênh hỗ trợ của dự án.',
+            'VNALO nên lưu dữ liệu trong thời hạn cần thiết cho vận hành, bảo mật, nghĩa vụ pháp lý và xử lý tranh chấp, sau đó xóa hoặc ẩn danh theo chính sách retention.',
+            'Người dùng nên có khả năng xem/rút consent analytics, cập nhật hồ sơ, thay đổi quyền thiết bị, tắt face-auth và yêu cầu hỗ trợ về dữ liệu cá nhân.',
           ],
         },
       ],
@@ -105,89 +117,27 @@ const content: Record<'vi' | 'en', Record<LegalPageKind, { title: string; subtit
   en: {
     terms: {
       title: 'VNALO Terms of Use',
-      subtitle: 'Rules for using accounts, messaging, calls, AI assistant, and face sign-in on VNALO.',
+      subtitle: 'Rules for accounts, messaging, calling, AI assistant, face-auth, and community features in VNALO.',
+      summary: ['Minimum age 16', 'No spam or fraud', 'AI assists; users must review', 'Face-auth is optional'],
       sections: [
-        {
-          title: '1. Account and age',
-          body: [
-            'You must provide accurate registration information, protect your password, and remain responsible for activity under your account.',
-            'VNALO allows registration only when the active product age requirement is satisfied.',
-          ],
-        },
-        {
-          title: '2. Acceptable use',
-          body: [
-            'Do not use VNALO for spam, fraud, malware, privacy violations, harassment, or unlawful content.',
-            'Groups, social posts, calls, and file sharing must be used for lawful communication purposes.',
-          ],
-        },
-        {
-          title: '3. AI assistant',
-          body: [
-            'The AI assistant may help draft, summarize, search, or suggest in-app actions. Review important outputs before using them.',
-            'Do not enter passwords, OTPs, secret keys, sensitive data, or content you are not authorized to process.',
-          ],
-        },
-        {
-          title: '4. Face sign-in',
-          body: [
-            'Face sign-in is optional. Enable it only on trusted devices and disable/delete enrollment when the product provides that control.',
-            'Do not enroll or verify with another person’s face without valid consent.',
-          ],
-        },
-        {
-          title: '5. Enforcement',
-          body: [
-            'VNALO may limit features, revoke sessions, or require additional verification when security, fraud, or terms violations are detected.',
-          ],
-        },
+        { title: '1. Accounts and eligibility', body: ['Provide accurate registration information, protect passwords/OTPs, and remain responsible for activity under your account.', 'VNALO applies a minimum age requirement of 16 years and may request additional verification when risk is detected.'] },
+        { title: '2. Acceptable use', body: ['Do not use VNALO for spam, fraud, malware, harassment, privacy violations, or unlawful content.', 'Messages, groups, social posts, calls, and file sharing must be used for lawful communication and must not overload the system.'] },
+        { title: '3. AI assistant and action commands', body: ['The AI assistant can draft, summarize, search, analyze images, or suggest in-app actions. AI output can be wrong and should be reviewed before use.', 'Do not enter passwords, OTPs, tokens, secret keys, raw biometric data, or content you are not authorized to process.', 'Risky actions such as creating groups, sending invitations, changing data, or invoking system features require explicit in-app confirmation.'] },
+        { title: '4. Face sign-in', body: ['Face-auth is optional and should only be enabled on trusted devices. Do not enroll or verify with another person’s face without valid consent.', 'VNALO may pause face-auth when models are not ready, security risk is detected, or verification services are unavailable.'] },
+        { title: '5. Enforcement and safety', body: ['VNALO may limit features, revoke sessions, require additional verification, or remove access when fraud, abuse, security risk, or terms violations are detected.'] },
       ],
     },
     privacy: {
       title: 'VNALO Privacy Policy',
-      subtitle: 'A summary of data VNALO processes, why it is used, and important privacy controls.',
+      subtitle: 'Data categories VNALO processes, why they are used, product analytics monitoring, and guardrails for sensitive data.',
+      summary: ['No sensitive data in admin dashboards', 'Analytics requires appropriate consent', 'Face data must be encrypted', 'Biometrics are not used for ads'],
       sections: [
-        {
-          title: '1. Account data',
-          body: [
-            'VNALO processes phone number, email, display name, date of birth, gender, avatar, session state, and device information to create accounts, authenticate users, and sync the experience.',
-          ],
-        },
-        {
-          title: '2. Messages, media, calls, and contacts',
-          body: [
-            'Messages, groups, reactions, attachments, images, videos, call logs, and connection state are processed to provide real-time chat and calling.',
-            'Contacts should only be used for friend suggestions after permission is granted. You can revoke contacts permission in system settings.',
-          ],
-        },
-        {
-          title: '3. AI assistant history',
-          body: [
-            'Prompts, AI responses, AI conversation history, and action commands may be processed to answer requests, preserve context, improve reliability, and debug failures.',
-            'VNALO should not log passwords, OTPs, access tokens, or sensitive content that is unnecessary for operations.',
-          ],
-        },
-        {
-          title: '4. Face data',
-          body: [
-            'When face-auth is enabled, face images or biometric embeddings may be processed for enrollment and verification. This data must be encrypted, access-limited, and not used for advertising.',
-            'Model readiness, authentication errors, and failed attempts may be recorded for security and abuse prevention, but raw biometric data should not be exposed in admin dashboards.',
-          ],
-        },
-        {
-          title: '5. Retention and your rights',
-          body: [
-            'VNALO should retain data only for the period needed for operations, security, legal obligations, and dispute handling, then delete or anonymize it according to internal policy.',
-            'You can request support to update profile data, change device permissions, disable face-auth, and understand which categories of data are being processed.',
-          ],
-        },
-        {
-          title: '6. Operations monitoring and your controls',
-          body: [
-            'VNALO may record login, logout, QR approval, service errors, push token state, and security events to operate the system.',
-            'You can update your profile, change device permissions, and request support about personal data through the project support channel.',
-          ],
-        },
+        { title: '1. Account and authentication data', body: ['VNALO processes phone number, email, display name, date of birth, gender, avatar, account state, sign-in sessions, device tokens, and security events to create accounts, authenticate users, and protect the service.', 'Login success/failure, logout, QR login, OTP, password change, and session revocation events may be recorded for security monitoring.'] },
+        { title: '2. Communication and content data', body: ['Messages, groups, reactions, attachments, images, videos, call logs, and connection state are processed to provide real-time chat and calling.', 'Message content or prompts should not be sent to analytics as raw data without separate consent and a clear processing purpose.'] },
+        { title: '3. Behavioral and product analytics', body: ['VNALO may record app sessions, open times, session duration, screens viewed, features used, message counts, client/API errors, online state, and usage intensity by hour/day/week/month.', 'Metrics such as active users, DAU/WAU/MAU, session duration p50/p95, screen views, top features, AI success rate, face-auth success rate, and error rate should be aggregated for product monitoring.', 'Behavioral data for product improvement should be minimized, size-limited, sanitized, and governed by user consent choices.'] },
+        { title: '4. AI assistant', body: ['Prompts, AI responses, AI history, action commands, and provider errors may be processed to answer requests, preserve context, enforce safety, and debug failures.', 'VNALO should remove passwords, OTPs, tokens, secret keys, and unnecessary sensitive data before storing logs or showing data in admin dashboards.'] },
+        { title: '5. Face-auth and biometric data', body: ['When face-auth is enabled, face images or biometric embeddings may be processed for enrollment and verification. This data must be encrypted, access-limited, and not used for advertising.', 'Admin dashboards should show only metadata such as model readiness, enrollment/verification counts, success/failure rates, and service errors; raw face images or embeddings must not be exposed.'] },
+        { title: '6. Retention, controls, and transparency', body: ['VNALO should retain data only as long as needed for operations, security, legal obligations, and dispute handling, then delete or anonymize it according to retention policy.', 'Users should be able to view/withdraw analytics consent, update profile data, change device permissions, disable face-auth, and request support about personal data.'] },
       ],
     },
   },
@@ -200,17 +150,23 @@ export function LegalPage({ kind }: { kind: LegalPageKind }) {
   return (
     <main className='legal-page'>
       <section className='legal-card'>
-        <Link className='legal-back-link' to='/register'>← {language === 'vi' ? 'Quay lại đăng ký' : 'Back to register'}</Link>
-        <p className='legal-eyebrow'>VNALO · {language === 'vi' ? 'Cập nhật' : 'Updated'} {updatedAt}</p>
-        <h1>{page.title}</h1>
-        <p className='legal-subtitle'>{page.subtitle}</p>
+        <div className='legal-topbar'>
+          <Link className='legal-back-link' to='/register'>← {language === 'vi' ? 'Quay lại đăng ký' : 'Back to register'}</Link>
+          <span className='legal-updated'>VNALO · {language === 'vi' ? 'Cập nhật' : 'Updated'} {updatedAt}</span>
+        </div>
+        <div className='legal-hero'>
+          <p className='legal-eyebrow'>{kind === 'terms' ? 'Terms' : 'Privacy'}</p>
+          <h1>{page.title}</h1>
+          <p className='legal-subtitle'>{page.subtitle}</p>
+        </div>
+        <div className='legal-summary-grid'>
+          {page.summary.map((item) => <span key={item}>{item}</span>)}
+        </div>
         <div className='legal-section-list'>
           {page.sections.map((section) => (
             <section className='legal-section' key={section.title}>
               <h2>{section.title}</h2>
-              {section.body.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
+              {section.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
             </section>
           ))}
         </div>
