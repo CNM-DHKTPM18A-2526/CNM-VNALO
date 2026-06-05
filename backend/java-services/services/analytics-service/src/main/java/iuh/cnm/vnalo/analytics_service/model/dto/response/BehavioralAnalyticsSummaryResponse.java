@@ -19,7 +19,11 @@ public class BehavioralAnalyticsSummaryResponse {
     private long aiPrompts;
     private long aiFailures;
     private long faceAuthAttempts;
+    private long activeUsersLast5Minutes;
+    private long activeUsersLast30Minutes;
     private double averageSessionDurationMinutes;
+    private double medianSessionDurationMinutes;
+    private double p95SessionDurationMinutes;
     private List<EventCountResponse> topEvents;
     private List<EventCountResponse> topScreens;
     private List<EventCountResponse> topFeatures;

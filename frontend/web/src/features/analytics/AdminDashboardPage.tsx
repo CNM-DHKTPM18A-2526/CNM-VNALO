@@ -722,9 +722,15 @@ export function AdminDashboardPage() {
                   tone="neutral"
                 />
                 <KpiCard
+                  label={L.realtimeUsers}
+                  value={behaviorSummary?.activeUsersLast5Minutes ?? 0}
+                  sub={`30m: ${formatNumber(behaviorSummary?.activeUsersLast30Minutes ?? 0)}`}
+                  tone="success"
+                />
+                <KpiCard
                   label={L.avgSessionDuration}
                   value={behaviorSummary?.averageSessionDurationMinutes ?? 0}
-                  sub={L.minutes}
+                  sub={`P50: ${formatNumber(behaviorSummary?.medianSessionDurationMinutes ?? 0)} · P95: ${formatNumber(behaviorSummary?.p95SessionDurationMinutes ?? 0)} ${L.minutes}`}
                   tone="success"
                 />
               </>
@@ -1065,6 +1071,7 @@ const EN_LABELS = {
   accessMode: 'Access mode',
   behaviorEvents: 'Behavior events',
   screenViews: 'Screen views',
+  realtimeUsers: 'Active now',
   avgSessionDuration: 'Avg session duration',
   minutes: 'minutes',
   // KPIs
@@ -1152,6 +1159,7 @@ const VI_LABELS = {
   accessMode: 'Chế độ truy cập',
   behaviorEvents: 'Sự kiện hành vi',
   screenViews: 'Lượt xem màn hình',
+  realtimeUsers: 'Đang hoạt động',
   avgSessionDuration: 'Thời lượng phiên TB',
   minutes: 'phút',
   // KPIs

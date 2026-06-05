@@ -63,7 +63,11 @@ export interface BehavioralAnalyticsSummaryResponse {
   aiPrompts: number
   aiFailures: number
   faceAuthAttempts: number
+  activeUsersLast5Minutes: number
+  activeUsersLast30Minutes: number
   averageSessionDurationMinutes: number
+  medianSessionDurationMinutes: number
+  p95SessionDurationMinutes: number
   topEvents: EventCountResponse[]
   topScreens: EventCountResponse[]
   topFeatures: EventCountResponse[]

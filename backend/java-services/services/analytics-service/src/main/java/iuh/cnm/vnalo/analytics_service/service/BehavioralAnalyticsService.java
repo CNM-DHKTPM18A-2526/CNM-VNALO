@@ -55,11 +55,13 @@ public class BehavioralAnalyticsService {
         putIfPresent(payload, "timezone", sanitizeString(request.getTimezone(), 24));
         payload.put("metadata", sanitizeMetadata(request.getMetadata()));
 
+        String platform = sanitizeString(request.getPlatform(), 32);
+
         AnalyticsEvent event = analyticsEventRepository.save(AnalyticsEvent.builder()
                 .eventType(request.getEventType())
                 .actorUserId(actorUserId)
                 .targetType(resolveTargetType(request.getEventType()))
-                .sourceService("web-client")
+                .sourceService(resolveSourceService(platform))
                 .occurredAt(occurredAt)
                 .payloadJson(writePayload(payload))
                 .build());
@@ -85,7 +87,11 @@ public class BehavioralAnalyticsService {
                 .faceAuthAttempts(count(AnalyticsEventType.FACE_ENROLL_STARTED, fromInstant, toInstant)
                         + count(AnalyticsEventType.FACE_VERIFY_SUCCEEDED, fromInstant, toInstant)
                         + count(AnalyticsEventType.FACE_VERIFY_FAILED, fromInstant, toInstant))
+                .activeUsersLast5Minutes(countDistinctActorsSince(Instant.now().minusSeconds(300)))
+                .activeUsersLast30Minutes(countDistinctActorsSince(Instant.now().minusSeconds(1_800)))
                 .averageSessionDurationMinutes(averageSessionDurationMinutes(events))
+                .medianSessionDurationMinutes(percentileSessionDurationMinutes(events, 0.5))
+                .p95SessionDurationMinutes(percentileSessionDurationMinutes(events, 0.95))
                 .topEvents(topByEventType(events))
                 .topScreens(topByPayloadKey(events, "screenName"))
                 .topFeatures(topByPayloadKey(events, "featureName"))
@@ -95,6 +101,10 @@ public class BehavioralAnalyticsService {
 
     private long count(AnalyticsEventType type, Instant from, Instant to) {
         return analyticsEventRepository.countByEventTypeAndOccurredAtBetween(type, from, to);
+    }
+
+    private long countDistinctActorsSince(Instant from) {
+        return analyticsEventRepository.countDistinctActorsBetween(from, Instant.now());
     }
 
     private Instant normalizeOccurredAt(Instant occurredAt) {
@@ -112,6 +122,15 @@ public class BehavioralAnalyticsService {
             case FACE_ENROLL_STARTED, FACE_VERIFY_SUCCEEDED, FACE_VERIFY_FAILED, FACE_MODEL_UNAVAILABLE -> "FACE_AUTH";
             case API_ERROR, CLIENT_ERROR -> "ERROR";
             default -> "SESSION";
+        };
+    }
+
+    private String resolveSourceService(String platform) {
+        if (!StringUtils.hasText(platform)) return "client";
+        return switch (platform.toLowerCase(Locale.ROOT)) {
+            case "web" -> "web-client";
+            case "mobile", "android", "ios" -> "mobile-client";
+            default -> "client";
         };
     }
 
@@ -167,7 +186,22 @@ public class BehavioralAnalyticsService {
     }
 
     private double averageSessionDurationMinutes(List<AnalyticsEvent> events) {
-        List<Long> durations = events.stream()
+        List<Long> durations = sessionDurations(events);
+        if (durations.isEmpty()) return 0;
+        double avgMs = durations.stream().mapToLong(Long::longValue).average().orElse(0);
+        return Math.round((avgMs / 60000.0) * 10.0) / 10.0;
+    }
+
+    private double percentileSessionDurationMinutes(List<AnalyticsEvent> events, double percentile) {
+        List<Long> durations = sessionDurations(events).stream().sorted().toList();
+        if (durations.isEmpty()) return 0;
+        int index = (int) Math.ceil(percentile * durations.size()) - 1;
+        long durationMs = durations.get(Math.max(0, Math.min(index, durations.size() - 1)));
+        return Math.round((durationMs / 60000.0) * 10.0) / 10.0;
+    }
+
+    private List<Long> sessionDurations(List<AnalyticsEvent> events) {
+        return events.stream()
                 .filter(event -> event.getEventType() == AnalyticsEventType.APP_SESSION_ENDED)
                 .map(this::readPayload)
                 .map(payload -> payload.get("durationMs"))
@@ -176,9 +210,6 @@ public class BehavioralAnalyticsService {
                 .map(Number::longValue)
                 .filter(value -> value > 0)
                 .toList();
-        if (durations.isEmpty()) return 0;
-        double avgMs = durations.stream().mapToLong(Long::longValue).average().orElse(0);
-        return Math.round((avgMs / 60000.0) * 10.0) / 10.0;
     }
 
     private List<EventCountResponse> topByEventType(List<AnalyticsEvent> events) {

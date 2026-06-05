@@ -37,8 +37,8 @@ public class AnalyticsController {
     private final AnalyticsOverviewService overviewService;
     private final AnalyticsTrendService trendService;
     private final AnalyticsBreakdownService breakdownService;
-        private final AnalyticsDashboardService dashboardService;
-                private final BackfillJobService backfillJobService;
+    private final AnalyticsDashboardService dashboardService;
+    private final BackfillJobService backfillJobService;
     private final BehavioralAnalyticsService behavioralAnalyticsService;
 
     @PostMapping("/events")
