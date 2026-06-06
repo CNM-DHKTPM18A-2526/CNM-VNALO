@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -120,6 +121,7 @@ class AdminMonitoringServiceTest {
         AdminMonitoringSummaryResponse summary = service.getSummary(adminId, 24);
 
         assertNotNull(summary);
+        assertFalse(summary.canExport());
         assertEquals(8L, summary.accounts().active());
         assertEquals(3L, summary.ai().distinctActiveUsersLast24Hours());
         assertEquals(2L, summary.consent().termsLast24Hours());

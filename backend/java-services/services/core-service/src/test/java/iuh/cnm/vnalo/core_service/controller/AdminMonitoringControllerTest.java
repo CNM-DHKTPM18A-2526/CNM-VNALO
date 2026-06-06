@@ -56,6 +56,7 @@ class AdminMonitoringControllerTest {
         AdminMonitoringSummaryResponse summary = new AdminMonitoringSummaryResponse(
                 Instant.now(),
                 "RBAC_DB",
+                true,
                 new AdminMonitoringSummaryResponse.AccountStats(1, 1, 0, 0, 0, 0, 0),
                 new AdminMonitoringSummaryResponse.SessionStats(0, 0, 0),
                 new AdminMonitoringSummaryResponse.AuditStats(0, 0, 0, 0, 0, 0),
