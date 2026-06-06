@@ -1,7 +1,4 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
-
-import { hasAdminMonitoringProfileAccess } from '../../features/auth/adminAccess'
 import { useAuth } from '../../features/auth/useAuth'
 import { useLanguage } from '../i18n/LanguageContext'
 import { Icon } from './Icon'
@@ -12,9 +9,7 @@ type SettingsMenuProps = {
 
 export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
   const { t } = useLanguage()
-  const { logout, user } = useAuth()
-  const navigate = useNavigate()
-  const canOpenDashboard = hasAdminMonitoringProfileAccess(user)
+  const { logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
   const buttonRef = React.useRef<HTMLButtonElement>(null)
@@ -53,9 +48,6 @@ export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
     action()
   }
 
-  const handleOpenDashboard = () => {
-    navigate('/admin/monitoring')
-  }
 
   const handleLogout = () => {
     logout()
@@ -83,23 +75,6 @@ export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
       {isMenuOpen ? (
         <div ref={menuRef} className='settings-menu-popover' role='menu'>
           <div className='settings-menu-items'>
-            {canOpenDashboard ? (
-              <>
-                <button
-                  className='settings-menu-item'
-                  role='menuitem'
-                  onClick={() => handleMenuItemClick(handleOpenDashboard)}
-                >
-                  <span className='settings-menu-item-icon' aria-hidden='true'>
-                    <Icon name='layoutDashboard' />
-                  </span>
-                  <span className='settings-menu-item-label'>Dashboard</span>
-                </button>
-
-                <div className='settings-menu-divider' />
-              </>
-            ) : null}
-
             <button
               className='settings-menu-item'
               role='menuitem'

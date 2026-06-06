@@ -46,6 +46,34 @@ export interface AnalyticsDashboardResponse {
   topActiveUsers: TopActiveUserResponse[]
 }
 
+export interface EventCountResponse {
+  key: string
+  count: number
+}
+
+export interface BehavioralAnalyticsSummaryResponse {
+  eventsTotal: number
+  activeUsers: number
+  sessionsStarted: number
+  sessionsEnded: number
+  screenViews: number
+  featureUses: number
+  clientErrors: number
+  apiErrors: number
+  aiPrompts: number
+  aiFailures: number
+  faceAuthAttempts: number
+  activeUsersLast5Minutes: number
+  activeUsersLast30Minutes: number
+  averageSessionDurationMinutes: number
+  medianSessionDurationMinutes: number
+  p95SessionDurationMinutes: number
+  topEvents: EventCountResponse[]
+  topScreens: EventCountResponse[]
+  topFeatures: EventCountResponse[]
+  hourlyUsage: EventCountResponse[]
+}
+
 export interface BackfillJobResponse {
   jobId: string
   fromDate: string
@@ -74,6 +102,7 @@ export interface ApiResponse<T> {
 export interface MonitoringSummary {
   generatedAt?: string
   accessMode?: string
+  canExport?: boolean
   accounts?: {
     total?: number
     active?: number

@@ -174,9 +174,7 @@ export function RegisterPage() {
         <header className='auth-branding'>
           <span className='auth-brand-badge'>Vnalo</span>
           <p className='auth-brand-subtitle'>
-            {t('auth.registerHeroTitle')}<br/>
-            <span style={{ fontSize: 13, color: '#666' }}>{t('auth.registerHeroCopy').length > 50 ? t('auth.registerHeroCopy').slice(0, 50) + '...' : t('auth.registerHeroCopy')}</span>
-          </p>
+            {t('auth.registerHeroTitle')}</p>
         </header>
 
         <div className='auth-card'>
@@ -271,7 +269,7 @@ export function RegisterPage() {
 
                 {errorMessage && <p className='auth-form-error'>{errorMessage}</p>}
 
-                <button type='submit' disabled={isSubmitting}>
+                <button type='submit' disabled={isSubmitting || !form.acceptLegal}>
                   {isSubmitting ? t('auth.sendingOtp') : t('auth.receiveOtpButton')}
                 </button>
 

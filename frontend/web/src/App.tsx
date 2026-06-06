@@ -22,6 +22,7 @@ import StoryViewerPage from './features/social/pages/StoryViewerPage'
 import { UserStoreProvider } from './features/chat/context/UserStoreContext'
 import { NotificationProvider } from './features/notifications/NotificationContext'
 import { AiAssistantProvider } from './features/ai-assistant/AiAssistantProvider'
+import { BehavioralAnalyticsTracker } from './features/analytics/tracking/BehavioralAnalyticsTracker'
 import './styles/app.css'
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
     <UserStoreProvider>
       <NotificationProvider>
         <AiAssistantProvider>
+        <BehavioralAnalyticsTracker />
         <Routes>
           <Route path='/login' element={isAuthenticated ? <Navigate replace to='/chat' /> : <LoginPage />} />
           <Route path='/login/qr' element={isAuthenticated ? <Navigate replace to='/chat' /> : <QrLoginPage />} />
@@ -52,7 +54,6 @@ function App() {
             <Route path='profile' element={<ProfilePage />} />
             <Route path='chat-ai' element={<Navigate replace to='/chat/vnalo-ai-assistant' />} />
             <Route path='social' element={<SocialPage />} />
-            <Route path='admin/monitoring' element={<AdminDashboardPage />} />
             <Route path='stories/create' element={<CreateStoryPage />} />
             <Route path='stories/:storyId' element={<StoryViewerPage />} />
           </Route>
@@ -66,7 +67,8 @@ function App() {
             }
           >
             <Route index element={<Navigate replace to='/admin/monitoring' />} />
-            <Route path='monitoring' element={<AdminMonitoringPage />} />
+            <Route path='monitoring' element={<AdminDashboardPage />} />
+            <Route path='monitoring/legacy' element={<AdminMonitoringPage />} />
           </Route>
 
           <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />

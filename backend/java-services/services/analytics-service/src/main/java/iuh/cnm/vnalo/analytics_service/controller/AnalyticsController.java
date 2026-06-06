@@ -1,6 +1,7 @@
 package iuh.cnm.vnalo.analytics_service.controller;
 
 import iuh.cnm.vnalo.analytics_service.model.dto.ApiResponse;
+import iuh.cnm.vnalo.analytics_service.model.dto.request.ClientAnalyticsEventRequest;
 import iuh.cnm.vnalo.analytics_service.model.dto.response.*;
 import iuh.cnm.vnalo.analytics_service.security.AnalyticsAccessGuardService;
 import iuh.cnm.vnalo.analytics_service.security.AnalyticsPrincipal;
@@ -8,19 +9,24 @@ import iuh.cnm.vnalo.analytics_service.service.AnalyticsBreakdownService;
 import iuh.cnm.vnalo.analytics_service.service.AnalyticsDashboardService;
 import iuh.cnm.vnalo.analytics_service.service.AnalyticsOverviewService;
 import iuh.cnm.vnalo.analytics_service.service.AnalyticsTrendService;
+import iuh.cnm.vnalo.analytics_service.service.BehavioralAnalyticsService;
 import iuh.cnm.vnalo.analytics_service.model.dto.response.BackfillJobResponse;
 import iuh.cnm.vnalo.analytics_service.service.BackfillJobService;
 import iuh.cnm.vnalo.analytics_service.validator.DateRangeValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/analytics")
@@ -31,8 +37,30 @@ public class AnalyticsController {
     private final AnalyticsOverviewService overviewService;
     private final AnalyticsTrendService trendService;
     private final AnalyticsBreakdownService breakdownService;
-        private final AnalyticsDashboardService dashboardService;
-                private final BackfillJobService backfillJobService;
+    private final AnalyticsDashboardService dashboardService;
+    private final BackfillJobService backfillJobService;
+    private final BehavioralAnalyticsService behavioralAnalyticsService;
+
+    @PostMapping("/events")
+    public ApiResponse<Map<String, UUID>> ingestClientEvent(
+            @AuthenticationPrincipal AnalyticsPrincipal principal,
+            @Valid @RequestBody ClientAnalyticsEventRequest request
+    ) {
+        UUID eventId = behavioralAnalyticsService.ingestClientEvent(principal.getUserId(), request);
+        return ApiResponse.success("Client analytics event recorded", Map.of("eventId", eventId));
+    }
+
+    @GetMapping("/behavior/summary")
+    public ApiResponse<BehavioralAnalyticsSummaryResponse> getBehavioralSummary(
+            @AuthenticationPrincipal AnalyticsPrincipal principal,
+            @RequestParam LocalDate from,
+            @RequestParam LocalDate to
+    ) {
+        accessGuardService.requireAnalyticsAccess(principal.getUserId());
+        dateRangeValidator.validate(from, to);
+        return ApiResponse.success("Behavioral analytics summary fetched successfully",
+                behavioralAnalyticsService.getSummary(from, to));
+    }
 
     @GetMapping("/overview")
     public ApiResponse<AnalyticsOverviewResponse> getOverview(

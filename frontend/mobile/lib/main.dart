@@ -32,6 +32,7 @@ import 'package:vnalo_mobile/features/call/widgets/incoming_call_coordinator.dar
 import 'package:vnalo_mobile/features/call/services/group_call_tracker.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
+import 'package:vnalo_mobile/services/analytics_lifecycle_tracker.dart';
 import 'package:vnalo_mobile/services/content_service.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_compose_draft_bus.dart';
@@ -310,7 +311,7 @@ class VnaloApp extends StatelessWidget {
               final content = child ?? const SizedBox.shrink();
               return Stack(
                 children: [
-                  content,
+                  AnalyticsLifecycleTracker(child: content),
                   const IncomingCallCoordinator(),
                   const AiFloatingBubble(),
                 ],

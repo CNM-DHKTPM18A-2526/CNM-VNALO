@@ -5,6 +5,7 @@ import java.time.Instant;
 public record AdminMonitoringSummaryResponse(
         Instant generatedAt,
         String accessMode,
+        boolean canExport,
         AccountStats accounts,
         SessionStats sessions,
         AuditStats audits,
