@@ -312,6 +312,54 @@ body.theme-dark .auth-lang-btn:hover {
   margin-bottom: 20px;
 }
 
+.auth-terms-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--auth-text-sub);
+  line-height: 1.5;
+  cursor: pointer;
+  text-align: left;
+}
+
+.auth-terms-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--auth-primary);
+  cursor: pointer;
+}
+
+.auth-terms-text {
+  line-height: 1.5;
+}
+
+.auth-legal-consent {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--auth-text-sub);
+}
+
+.auth-legal-consent a {
+  color: var(--auth-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-terms-link {
+  color: var(--auth-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-terms-link:hover,
+.auth-legal-consent a:hover {
+  text-decoration: underline;
+}
+
 /* Mobile Responsive - Ensure scrolling works on small screens */
 @media (max-width: 480px) {
   .auth-page {

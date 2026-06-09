@@ -18,6 +18,7 @@ type RegisterFormState = {
   gender: Gender | ''
   password: string
   confirmPassword: string
+  agreeTerms: boolean
 }
 
 type RegisterErrors = Partial<Record<keyof RegisterFormState | 'otpCode', string>>
@@ -73,6 +74,8 @@ function validateRegisterForm(values: RegisterFormState): RegisterErrors {
 
   if (values.confirmPassword !== values.password) errors.confirmPassword = 'Mật khẩu chưa khớp'
 
+  if (!values.agreeTerms) errors.agreeTerms = 'Bạn cần đồng ý với điều khoản sử dụng'
+
   return errors
 }
 
@@ -89,6 +92,7 @@ export function RegisterPage() {
     gender: '',
     password: '',
     confirmPassword: '',
+    agreeTerms: false,
   })
   const [otpCode, setOtpCode] = React.useState('')
   const [normalizedPhone, setNormalizedPhone] = React.useState('')
@@ -246,6 +250,23 @@ export function RegisterPage() {
                 />
                 {errors.confirmPassword && <span className='auth-field-error'>{errors.confirmPassword}</span>}
 
+                <label className='auth-terms-row'>
+                  <input
+                    className='auth-terms-checkbox'
+                    type='checkbox'
+                    checked={form.agreeTerms}
+                    onChange={(e) => setField('agreeTerms', e.target.checked)}
+                  />
+                  <span className='auth-terms-text'>
+                    {t('auth.termsLabel')}
+                    {' '}
+                    <Link className='auth-terms-link' to='/legal/terms' target='_blank' rel='noopener noreferrer'>{t('auth.termsLinkLabel')}</Link>
+                    {' '}&{' '}
+                    <Link className='auth-terms-link' to='/legal/privacy' target='_blank' rel='noopener noreferrer'>{t('auth.privacyLinkLabel')}</Link>
+                  </span>
+                </label>
+                {errors.agreeTerms && <span className='auth-field-error'>{errors.agreeTerms}</span>}
+
                 {errorMessage && <p className='auth-form-error'>{errorMessage}</p>}
 
                 <button type='submit' disabled={isSubmitting}>
@@ -254,6 +275,11 @@ export function RegisterPage() {
 
                 <p className='auth-switch-copy'>
                   {t('auth.alreadyHaveAccount')} <Link to='/login' style={{ color: '#0068ff', textDecoration: 'none', fontWeight: 500 }}>{t('auth.signInNow')}</Link>
+                </p>
+
+                <p className='auth-legal-consent'>
+                  <Link to='/legal/terms'>{t('auth.termsLinkLabel')}</Link>{' '}·{' '}
+                  <Link to='/legal/privacy'>{t('auth.privacyLinkLabel')}</Link>
                 </p>
               </form>
             ) : (
