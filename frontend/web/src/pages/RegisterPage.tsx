@@ -258,12 +258,14 @@ export function RegisterPage() {
                     type='checkbox'
                     checked={form.acceptLegal}
                     onChange={(e) => setField('acceptLegal', e.target.checked)}
-                    style={{ marginRight: 8 }}
                   />
-                  {t('auth.termsPrefix')}{' '}
-                  <Link to='/legal/terms'>{t('auth.termsLinkLabel')}</Link>{' '}
-                  {t('auth.andConnector')}{' '}
-                  <Link to='/legal/privacy'>{t('auth.privacyLinkLabel')}</Link>.
+                  <span className='auth-legal-box' aria-hidden='true' />
+                  <span className='auth-legal-text'>
+                    {t('auth.termsPrefix')}{' '}
+                    <Link to='/legal/terms'>{t('auth.termsLinkLabel')}</Link>{' '}
+                    {t('auth.andConnector')}{' '}
+                    <Link to='/legal/privacy'>{t('auth.privacyLinkLabel')}</Link>.
+                  </span>
                 </label>
                 {errors.acceptLegal && <span className='auth-field-error'>{errors.acceptLegal}</span>}
 
