@@ -341,6 +341,7 @@ body.theme-dark .auth-lang-btn:hover {
   }
 }
 
+.auth-form label.auth-legal-consent,
 .auth-legal-consent {
   display: grid;
   grid-template-columns: 18px 1fr;
@@ -361,6 +362,7 @@ body.theme-dark .auth-lang-btn:hover {
 }
 
 .auth-legal-box {
+  display: block;
   width: 17px;
   height: 17px;
   border: 1.5px solid var(--auth-input-border);
